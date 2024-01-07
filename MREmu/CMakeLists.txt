@@ -8,3 +8,4 @@ endif()
 
 target_link_libraries(MREmu sfml-graphics)
 target_link_libraries(MREmu imgui)
+target_link_libraries(MREmu unicorn)
