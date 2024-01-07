@@ -10,3 +10,5 @@ target_link_libraries(MREmu sfml-graphics)
 target_link_libraries(MREmu imgui)
 target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu capstone)
+
+target_include_directories(MREmu PUBLIC "../include")
