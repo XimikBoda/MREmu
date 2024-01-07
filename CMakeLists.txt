@@ -12,4 +12,10 @@ endif()
 project ("MREmu")
 
 # Include sub-projects.
-add_subdirectory ("MREmu")
+add_subdirectory (imgui)
+
+set(BUILD_SHARED_LIBS FALSE) 
+add_subdirectory(SFML) 
+
+
+add_subdirectory (MREmu)
