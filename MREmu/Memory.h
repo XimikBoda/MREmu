@@ -12,11 +12,11 @@
 #endif
 
 #ifdef X64MODE
-#define ADRESS_TO_EMU(x) ((uint32_t)(uint64_t(x)+shared_memory_offset))
-#define ADRESS_FROM_EMU(x) ((void*)((x)+shared_memory_offset))
+#define ADDRESS_TO_EMU(x) ((uint32_t)(uint64_t(x)-shared_memory_offset))
+#define ADDRESS_FROM_EMU(x) ((void*)((x)+shared_memory_offset))
 #else
-#define ADRESS_TO_EMU(x) (x)
-#define ADRESS_FROM_EMU(x) (x)
+#define ADDRESS_TO_EMU(x) (x)
+#define ADDRESS_FROM_EMU(x) (x)
 #endif // X64MODE
 
 extern void* shared_memory_prt;
