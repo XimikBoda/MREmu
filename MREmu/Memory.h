@@ -19,7 +19,10 @@
 #define ADRESS_FROM_EMU(x) (x)
 #endif // X64MODE
 
+extern void* shared_memory_prt;
 extern uint64_t shared_memory_offset;
+extern size_t shared_memory_size;
+extern size_t shared_memory_in_emu_start;
 
 
 

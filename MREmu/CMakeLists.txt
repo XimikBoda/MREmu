@@ -1,6 +1,11 @@
 ﻿cmake_minimum_required (VERSION 3.8)
 
-add_executable (MREmu "MREmu.cpp" "MREmu.h" "Memory.cpp" "Cpu.cpp" "Cpu.h")
+add_executable (MREmu 
+						"MREmu.cpp" "MREmu.h" 
+						"Memory.cpp" "Memory.h" 
+						"Cpu.cpp" "Cpu.h" 
+						"App.cpp" "App.h" 
+						"MreTags.cpp" "MreTags.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREmu PROPERTY CXX_STANDARD 20)
