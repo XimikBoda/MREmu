@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-void App::preparation_and_start()
+void App::preparation()
 {
 	bool is_ads = tags.is_ads();
 	bool is_zipped = tags.is_zipped();
@@ -14,6 +14,8 @@ void App::preparation_and_start()
 	mem_location = Memory::shared_malloc(mem_size, 0x100000);
 	memset(mem_location, 0, mem_size);
 
+	offset_mem = ADDRESS_TO_EMU(mem_location);
+
 	if (!is_zipped)
 	{
 		{
@@ -22,6 +24,8 @@ void App::preparation_and_start()
 			if (!elf.load(ss))
 				abort();
 		}
+
+		entry_point = (elf.get_entry() + offset_mem);
 
 		segments_size = 0;
 		for (int i = 0; i < elf.segments.size(); ++i) {
@@ -35,6 +39,29 @@ void App::preparation_and_start()
 
 			segments_size = std::max<size_t>(segments_size,
 				pseg->get_virtual_address() + pseg->get_memory_size());
+		}
+
+		for (int i = 0; i < elf.sections.size(); ++i) {
+			ELFIO::section* psec = elf.sections[i];
+
+			if (psec->get_name() == std::string(".rel.dyn") || psec->get_name() == std::string(".rel.plt")) {
+				ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_address()]; //TODO
+				for (int i = 0; i < psec->get_size() / sizeof(ELFIO::Elf32_Rel); ++i) {
+					switch (sym[i].r_info & 0xFF) {
+					case 0x17:
+						*(uint32_t*)((unsigned char*)mem_location + sym[i].r_offset) += offset_mem;
+						break;
+					case 0x02:
+					case 0x16:
+						*(uint32_t*)((unsigned char*)mem_location + sym[i].r_offset) = 0;
+						break;
+					}
+				}
+			}
+			if (psec->get_name() == std::string(".vm_res")) {
+				res_offset = psec->get_offset();
+				res_size = psec->get_size();
+			}
 		}
 
 	}

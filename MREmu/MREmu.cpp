@@ -14,7 +14,7 @@ int main() {
 
     App app;
     app.load_from_file("3D_test.vxp");
-    app.preparation_and_start();
+    app.preparation();
 
     return 0;
 }

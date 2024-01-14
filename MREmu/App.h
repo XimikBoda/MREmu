@@ -15,11 +15,16 @@ public:
 	MreTags tags;
 
 	void* mem_location = 0;
+	size_t offset_mem;
 	size_t mem_size;
 	size_t segments_size;
 
+	uint32_t entry_point;
+	uint32_t res_offset;
+	uint32_t res_size;
+
 	ELFIO::elfio elf;
 
-	void preparation_and_start();
+	void preparation();
 	bool load_from_file(fs::path path);//tmp
 };
