@@ -5,8 +5,8 @@
 
 void App::preparation()
 {
-	bool is_ads = tags.is_ads();
-	bool is_zipped = tags.is_zipped();
+	is_ads = tags.is_ads();
+	is_zipped = tags.is_zipped();
 
 	mem_size = tags.get_ram() * 1024;
 	mem_size = std::max<size_t>(512 * 1024, mem_size);
@@ -63,7 +63,6 @@ void App::preparation()
 				res_size = psec->get_size();
 			}
 		}
-
 	}
 	else
 	{
@@ -71,6 +70,21 @@ void App::preparation()
 		abort();
 	}
 }
+
+void App::start()
+{
+	if (is_ads) {
+		uint32_t *init_params = (uint32_t*)((unsigned char*)mem_location + mem_size - 6*4); //TODO move to another place
+
+		init_params[0] = offset_mem + segments_size; //I'll have to figure out exactly how it works
+		init_params[1] = 0; //vm_get_sym_entry from bridge
+		init_params[2] = init_params[0] + 1024;
+		init_params[3] = init_params[2] + 2 * 1024;
+		init_params[4] = 3 * 1024;
+		init_params[5] = entry_point;
+	}
+}
+
 
 bool App::load_from_file(fs::path path)
 {
@@ -84,3 +98,4 @@ bool App::load_from_file(fs::path path)
 	in.close();
 	tags.load(file_context);
 }
+

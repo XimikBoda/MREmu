@@ -23,8 +23,12 @@ public:
 	uint32_t res_offset;
 	uint32_t res_size;
 
+	bool is_ads;
+	bool is_zipped;
+
 	ELFIO::elfio elf;
 
 	void preparation();
+	void start();
 	bool load_from_file(fs::path path);//tmp
 };
