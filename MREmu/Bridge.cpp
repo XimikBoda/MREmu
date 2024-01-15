@@ -1,14 +1,15 @@
 #include "Bridge.h"
 #include "Memory.h"
 #include <string>
+#include <iostream>
 #include <unicorn/unicorn.h>
 
-const unsigned char bxlr[2] = { 0x70, 0x47 }
+const unsigned char bxlr[2] = { 0x70, 0x47 };
 
 extern uc_engine * uc;
 uc_hook trace;
 
-namespace Brigge {
+namespace Bridge {
 	struct br_func {
 		std::string name;
 		void (*f)(uc_engine* uc);
@@ -51,12 +52,12 @@ namespace Brigge {
 
 
 	void br_vm_get_sym_entry(uc_engine* uc) {
-		write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(0))));
+		write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 	}
 
 	std::vector<br_func> func_map =
 	{
-		"vm_get_sym_entry", br_vm_get_sym_entry();
+		{"vm_get_sym_entry", br_vm_get_sym_entry},
 	};
 
 	int vm_get_sym_entry(char* symbol) {
@@ -70,7 +71,7 @@ namespace Brigge {
 				break;
 			}
 
-		cout << "vm_get_sym_entry(\"" << str << "\") -> " << ret << " \n";
+		std::cout << "vm_get_sym_entry(\"" << str << "\") -> " << ret << " \n";
 
 		return ret;
 	}
@@ -84,7 +85,7 @@ namespace Brigge {
 		func_map[ind].f(uc);
 	}
 
-	int init() {
+	void init() {
 		size_t func_count = func_map.size();
 
 		func_ptr = (unsigned char*)Memory::shared_malloc(func_count * 2);
