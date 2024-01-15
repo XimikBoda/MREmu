@@ -1,5 +1,6 @@
 #include "App.h"
 #include "Memory.h"
+#include "Bridge.h"
 #include <fstream>
 #include <sstream>
 
@@ -35,7 +36,7 @@ void App::preparation()
 				abort();
 
 			memcpy((unsigned char*)mem_location + pseg->get_virtual_address(),
-				file_context.data() + pseg->get_offset(), pseg->get_memory_size());
+				file_context.data() + pseg->get_offset(), pseg->get_file_size());
 
 			segments_size = std::max<size_t>(segments_size,
 				pseg->get_virtual_address() + pseg->get_memory_size());
@@ -82,6 +83,10 @@ void App::start()
 		init_params[3] = init_params[2] + 2 * 1024;
 		init_params[4] = 3 * 1024;
 		init_params[5] = entry_point;
+	}
+	else {
+		uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
+		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);
 	}
 }
 

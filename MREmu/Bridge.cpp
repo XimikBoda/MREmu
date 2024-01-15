@@ -5,8 +5,9 @@
 #include <unicorn/unicorn.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
+const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
 
-extern uc_engine * uc;
+extern uc_engine* uc;
 uc_hook trace;
 
 namespace Bridge {
@@ -16,6 +17,7 @@ namespace Bridge {
 	};
 
 	unsigned char* func_ptr;
+	uint32_t idle_p = 0;
 
 	static unsigned int read_reg(uc_engine* uc, int reg) {
 		unsigned int r = 0;
@@ -60,7 +62,7 @@ namespace Bridge {
 		{"vm_get_sym_entry", br_vm_get_sym_entry},
 	};
 
-	int vm_get_sym_entry(char* symbol) {
+	int vm_get_sym_entry(const char* symbol) {
 		std::string str = symbol;
 
 		int ret = 0;
@@ -71,7 +73,7 @@ namespace Bridge {
 				break;
 			}
 
-		std::cout << "vm_get_sym_entry(\"" << str << "\") -> " << ret << " \n";
+		printf("vm_get_sym_entry(%s) -> %08x\n", symbol, ret);
 
 		return ret;
 	}
@@ -88,12 +90,39 @@ namespace Bridge {
 	void init() {
 		size_t func_count = func_map.size();
 
-		func_ptr = (unsigned char*)Memory::shared_malloc(func_count * 2);
+		func_ptr = (unsigned char*)Memory::shared_malloc(func_count * 2 + 2);
 
 		for (int i = 0; i < func_count; ++i)
 			func_ptr[i * 2] = bxlr[0], func_ptr[i * 2 + 1] = bxlr[1];
 
+		func_ptr[func_count * 2] = idle_bin[0], func_ptr[func_count * 2 + 1] = idle_bin[1];
+
+		idle_p = ADDRESS_TO_EMU(func_ptr + func_count * 2) | 1;
+
 		uc_hook_add(uc, &trace, UC_HOOK_CODE, bridge_hoock, 0,
-			ADDRESS_TO_EMU(func_ptr), ADDRESS_TO_EMU(func_ptr + func_count * 2));
+			ADDRESS_TO_EMU(func_ptr), ADDRESS_TO_EMU(func_ptr + func_count * 2 - 1));
+	}
+
+	int run_cpu(unsigned int adr, int n, ...) {
+		va_list factor;
+
+		va_start(factor, adr);
+		if (n > 4)
+			throw 1;
+		for (int i = 0; i < n; i++) {
+			unsigned int t = va_arg(factor, unsigned int);
+			if (i >= 0)
+				uc_reg_write(uc, UC_ARM_REG_R0 + i, &t);
+		}
+		va_end(factor);
+		//write_reg(uc, UC_ARM_REG_LR, (uint64_t)stack_p);
+		write_reg(uc, UC_ARM_REG_LR, (uint64_t)idle_p);
+		uc_err err = uc_emu_start(uc, (adr), (uint64_t)idle_p & ~1, 0, 0);
+		if (err) {
+			printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+		}
+		unsigned int r0 = 0;
+		uc_reg_read(uc, UC_ARM_REG_R0, &r0);
+		return r0;
 	}
 }
