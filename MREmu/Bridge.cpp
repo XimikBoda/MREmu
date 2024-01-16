@@ -4,6 +4,8 @@
 #include <iostream>
 #include <unicorn/unicorn.h>
 
+#include <vmgraph.h>
+
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
 
@@ -57,9 +59,29 @@ namespace Bridge {
 		write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 	}
 
+	void br_vm_malloc(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(vm_malloc(read_arg(uc, 0))));
+	}
+
+	void br_vm_free(uc_engine* uc) {
+		vm_free((char*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+	}
+
+	void br_vm_graphic_get_screen_width(uc_engine* uc) {
+		write_ret(uc, vm_graphic_get_screen_width());
+	}
+
+	void br_vm_graphic_get_screen_height(uc_engine* uc) {
+		write_ret(uc, vm_graphic_get_screen_width());
+	}
+
 	std::vector<br_func> func_map =
 	{
 		{"vm_get_sym_entry", br_vm_get_sym_entry},
+		{"vm_malloc", br_vm_malloc},
+		{"vm_free", br_vm_free},
+		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
+		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
 	};
 
 	int vm_get_sym_entry(const char* symbol) {

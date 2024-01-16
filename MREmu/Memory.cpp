@@ -51,6 +51,17 @@ namespace Memory {
 		shared_memory.free((size_t)addr);
 	}
 
+	void* app_malloc(int size) {
+		MemoryManager &mm = get_current_app_memory();
+		return (void*)mm.malloc(size);
+	}
+
+	void app_free(void* addr)
+	{
+		MemoryManager& mm = get_current_app_memory();
+		mm.free((size_t)addr);
+	}
+
 	void deinit()
 	{
 		_aligned_free(shared_memory_prt);

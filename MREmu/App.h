@@ -1,5 +1,6 @@
 #pragma once
 #include "MreTags.h"
+#include "Memory.h"
 #include <filesystem>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -27,6 +28,8 @@ public:
 	bool is_zipped;
 
 	ELFIO::elfio elf;
+
+	Memory::MemoryManager app_memory;
 
 	void preparation();
 	void start();

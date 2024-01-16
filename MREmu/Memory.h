@@ -24,8 +24,6 @@ extern uint64_t shared_memory_offset;
 extern size_t shared_memory_size;
 extern size_t shared_memory_in_emu_start;
 
-
-
 namespace Memory {
 	class MemoryManager {
 		struct memory_region_t {
@@ -49,4 +47,9 @@ namespace Memory {
 	void init(size_t shared_memory_size);
 	void* shared_malloc(size_t size, size_t align = 8);
 	void shared_free(void* addr);
+
+	void* app_malloc(int size);
+	void app_free(void* addr);
 }
+
+Memory::MemoryManager& get_current_app_memory();

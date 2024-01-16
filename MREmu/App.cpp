@@ -4,8 +4,12 @@
 #include <fstream>
 #include <sstream>
 
+static App* app_tmp = 0; //delete this
+
 void App::preparation()
 {
+	app_tmp = this;
+
 	is_ads = tags.is_ads();
 	is_zipped = tags.is_zipped();
 
@@ -70,6 +74,9 @@ void App::preparation()
 		printf("zipped files is not realized\n");
 		abort();
 	}
+
+	app_memory = Memory::MemoryManager((size_t)mem_location, mem_size);
+	app_memory.malloc(segments_size); // for "protect" code
 }
 
 void App::start()
@@ -104,3 +111,6 @@ bool App::load_from_file(fs::path path)
 	tags.load(file_context);
 }
 
+Memory::MemoryManager& get_current_app_memory() { //TODO: move to app manager
+	return app_tmp->app_memory;
+}
