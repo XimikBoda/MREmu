@@ -20,5 +20,6 @@ target_link_libraries(MREmu capstone)
 target_link_libraries(MREmu MREngine)
 
 target_include_directories(MREmu PUBLIC "../include")
+target_include_directories(MREmu PUBLIC "MREngine")
 
 add_subdirectory (MREngine)

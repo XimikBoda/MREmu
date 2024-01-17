@@ -4,7 +4,8 @@
 #include <iostream>
 #include <unicorn/unicorn.h>
 
-#include <vmgraph.h>
+#include <Graphic.h>
+#include <System.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };

@@ -1,5 +1,4 @@
 #include "Graphic.h"
-#include <vmgraph.h>
 
 static MREngine::Graphic *graphic = 0;
 

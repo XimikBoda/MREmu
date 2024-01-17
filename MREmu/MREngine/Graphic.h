@@ -1,5 +1,6 @@
 #pragma once
 
+#include "System.h"
 
 namespace MREngine {
 	class Graphic {
@@ -13,3 +14,7 @@ namespace MREngine {
 		~Graphic();
 	};
 }
+
+// MRE API
+VMINT vm_graphic_get_screen_width(void);
+VMINT vm_graphic_get_screen_height(void);
