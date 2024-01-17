@@ -1,6 +1,8 @@
 #pragma once
 #include "MreTags.h"
 #include "Memory.h"
+#include "MREngine/System.h"
+#include "MREngine/Resources.h"
 #include <filesystem>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -21,8 +23,6 @@ public:
 	size_t segments_size;
 
 	uint32_t entry_point;
-	uint32_t res_offset;
-	uint32_t res_size;
 
 	bool is_ads;
 	bool is_zipped;
@@ -30,6 +30,8 @@ public:
 	ELFIO::elfio elf;
 
 	Memory::MemoryManager app_memory;
+	MREngine::SystemCallbacks system_callbacks;
+	MREngine::Resources resources;
 
 	void preparation();
 	void start();

@@ -10,6 +10,8 @@ void App::preparation()
 {
 	app_tmp = this;
 
+	resources.file_context = &file_context;
+
 	is_ads = tags.is_ads();
 	is_zipped = tags.is_zipped();
 
@@ -64,8 +66,8 @@ void App::preparation()
 				}
 			}
 			if (psec->get_name() == std::string(".vm_res")) {
-				res_offset = psec->get_offset();
-				res_size = psec->get_size();
+				resources.offset = psec->get_offset();
+				resources.size = psec->get_size();
 			}
 		}
 	}
@@ -77,6 +79,8 @@ void App::preparation()
 
 	app_memory = Memory::MemoryManager((size_t)mem_location, mem_size);
 	app_memory.malloc(segments_size); // for "protect" code
+
+	resources.scan();
 }
 
 void App::start()
@@ -113,4 +117,12 @@ bool App::load_from_file(fs::path path)
 
 Memory::MemoryManager& get_current_app_memory() { //TODO: move to app manager
 	return app_tmp->app_memory;
+}
+
+MREngine::SystemCallbacks& get_current_app_system_callbacks() {
+	return app_tmp->system_callbacks;
+}
+
+MREngine::Resources& get_current_app_resources() {
+	return app_tmp->resources;
 }

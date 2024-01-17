@@ -2,7 +2,8 @@
 
 add_library (MREngine 
 						"Graphic.cpp" "Graphic.h"
-						"System.cpp" "System.h" )
+						"System.cpp" "System.h" 
+						"Resources.cpp" "Resources.h")
 
 target_link_libraries(MREngine sfml-graphics)
 target_link_libraries(MREngine imgui)

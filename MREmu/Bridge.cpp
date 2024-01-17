@@ -5,6 +5,7 @@
 #include <unicorn/unicorn.h>
 
 #include <vmgraph.h>
+#include <vmres.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
@@ -64,7 +65,11 @@ namespace Bridge {
 	}
 
 	void br_vm_free(uc_engine* uc) {
-		vm_free((char*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+		vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+	}
+
+	void br_vm_reg_sysevt_callback(uc_engine* uc) {
+		vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
 	}
 
 	void br_vm_graphic_get_screen_width(uc_engine* uc) {
@@ -75,13 +80,23 @@ namespace Bridge {
 		write_ret(uc, vm_graphic_get_screen_width());
 	}
 
+	void br_vm_load_resource(uc_engine* uc) {
+		write_ret(uc, 
+			ADDRESS_TO_EMU(vm_load_resource(
+				(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+			)));
+	}
+
 	std::vector<br_func> func_map =
 	{
 		{"vm_get_sym_entry", br_vm_get_sym_entry},
 		{"vm_malloc", br_vm_malloc},
 		{"vm_free", br_vm_free},
+		{"vm_reg_sysevt_callback", br_vm_reg_sysevt_callback},
 		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
 		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
+		{"vm_load_resource", br_vm_load_resource},
 	};
 
 	int vm_get_sym_entry(const char* symbol) {
