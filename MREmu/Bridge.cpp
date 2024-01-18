@@ -1,5 +1,6 @@
 #include "Bridge.h"
 #include "Memory.h"
+#include "ARModule.h"
 #include <string>
 #include <iostream>
 #include <unicorn/unicorn.h>
@@ -21,6 +22,8 @@ namespace Bridge {
 
 	unsigned char* func_ptr;
 	uint32_t idle_p = 0;
+
+	ARModule armodule;
 
 	static unsigned int read_reg(uc_engine* uc, int reg) {
 		unsigned int r = 0;
@@ -88,6 +91,20 @@ namespace Bridge {
 			)));
 	}
 
+	//ARModule
+
+	void br_armodule_malloc(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(armodule.app_memory.malloc(read_arg(uc, 0))));
+	}
+
+	void br_armodule_realloc(uc_engine* uc) {
+		//write_ret(uc, ADDRESS_TO_EMU(armodule.app_memory.malloc(read_arg(uc, 0))));
+	}
+
+	void br_armodule_free(uc_engine* uc) {
+		vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+	}
+
 	std::vector<br_func> func_map =
 	{
 		{"vm_get_sym_entry", br_vm_get_sym_entry},
@@ -97,6 +114,9 @@ namespace Bridge {
 		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
 		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
 		{"vm_load_resource", br_vm_load_resource},
+		{"armodule_malloc", br_armodule_malloc},
+		{"armodule_realloc", br_armodule_realloc},
+		{"armodule_free", br_armodule_free},
 	};
 
 	int vm_get_sym_entry(const char* symbol) {
@@ -109,6 +129,9 @@ namespace Bridge {
 				ret = (ADDRESS_TO_EMU(func_ptr) + i * 2) | 1;
 				break;
 			}
+
+		if (ret == 0)
+			ret = armodule.vm_get_sym_entry(symbol);
 
 		printf("vm_get_sym_entry(%s) -> %08x\n", symbol, ret);
 
@@ -138,12 +161,16 @@ namespace Bridge {
 
 		uc_hook_add(uc, &trace, UC_HOOK_CODE, bridge_hoock, 0,
 			ADDRESS_TO_EMU(func_ptr), ADDRESS_TO_EMU(func_ptr + func_count * 2 - 1));
+
+		armodule.init(vm_get_sym_entry("armodule_malloc"), 
+			vm_get_sym_entry("armodule_realloc"),
+			vm_get_sym_entry("armodule_free"));
 	}
 
 	int run_cpu(unsigned int adr, int n, ...) {
 		va_list factor;
 
-		va_start(factor, adr);
+		va_start(factor, n);
 		if (n > 4)
 			throw 1;
 		for (int i = 0; i < n; i++) {

@@ -7,7 +7,8 @@ add_executable (MREmu
 						"Bridge.cpp" "Bridge.h" 
 						"App.cpp" "App.h" 
 						"MreTags.cpp" "MreTags.h" 
-						"Disassembler.cpp" "Disassembler.h")
+						"Disassembler.cpp" "Disassembler.h"
+						"ARModule.cpp" "ARModule.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREmu PROPERTY CXX_STANDARD 20)
