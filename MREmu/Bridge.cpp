@@ -66,6 +66,11 @@ namespace Bridge {
 	void br_vm_malloc(uc_engine* uc) {
 		write_ret(uc, ADDRESS_TO_EMU(vm_malloc(read_arg(uc, 0))));
 	}
+	void br_vm_realloc(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(
+			vm_realloc((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1))));
+	}
 
 	void br_vm_free(uc_engine* uc) {
 		vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
@@ -98,17 +103,21 @@ namespace Bridge {
 	}
 
 	void br_armodule_realloc(uc_engine* uc) {
-		//write_ret(uc, ADDRESS_TO_EMU(armodule.app_memory.malloc(read_arg(uc, 0))));
+		write_ret(uc, ADDRESS_TO_EMU(
+			armodule.app_memory.realloc(
+				(size_t)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1))));
 	}
 
 	void br_armodule_free(uc_engine* uc) {
-		vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+		armodule.app_memory.free((size_t)ADDRESS_FROM_EMU(read_arg(uc, 0)));
 	}
 
 	std::vector<br_func> func_map =
 	{
 		{"vm_get_sym_entry", br_vm_get_sym_entry},
 		{"vm_malloc", br_vm_malloc},
+		{"vm_realloc", br_vm_realloc},
 		{"vm_free", br_vm_free},
 		{"vm_reg_sysevt_callback", br_vm_reg_sysevt_callback},
 		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},

@@ -12,8 +12,11 @@
 #endif
 
 #ifdef X64MODE
-#define ADDRESS_TO_EMU(x) ((uint32_t)(uint64_t(x)-shared_memory_offset))
-#define ADDRESS_FROM_EMU(x) ((void*)((x)+shared_memory_offset))
+uint32_t ADDRESS_TO_EMU(void* x);
+uint32_t ADDRESS_TO_EMU(size_t x);
+void* ADDRESS_FROM_EMU(uint32_t x);
+//#define ADDRESS_TO_EMU(x) ((uint32_t)(uint64_t(x)-shared_memory_offset))
+//#define ADDRESS_FROM_EMU(x) ((void*)((x)+shared_memory_offset))
 #else
 #define ADDRESS_TO_EMU(x) (x)
 #define ADDRESS_FROM_EMU(x) (x)
@@ -41,6 +44,8 @@ namespace Memory {
 		size_t malloc(size_t size, size_t align = 8); // align is 8 righd? //todo
 		size_t malloc_topmost(size_t size);
 
+		size_t realloc(size_t addr, size_t size);
+
 		void free(size_t addr);
 	};
 
@@ -49,6 +54,7 @@ namespace Memory {
 	void shared_free(void* addr);
 
 	void* app_malloc(int size);
+	void* app_realloc(void* p, int size);
 	void app_free(void* addr);
 }
 

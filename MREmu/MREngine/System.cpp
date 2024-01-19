@@ -15,6 +15,10 @@ void* vm_calloc(int size) {
 	return adr;
 }
 
+void* vm_realloc(void* p, int size) {
+	return Memory::app_realloc(p, size);
+}
+
 void vm_free(void* ptr) {
 	Memory::app_free(ptr);
 }

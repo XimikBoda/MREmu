@@ -17,6 +17,22 @@ uint64_t shared_memory_offset = NULL;
 size_t shared_memory_size = 0;
 size_t shared_memory_in_emu_start = 0;
 
+#ifdef X64MODE
+uint32_t ADDRESS_TO_EMU(size_t x) {
+	if (x == 0)
+		return 0;
+	return ((uint32_t)(uint64_t(x) - shared_memory_offset));
+}
+uint32_t ADDRESS_TO_EMU(void*x) {
+	return ADDRESS_TO_EMU((size_t)x);
+}
+void* ADDRESS_FROM_EMU(uint32_t x) {
+	if (x == 0)
+		return 0;
+	return ((void*)((x)+shared_memory_offset));
+}
+#endif // X64MODE
+
 namespace Memory {
 	MemoryManager shared_memory;
 
@@ -54,6 +70,11 @@ namespace Memory {
 	void* app_malloc(int size) {
 		MemoryManager &mm = get_current_app_memory();
 		return (void*)mm.malloc(size);
+	}
+
+	void* app_realloc(void* p, int size) {
+		MemoryManager& mm = get_current_app_memory();
+		return (void*)mm.realloc((size_t)p, size);
 	}
 
 	void app_free(void* addr)
@@ -102,10 +123,51 @@ namespace Memory {
 		return 0; //TODO
 	}
 
+	size_t MemoryManager::realloc(size_t addr, size_t size)
+	{
+		if (addr == 0)
+			return malloc(size);
+
+		int mem_ind = -1;
+		for (int i = 0; i < regions.size(); ++i) {
+			if (regions[i].adr == addr) {
+				mem_ind = i;
+				break;
+			}
+		}
+
+		if (size <= regions[mem_ind].size) {
+			free_memory_size += regions[mem_ind].size - size;
+			regions[mem_ind].size = size;
+			return regions[mem_ind].adr;
+		}
+
+		size_t allow_max_size = mem_size - (regions[mem_ind].adr - start_adr);
+		if (mem_ind + 1 < regions.size())
+			allow_max_size = regions[mem_ind + 1].adr - regions[mem_ind].adr;
+
+		if (allow_max_size >= size) {
+			free_memory_size -= size - regions[mem_ind].size;
+			regions[mem_ind].size = size;
+			return regions[mem_ind].adr;
+		}
+
+		size_t new_adr = malloc(size);
+
+		if (new_adr == 0)
+			return 0;
+
+		memcpy((void*)new_adr, (void*)regions[mem_ind].adr, regions[mem_ind].size); //need to be careful
+		free(regions[mem_ind].adr);
+
+		return new_adr;
+	}
+
 	void MemoryManager::free(size_t addr)
 	{
 		for (int i = 0; i < regions.size(); ++i) {
 			if (regions[i].adr == addr) {
+				free_memory_size += regions[i].size;
 				regions.erase(regions.begin() + i);
 				return;
 			}
