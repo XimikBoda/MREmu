@@ -112,7 +112,8 @@ bool App::load_from_file(fs::path path)
 {
 	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
 	if (!in.is_open())
-		return 0;
+		abort();
+		//return 0;
 	size_t file_size = (size_t)in.tellg();
 	in.seekg(0, std::ios::beg);
 	file_context.resize(file_size);
@@ -135,4 +136,8 @@ MREngine::Resources& get_current_app_resources() {
 
 MREngine::AppGraphic& get_current_app_graphic() {
 	return app_tmp->graphic;
+}
+
+MREngine::Timer& get_current_app_timer() {
+	return app_tmp->timer;
 }

@@ -7,6 +7,7 @@
 
 #include <vmgraph.h>
 #include <vmres.h>
+#include <vmtimer.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
@@ -80,6 +81,27 @@ namespace Bridge {
 		vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
 	}
 
+	// Timer
+
+	void br_vm_create_timer(uc_engine* uc) {
+		write_ret(uc, vm_create_timer(read_arg(uc, 0),
+			(VM_TIMERPROC_T)read_arg(uc, 1)));
+	}
+
+	void br_vm_delete_timer(uc_engine* uc) {
+		write_ret(uc, vm_delete_timer(read_arg(uc, 0)));
+	}
+
+	void br_vm_create_timer_ex(uc_engine* uc) {
+		write_ret(uc, vm_create_timer_ex(read_arg(uc, 0),
+			(VM_TIMERPROC_T)read_arg(uc, 1)));
+	}
+
+	void br_vm_delete_timer_ex(uc_engine* uc) {
+		write_ret(uc, vm_delete_timer_ex(read_arg(uc, 0)));
+	}
+
+
 	// Graphic
 
 	void br_vm_graphic_get_screen_width(uc_engine* uc) {
@@ -87,11 +109,11 @@ namespace Bridge {
 	}
 
 	void br_vm_graphic_get_screen_height(uc_engine* uc) {
-		write_ret(uc, vm_graphic_get_screen_width());
+		write_ret(uc, vm_graphic_get_screen_height());
 	}
 
 	void br_vm_graphic_create_layer(uc_engine* uc) {
-		write_ret(uc, 
+		write_ret(uc,
 			vm_graphic_create_layer(
 				read_arg(uc, 0),
 				read_arg(uc, 1),
@@ -107,7 +129,7 @@ namespace Bridge {
 	// Resources
 
 	void br_vm_load_resource(uc_engine* uc) {
-		write_ret(uc, 
+		write_ret(uc,
 			ADDRESS_TO_EMU(vm_load_resource(
 				(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
@@ -134,15 +156,24 @@ namespace Bridge {
 	std::vector<br_func> func_map =
 	{
 		{"vm_get_sym_entry", br_vm_get_sym_entry},
+
 		{"vm_malloc", br_vm_malloc},
 		{"vm_realloc", br_vm_realloc},
 		{"vm_free", br_vm_free},
 		{"vm_reg_sysevt_callback", br_vm_reg_sysevt_callback},
+
+		{"vm_create_timer", br_vm_create_timer},
+		{"vm_delete_timer", br_vm_delete_timer},
+		{"vm_create_timer_ex", br_vm_create_timer_ex},
+		{"vm_delete_timer_ex", br_vm_delete_timer_ex}, // done
+
 		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
 		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
 		{"vm_graphic_create_layer", br_vm_graphic_create_layer},
 		{"vm_graphic_get_layer_buffer", br_vm_graphic_get_layer_buffer},
+
 		{"vm_load_resource", br_vm_load_resource},
+
 		{"armodule_malloc", br_armodule_malloc},
 		{"armodule_realloc", br_armodule_realloc},
 		{"armodule_free", br_armodule_free},
@@ -191,7 +222,7 @@ namespace Bridge {
 		uc_hook_add(uc, &trace, UC_HOOK_CODE, bridge_hoock, 0,
 			ADDRESS_TO_EMU(func_ptr), ADDRESS_TO_EMU(func_ptr + func_count * 2 - 1));
 
-		armodule.init(vm_get_sym_entry("armodule_malloc"), 
+		armodule.init(vm_get_sym_entry("armodule_malloc"),
 			vm_get_sym_entry("armodule_realloc"),
 			vm_get_sym_entry("armodule_free"));
 	}

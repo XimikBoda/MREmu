@@ -4,6 +4,7 @@
 #include "MREngine/System.h"
 #include "MREngine/Resources.h"
 #include "MREngine/Graphic.h"
+#include "MREngine/Timer.h"
 #include <filesystem>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -34,6 +35,7 @@ public:
 	MREngine::SystemCallbacks system_callbacks;
 	MREngine::Resources resources;
 	MREngine::AppGraphic graphic;
+	MREngine::Timer timer;
 
 	void preparation();
 	void start();

@@ -3,12 +3,11 @@
 #include <imgui.h>
 #include <imgui-SFML.h>
 #include <SFML/Graphics/Image.hpp>
-#include <SFML/Graphics/Texture.hpp>
 #include <vmgraph.h>
 
 static MREngine::Graphic* graphic = 0; // Do I really need this?
 
-sf::Texture buf_to_texture(void* buf, int w, int h) {
+void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 	static std::vector<unsigned char> pix_data;
 
 	if (pix_data.size() < w * h * 4)
@@ -24,10 +23,10 @@ sf::Texture buf_to_texture(void* buf, int w, int h) {
 	sf::Image im;
 	im.create(w, h, &pix_data[0]);
 
-	sf::Texture tex;
+	//sf::Texture tex;
 	tex.loadFromImage(im);
 
-	return tex;
+	//return tex;
 }
 
 MREngine::Graphic::Graphic()
@@ -45,8 +44,8 @@ void MREngine::Graphic::activate()
 
 void MREngine::Graphic::imgui_screen() {
 	if (ImGui::Begin("Screen")) {
-		sf::Texture tex = buf_to_texture(screen.data(), width, height);
-		ImGui::Image(tex);
+		buf_to_texture(screen.data(), width, height, screen_tex);
+		ImGui::Image(screen_tex);
 		ImGui::End();
 	}
 }
@@ -82,10 +81,10 @@ void MREngine::AppGraphic::imgui_layers() {
 	if (ImGui::Begin("Layers")) {
 		for (int i = 0; i < layers.size(); ++i) {
 			auto& el = layers[i];
-			sf::Texture tex = buf_to_texture(el.buf, el.w, el.h);
+			buf_to_texture(el.buf, el.w, el.h, el.tex);
 			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d, t: %d", 
 				i, el.x, el.y, el.w, el.h, el.trans_color);
-			ImGui::Image(tex);
+			ImGui::Image(el.tex);
 			ImGui::End();
 		}
 	}

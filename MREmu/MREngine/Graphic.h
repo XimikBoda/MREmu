@@ -1,11 +1,14 @@
 #pragma once
 #include <vector>
+#include <SFML/Graphics/Texture.hpp>
 
 
 namespace MREngine {
 	class Graphic {
 	public:
 		int width = 240, height = 320;
+
+		sf::Texture screen_tex;
 
 		std::vector<uint16_t> screen;
 		void* base_buf1 = 0; // wrong, need to change to canvas
@@ -24,6 +27,7 @@ namespace MREngine {
 		void* buf = 0;
 		int x = 0, y = 0, w = 0, h = 0;
 		int trans_color = -1;
+		sf::Texture tex;
 	};
 
 	class AppGraphic {

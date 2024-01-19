@@ -44,10 +44,13 @@ int main() {
 				break;
 			}
 		}
+		uint32_t delta_ms = deltaClock.getElapsedTime().asMilliseconds();
 		ImGui::SFML::Update(win, deltaClock.restart());
 
 		graphic.imgui_screen();
 		app.graphic.imgui_layers();
+
+		app.timer.update(delta_ms);
 
 		ImGui::SFML::Render(win);
 		win.display();
