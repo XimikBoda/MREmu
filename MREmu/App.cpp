@@ -3,6 +3,7 @@
 #include "Bridge.h"
 #include <fstream>
 #include <sstream>
+#include <vmsys.h>
 
 static App* app_tmp = 0; //delete this
 
@@ -99,6 +100,11 @@ void App::start()
 		uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);
 	}
+
+	if (system_callbacks.sysevt) { //tmp
+		Bridge::run_cpu(system_callbacks.sysevt, 2, VM_MSG_CREATE, 0);
+		Bridge::run_cpu(system_callbacks.sysevt, 2, VM_MSG_PAINT, 0);
+	}
 }
 
 
@@ -125,4 +131,8 @@ MREngine::SystemCallbacks& get_current_app_system_callbacks() {
 
 MREngine::Resources& get_current_app_resources() {
 	return app_tmp->resources;
+}
+
+MREngine::AppGraphic& get_current_app_graphic() {
+	return app_tmp->graphic;
 }

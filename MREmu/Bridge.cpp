@@ -80,6 +80,8 @@ namespace Bridge {
 		vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
 	}
 
+	// Graphic
+
 	void br_vm_graphic_get_screen_width(uc_engine* uc) {
 		write_ret(uc, vm_graphic_get_screen_width());
 	}
@@ -87,6 +89,22 @@ namespace Bridge {
 	void br_vm_graphic_get_screen_height(uc_engine* uc) {
 		write_ret(uc, vm_graphic_get_screen_width());
 	}
+
+	void br_vm_graphic_create_layer(uc_engine* uc) {
+		write_ret(uc, 
+			vm_graphic_create_layer(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4)));
+	}
+
+	void br_vm_graphic_get_layer_buffer(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
+	}
+
+	// Resources
 
 	void br_vm_load_resource(uc_engine* uc) {
 		write_ret(uc, 
@@ -122,6 +140,8 @@ namespace Bridge {
 		{"vm_reg_sysevt_callback", br_vm_reg_sysevt_callback},
 		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
 		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
+		{"vm_graphic_create_layer", br_vm_graphic_create_layer},
+		{"vm_graphic_get_layer_buffer", br_vm_graphic_get_layer_buffer},
 		{"vm_load_resource", br_vm_load_resource},
 		{"armodule_malloc", br_armodule_malloc},
 		{"armodule_realloc", br_armodule_realloc},

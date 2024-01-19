@@ -3,6 +3,7 @@
 #include "Memory.h"
 #include "MREngine/System.h"
 #include "MREngine/Resources.h"
+#include "MREngine/Graphic.h"
 #include <filesystem>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -32,6 +33,7 @@ public:
 	Memory::MemoryManager app_memory;
 	MREngine::SystemCallbacks system_callbacks;
 	MREngine::Resources resources;
+	MREngine::AppGraphic graphic;
 
 	void preparation();
 	void start();
