@@ -8,6 +8,8 @@
 #include <vmgraph.h>
 #include <vmres.h>
 #include <vmtimer.h>
+#include <vmpromng.h>
+#include <vmgettag.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
@@ -71,9 +73,16 @@ namespace Bridge {
 		write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 	}
 
+	// System
+
+	void br_vm_get_malloc_stat(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(vm_get_malloc_stat()));
+	}
+
 	void br_vm_malloc(uc_engine* uc) {
 		write_ret(uc, ADDRESS_TO_EMU(vm_malloc(read_arg(uc, 0))));
 	}
+
 	void br_vm_realloc(uc_engine* uc) {
 		write_ret(uc, ADDRESS_TO_EMU(
 			vm_realloc((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -86,6 +95,51 @@ namespace Bridge {
 
 	void br_vm_reg_sysevt_callback(uc_engine* uc) {
 		vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
+	}
+
+	void br_vm_get_mre_total_mem_size(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(vm_get_mre_total_mem_size()));
+	}
+	void br_vm_get_exec_filename(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(
+			vm_get_exec_filename(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)))));
+	}
+
+	void br_vm_get_sys_property(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(
+			vm_get_sys_property(
+				read_arg(uc, 0),
+				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2))));
+	}
+
+	void br_vm_get_vm_tag(uc_engine* uc) {
+		write_ret(uc,
+			vm_get_vm_tag(
+				(short*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+				(int*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
+	}
+
+	// Program manager
+
+	void br_vm_pmng_get_current_handle(uc_engine* uc) {
+		write_ret(uc, vm_pmng_get_current_handle());
+	}
+
+	void br_vm_reg_msg_proc(uc_engine* uc) {
+		vm_reg_msg_proc((VM_MESSAGE_PROC)read_arg(uc, 0));
+	}
+
+	void br_vm_post_msg(uc_engine* uc) {
+		write_ret(uc,
+			vm_post_msg(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3)));
 	}
 
 	// Timer
@@ -164,10 +218,20 @@ namespace Bridge {
 	{
 		{"vm_get_sym_entry", br_vm_get_sym_entry},
 
+		{"vm_get_malloc_stat", br_vm_get_malloc_stat},
 		{"vm_malloc", br_vm_malloc},
 		{"vm_realloc", br_vm_realloc},
 		{"vm_free", br_vm_free},
 		{"vm_reg_sysevt_callback", br_vm_reg_sysevt_callback},
+		{"vm_get_mre_total_mem_size", br_vm_get_mre_total_mem_size},
+		{"vm_get_exec_filename", br_vm_get_exec_filename},
+		{"vm_get_sys_property", br_vm_get_sys_property},
+
+		{"vm_get_vm_tag", br_vm_get_vm_tag},
+
+		{"vm_pmng_get_current_handle", br_vm_pmng_get_current_handle},
+		{"vm_reg_msg_proc", br_vm_reg_msg_proc},
+		{"vm_post_msg", br_vm_post_msg},
 
 		{"vm_create_timer", br_vm_create_timer},
 		{"vm_delete_timer", br_vm_delete_timer},

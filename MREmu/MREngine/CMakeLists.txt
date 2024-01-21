@@ -4,7 +4,8 @@ add_library (MREngine
 						"Graphic.cpp" "Graphic.h"
 						"System.cpp" "System.h" 
 						"Resources.cpp" "Resources.h"
-						"Timer.cpp" "Timer.h")
+						"Timer.cpp" "Timer.h"
+						"ProgramManager.cpp" "ProgramManager.h")
 
 target_link_libraries(MREngine sfml-graphics)
 target_link_libraries(MREngine imgui)

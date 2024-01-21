@@ -60,7 +60,7 @@ bool MreTags::is_zipped()
 unsigned int MreTags::get_ram()
 {
 	if (raw_tags[0x0F].size() == 4)
-		return *(unsigned int*)raw_tags[0x22].data();
+		return *(unsigned int*)raw_tags[0x0F].data();
 	return false;
 }
 
