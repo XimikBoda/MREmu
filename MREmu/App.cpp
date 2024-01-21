@@ -86,18 +86,11 @@ void App::preparation()
 
 void App::start()
 {
+	uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
 	if (is_ads) {
-		uint32_t *init_params = (uint32_t*)((unsigned char*)mem_location + mem_size - 6*4); //TODO move to another place
-
-		init_params[0] = offset_mem + segments_size; //I'll have to figure out exactly how it works
-		init_params[1] = 0; //vm_get_sym_entry from bridge
-		init_params[2] = init_params[0] + 1024;
-		init_params[3] = init_params[2] + 2 * 1024;
-		init_params[4] = 3 * 1024;
-		init_params[5] = entry_point;
+		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + segments_size);
 	}
 	else {
-		uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);
 	}
 

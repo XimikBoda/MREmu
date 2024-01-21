@@ -26,7 +26,7 @@ int main() {
     win.setFramerateLimit(60);
 
     App app;
-    app.load_from_file("3D_test.vxp");
+    app.load_from_file("tiny_ads.vxp");
     app.preparation();
     app.start();
 

@@ -36,6 +36,13 @@ namespace Bridge {
 		uc_reg_write(uc, reg, &val);
 	}
 
+	void put_to_reg(uc_engine* uc, unsigned int val) {
+		unsigned int sp = read_reg(uc, UC_ARM_REG_SP);
+		sp -= 4;
+		write_reg(uc, UC_ARM_REG_SP, sp);
+		uc_mem_write(uc, sp, &val, 4);
+	}
+
 	unsigned int top_sp(uc_engine* uc, int l) {
 		unsigned int el, sp = read_reg(uc, UC_ARM_REG_SP);
 		uc_mem_read(uc, sp + 4 * l, &el, 4);
@@ -227,7 +234,33 @@ namespace Bridge {
 			vm_get_sym_entry("armodule_free"));
 	}
 
-	int run_cpu(unsigned int adr, int n, ...) {
+	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base) {
+		uint32_t base_it = data_base - 0x80;
+
+		write_reg(uc, UC_ARM_REG_R9, data_base);
+
+		put_to_reg(uc, (uint64_t)idle_p);
+		put_to_reg(uc, 0);
+
+		*(uint32_t*)ADDRESS_FROM_EMU(base_it) = read_reg(uc, UC_ARM_REG_SP);
+		base_it += 4;
+
+		*(uint32_t*)ADDRESS_FROM_EMU(base_it) = vm_get_sym_entry_p;
+		base_it += 4;
+
+		*(uint32_t*)ADDRESS_FROM_EMU(base_it) = data_base + 1024;
+		base_it += 4;
+
+		*(uint32_t*)ADDRESS_FROM_EMU(base_it) = data_base + 1024 + 2 * 1024;
+		base_it += 4;
+
+		*(uint32_t*)ADDRESS_FROM_EMU(base_it) = 3 * 1024;
+		base_it += 4;
+
+		return run_cpu(entry, 0);
+	}
+
+	int run_cpu(uint32_t adr, int n, ...) {
 		va_list factor;
 
 		va_start(factor, n);
