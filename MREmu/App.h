@@ -17,7 +17,6 @@ class App
 public:
 	std::vector<unsigned char> file_context;
 
-	MreTags tags;
 
 	void* mem_location = 0;
 	size_t offset_mem;
@@ -29,7 +28,7 @@ public:
 	bool is_ads;
 	bool is_zipped;
 
-	ELFIO::elfio elf;
+	MreTags tags;
 
 	Memory::MemoryManager app_memory;
 	MREngine::SystemCallbacks system_callbacks;

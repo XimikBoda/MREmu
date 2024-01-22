@@ -83,6 +83,10 @@ namespace Bridge {
 		write_ret(uc, ADDRESS_TO_EMU(vm_malloc(read_arg(uc, 0))));
 	}
 
+	void br_vm_calloc(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(vm_calloc(read_arg(uc, 0))));
+	}
+
 	void br_vm_realloc(uc_engine* uc) {
 		write_ret(uc, ADDRESS_TO_EMU(
 			vm_realloc((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -100,6 +104,11 @@ namespace Bridge {
 	void br_vm_get_mre_total_mem_size(uc_engine* uc) {
 		write_ret(uc, ADDRESS_TO_EMU(vm_get_mre_total_mem_size()));
 	}
+
+	void br_vm_get_tick_count(uc_engine* uc) {
+		write_ret(uc, vm_get_tick_count());
+	}
+
 	void br_vm_get_exec_filename(uc_engine* uc) {
 		write_ret(uc, ADDRESS_TO_EMU(
 			vm_get_exec_filename(
@@ -187,6 +196,12 @@ namespace Bridge {
 		write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
 	}
 
+	void br_vm_graphic_flush_layer(uc_engine* uc) {
+		write_ret(uc, vm_graphic_flush_layer(
+			(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+			read_arg(uc, 1)));
+	}
+
 	// Resources
 
 	void br_vm_load_resource(uc_engine* uc) {
@@ -220,10 +235,12 @@ namespace Bridge {
 
 		{"vm_get_malloc_stat", br_vm_get_malloc_stat},
 		{"vm_malloc", br_vm_malloc},
+		{"vm_calloc", br_vm_calloc},
 		{"vm_realloc", br_vm_realloc},
 		{"vm_free", br_vm_free},
 		{"vm_reg_sysevt_callback", br_vm_reg_sysevt_callback},
 		{"vm_get_mre_total_mem_size", br_vm_get_mre_total_mem_size},
+		{"vm_get_tick_count", br_vm_get_tick_count},
 		{"vm_get_exec_filename", br_vm_get_exec_filename},
 		{"vm_get_sys_property", br_vm_get_sys_property},
 
@@ -242,6 +259,7 @@ namespace Bridge {
 		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
 		{"vm_graphic_create_layer", br_vm_graphic_create_layer},
 		{"vm_graphic_get_layer_buffer", br_vm_graphic_get_layer_buffer},
+		{"vm_graphic_flush_layer", br_vm_graphic_flush_layer},
 
 		{"vm_load_resource", br_vm_load_resource},
 
@@ -299,6 +317,7 @@ namespace Bridge {
 	}
 
 	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base) {
+		data_base += 0x80;
 		uint32_t base_it = data_base - 0x80;
 
 		write_reg(uc, UC_ARM_REG_R9, data_base);

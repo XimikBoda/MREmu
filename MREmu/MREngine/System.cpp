@@ -39,6 +39,11 @@ VMUINT vm_get_mre_total_mem_size(void) {
 	return shared_memory_size;
 }
 
+VMINT vm_get_tick_count(void) {
+	extern uint32_t tick_count;
+	return tick_count;
+}
+
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
 	swprintf_s((wchar_t*)filename, 260, L"e:\\TEMP");
 	return 0;

@@ -10,7 +10,7 @@ void MreTags::load(std::vector<unsigned char>& file)
 	if (file_size < 4 * 3)
 		abort();//TODO
 
-	uint32_t tags_offset = *(uint32_t*)&file[file_size - 4 * 3];
+	tags_offset = *(uint32_t*)&file[file_size - 4 * 3];
 
 	uint32_t id, tag_size, pos = tags_offset;
 

@@ -21,6 +21,9 @@ void MREngine::Resources::scan()
 		uint32_t res_size = *(uint32_t*)(file_context->data() + pos);
 		pos += 4;
 
+		if (res_offset < offset)
+			res_offset += offset;
+
 		if (res_offset < offset || res_offset + res_size > offset + size)
 			abort();
 

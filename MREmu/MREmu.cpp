@@ -13,6 +13,7 @@
 
 #include "MREngine/Graphic.h"
 
+uint32_t tick_count = 0; //TODO
 
 int main() {
     Memory::init(128 * 1024 * 1024);
@@ -26,7 +27,7 @@ int main() {
     win.setFramerateLimit(60);
 
     App app;
-    app.load_from_file("0.vxp");
+    app.load_from_file("RTXBlocksVxp.vxp");
     app.preparation();
     app.start();
 
@@ -46,6 +47,8 @@ int main() {
 		}
 		uint32_t delta_ms = deltaClock.getElapsedTime().asMilliseconds();
 		ImGui::SFML::Update(win, deltaClock.restart());
+
+		tick_count += delta_ms;
 
 		graphic.imgui_screen();
 		app.graphic.imgui_layers();

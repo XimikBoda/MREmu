@@ -85,8 +85,8 @@ void MREngine::AppGraphic::imgui_layers() {
 			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d, t: %d", 
 				i, el.x, el.y, el.w, el.h, el.trans_color);
 			ImGui::Image(el.tex);
-			ImGui::End();
 		}
+		ImGui::End();
 	}
 }
 
@@ -116,4 +116,9 @@ VMINT vm_graphic_create_layer(VMINT x, VMINT y, VMINT width, VMINT height, VMINT
 
 VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
 	return (VMUINT8*)get_current_app_graphic().get_layer_buf(handle);
+}
+
+VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
+	memcpy(graphic->screen.data(), graphic->base_buf1, graphic->screen.size()*2);//temp
+	return 0;
 }

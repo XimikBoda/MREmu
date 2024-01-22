@@ -1,11 +1,25 @@
 #include "App.h"
 #include "Memory.h"
 #include "Bridge.h"
+#include "miniz.h"
 #include <fstream>
 #include <sstream>
 #include <vmsys.h>
 
 static App* app_tmp = 0; //delete this
+
+typedef struct
+{
+	uint32_t ro_offset;
+	uint32_t ro_size;
+	uint32_t org_ro_size;
+	uint32_t rw_offset;
+	uint32_t rw_size;
+	uint32_t org_rw_size;
+	uint32_t zi_size;
+	uint32_t res_offset;
+	uint32_t res_size;
+} compress_ads_elf_info;
 
 void App::preparation()
 {
@@ -26,6 +40,8 @@ void App::preparation()
 
 	if (!is_zipped)
 	{
+		ELFIO::elfio elf;
+
 		{
 			std::stringstream ss;
 			ss.write((char*)file_context.data(), file_context.size());
@@ -74,8 +90,32 @@ void App::preparation()
 	}
 	else
 	{
-		printf("zipped files is not realized\n");
-		abort();
+		if (is_ads) {
+			uint32_t elf_info_size = *(uint32_t*)(file_context.data() + tags.tags_offset - 4);
+
+			if (elf_info_size != sizeof(compress_ads_elf_info)) abort();
+
+			compress_ads_elf_info* info = (compress_ads_elf_info*)(file_context.data() + tags.tags_offset - 4 - elf_info_size);
+
+			uLongf dL = info->org_ro_size;
+			if(uncompress((unsigned char*)mem_location, 
+				&dL, file_context.data() + info->ro_offset, info->ro_size)) abort();
+
+			dL = info->org_rw_size;
+			if (uncompress((unsigned char*)mem_location + info->org_ro_size, 
+				&dL, file_context.data() + info->rw_offset, info->rw_size)) abort();
+
+			resources.offset = info->res_offset;
+			resources.size = info->res_size;
+
+			segments_size = info->org_ro_size + info->org_rw_size + info->zi_size;
+
+			entry_point = offset_mem;
+		}
+		else {
+			printf("zipped no ads is not realized\n");
+			exit(0);
+		}
 	}
 
 	app_memory = Memory::MemoryManager((size_t)mem_location, mem_size);
