@@ -13,7 +13,7 @@
 
 #include "MREngine/Graphic.h"
 
-uint32_t tick_count = 0; //TODO
+sf::Clock global_clock;
 
 int main() {
     Memory::init(128 * 1024 * 1024);
@@ -48,10 +48,9 @@ int main() {
 		uint32_t delta_ms = deltaClock.getElapsedTime().asMilliseconds();
 		ImGui::SFML::Update(win, deltaClock.restart());
 
-		tick_count += delta_ms;
-
 		graphic.imgui_screen();
 		app.graphic.imgui_layers();
+		app.graphic.imgui_canvases();
 
 		app.timer.update(delta_ms);
 

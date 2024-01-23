@@ -202,6 +202,45 @@ namespace Bridge {
 			read_arg(uc, 1)));
 	}
 
+	void br_vm_graphic_create_canvas(uc_engine* uc) {
+		write_ret(uc,
+			vm_graphic_create_canvas(
+				read_arg(uc, 0),
+				read_arg(uc, 1)));
+	}
+
+	void br_vm_graphic_release_canvas(uc_engine* uc) {
+		vm_graphic_release_canvas(
+			read_arg(uc, 0));
+	}
+
+	void br_vm_graphic_get_canvas_buffer(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(
+			vm_graphic_get_canvas_buffer(
+				read_arg(uc, 0))));
+	}
+
+	void br_vm_graphic_load_image(uc_engine* uc) {
+		write_ret(uc, 
+			vm_graphic_load_image(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1)));
+	}
+
+	void br_vm_graphic_blt(uc_engine* uc) {
+		vm_graphic_blt(
+			(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+			read_arg(uc, 1),
+			read_arg(uc, 2),
+			(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+			read_arg(uc, 4),
+			read_arg(uc, 5),
+			read_arg(uc, 6),
+			read_arg(uc, 7),
+			read_arg(uc, 8)
+		);
+	}
+
 	// Resources
 
 	void br_vm_load_resource(uc_engine* uc) {
@@ -260,6 +299,11 @@ namespace Bridge {
 		{"vm_graphic_create_layer", br_vm_graphic_create_layer},
 		{"vm_graphic_get_layer_buffer", br_vm_graphic_get_layer_buffer},
 		{"vm_graphic_flush_layer", br_vm_graphic_flush_layer},
+		{"vm_graphic_create_canvas", br_vm_graphic_create_canvas},
+		{"vm_graphic_release_canvas", br_vm_graphic_release_canvas},
+		{"vm_graphic_get_canvas_buffer", br_vm_graphic_get_canvas_buffer},
+		{"vm_graphic_load_image", br_vm_graphic_load_image},
+		{"vm_graphic_blt", br_vm_graphic_blt},
 
 		{"vm_load_resource", br_vm_load_resource},
 

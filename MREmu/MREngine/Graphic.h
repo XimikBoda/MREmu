@@ -2,6 +2,7 @@
 #include <vector>
 #include <SFML/Graphics/Texture.hpp>
 
+const char* const CANVAS_MAGIC = "MTKCANVAS"; // Do we have an app that checks for this?
 
 namespace MREngine {
 	class Graphic {
@@ -30,14 +31,39 @@ namespace MREngine {
 		sf::Texture tex;
 	};
 
+#pragma pack (push, 1)
+	struct canvas_signature {
+		char magic[9];
+		uint8_t frame_count = 1;
+		uint8_t i_dont_know = 0xFF;
+		uint8_t color_format = 1;
+	};
+
+	struct canvas_frame_property {
+		uint8_t flag = 0; //?
+		uint16_t left = 0;
+		uint16_t top = 0;
+		uint16_t width = 0;
+		uint16_t height = 0;
+		uint16_t delay = 0;
+		uint8_t trans_color_index = 0;
+		uint16_t trans_color = 0;
+		uint16_t reserved = 0; 
+		uint32_t offset = 0;
+	};
+#pragma pack(pop)
+
 	class AppGraphic {
 	public:
 		std::vector<layer> layers;
+
+		std::vector<std::pair<void*, sf::Texture>> canvases_list;
 
 		int create_layer(int x, int y, int w, int h, int trans_color);
 		void* get_layer_buf(int handle);
 
 		void imgui_layers();
+		void imgui_canvases();
 	};
 }
 

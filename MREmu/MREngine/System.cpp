@@ -3,6 +3,7 @@
 #include <vmsys.h>
 #include <vmgettag.h>
 #include <string>
+#include <SFML/System/Clock.hpp>
 
 //MRE API
 
@@ -40,8 +41,8 @@ VMUINT vm_get_mre_total_mem_size(void) {
 }
 
 VMINT vm_get_tick_count(void) {
-	extern uint32_t tick_count;
-	return tick_count;
+	extern sf::Clock global_clock;
+	return global_clock.getElapsedTime().asMilliseconds();
 }
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
