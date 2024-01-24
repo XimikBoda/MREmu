@@ -13,6 +13,7 @@
 
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
+#include "MREngine/SIM.h"
 
 sf::Clock global_clock;
 
@@ -23,6 +24,7 @@ int main() {
 
     MREngine::Graphic graphic;
 	MREngine::IO::init();
+	MREngine::SIM::init();
 
     sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
     ImGui::SFML::Init(win);

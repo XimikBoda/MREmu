@@ -114,6 +114,8 @@ int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_col
 		layers.push_back({ graphic->base_buf1, 0, 0, graphic->width, graphic->height, trans_color });
 		return 0;
 	}
+	else
+		abort();
 }
 
 void* MREngine::AppGraphic::get_layer_buf(int handle) {

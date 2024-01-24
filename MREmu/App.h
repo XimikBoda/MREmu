@@ -5,6 +5,7 @@
 #include "MREngine/Resources.h"
 #include "MREngine/Graphic.h"
 #include "MREngine/Timer.h"
+#include "MREngine/IO.h"
 #include <filesystem>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -35,6 +36,7 @@ public:
 	MREngine::Resources resources;
 	MREngine::AppGraphic graphic;
 	MREngine::Timer timer;
+	MREngine::AppIO io;
 
 	void preparation();
 	void start();

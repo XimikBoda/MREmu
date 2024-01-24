@@ -32,6 +32,182 @@ fs::path convert_path(const VMWSTR str) { // TODO rewrite this
 	return res;
 }
 
+VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	fs::path path = convert_path(filename);
+
+	std::ios_base::openmode fmode = std::ios_base::binary;
+
+	if (fmode | MODE_READ)
+		fmode |= std::ios_base::in;
+
+	if (fmode | MODE_WRITE)
+		fmode |= std::ios_base::out | std::ios_base::_Nocreate;
+
+	if (fmode | MODE_CREATE_ALWAYS_WRITE)
+		fmode |= std::ios_base::out;
+
+	if (fmode | MODE_APPEND)
+		fmode |= std::ios_base::out | std::ios_base::app;
+
+	io.files.resize(io.files.size() + 1);
+
+	std::fstream& f = io.files[io.files.size() - 1];
+
+	f.open(path, fmode);
+
+	if (!f.good()) {
+		io.files.resize(io.files.size() - 1);
+		return -1;
+	}
+
+	//io.files.push_back(f);
+
+	return io.files.size() - 1;
+}
+
+void vm_file_close(VMFILE handle) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return;
+
+	io.files[handle].close();
+}
+
+VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return -1;
+
+	auto& f = io.files[handle];
+
+	if (!f.good())
+		return -1;
+
+	f.read((char*)data, length);
+
+	*nread = f.gcount();
+	return *nread;
+}
+
+VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return -1;
+
+	auto& f = io.files[handle];
+
+	if (!f.good())
+		return -1;
+
+	f.write((char*)data, length);
+
+	*written = f.gcount();
+	return *written;
+}
+
+VMINT vm_file_commit(VMFILE handle) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return -1;
+
+	auto& f = io.files[handle];
+
+	if (!f.good())
+		return -1;
+
+	f.flush();
+	return 0;
+}
+
+VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return -1;
+
+	auto& f = io.files[handle];
+
+	if (!f.good())
+		return -1;
+
+
+	std::ios_base::seekdir sdir = 0;
+
+	switch (base) {
+	case BASE_BEGIN:
+		sdir = std::ios_base::beg;
+		break;
+	case BASE_CURR:
+		sdir = std::ios_base::cur;
+		break;
+	case BASE_END:
+		sdir = std::ios_base::end;
+		break;
+	default:
+		return -1;
+		break;
+	}
+
+	f.seekg(offset, base);
+
+	return 0;
+}
+
+VMINT vm_file_tell(VMFILE handle) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return -1;
+
+	auto& f = io.files[handle];
+
+	if (!f.good())
+		return -1;
+
+	return f.tellg();
+}
+
+VMINT vm_file_is_eof(VMFILE handle) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return -1;
+
+	auto& f = io.files[handle];
+
+	if (!f.good())
+		return -1;
+
+	return f.eof();
+}
+
+VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.files.size())
+		return -1;
+
+	auto& f = io.files[handle];
+
+	if (!f.good())
+		return -1;
+
+	size_t pos = f.tellg();
+	f.seekg(0, std::ios_base::end);
+
+	*file_size = f.tellg();
+
+	f.seekg(pos, std::ios_base::beg);
+
+	return 0;
+}
+
 VMINT vm_file_mkdir(const VMWSTR dirname) {
 	fs::path path = convert_path(dirname);
 	bool res = fs::create_directory(path);

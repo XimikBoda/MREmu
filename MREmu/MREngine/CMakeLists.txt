@@ -7,6 +7,7 @@ add_library (MREngine
 						"Timer.cpp" "Timer.h"
 						"ProgramManager.cpp" "ProgramManager.h"
 						"IO.cpp" "IO.h"
+						"SIM.cpp" "SIM.h"
 						"CharSet.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)

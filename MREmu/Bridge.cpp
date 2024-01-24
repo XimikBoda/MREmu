@@ -11,6 +11,7 @@
 #include <vmpromng.h>
 #include <vmgettag.h>
 #include <vmchset.h>
+#include <vmsim.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
@@ -200,6 +201,12 @@ namespace Bridge {
 		write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 	}
 
+	// SIM
+
+	void br_vm_get_imei(uc_engine* uc) {
+		write_ret(uc, ADDRESS_TO_EMU(vm_get_imei()));
+	}
+
 	// Graphic
 
 	void br_vm_graphic_get_screen_width(uc_engine* uc) {
@@ -333,12 +340,57 @@ namespace Bridge {
 		{"vm_create_timer_ex", br_vm_create_timer_ex},
 		{"vm_delete_timer_ex", br_vm_delete_timer_ex}, // done
 
+		{"vm_file_open", [](uc_engine* uc) {
+			write_ret(uc, vm_file_open(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2)));
+		}},
+		{"vm_file_close", [](uc_engine* uc) {
+			vm_file_close(read_arg(uc, 0));
+		}},
+		{"vm_file_read", [](uc_engine* uc) {
+			write_ret(uc, vm_file_read(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 1),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+		}},
+		{"vm_file_write", [](uc_engine* uc) {
+			write_ret(uc, vm_file_write(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 1),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+		}},
+		{"vm_file_commit", [](uc_engine* uc) {
+			write_ret(uc, vm_file_commit(read_arg(uc, 0)));
+		}},
+		{"vm_file_seek", [](uc_engine* uc) {
+			write_ret(uc, vm_file_seek(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2)));
+		}},
+		{"vm_file_tell", [](uc_engine* uc) {
+			write_ret(uc, vm_file_tell(read_arg(uc, 0)));
+		}},
+		{"vm_file_is_eof", [](uc_engine* uc) {
+			write_ret(uc, vm_file_is_eof(read_arg(uc, 0)));
+		}},
+		{"vm_file_getfilesize", [](uc_engine* uc) {
+			write_ret(uc, vm_file_getfilesize(
+				read_arg(uc, 0),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
 		{"vm_file_mkdir", br_vm_file_mkdir},
 		{"vm_file_set_attributes", br_vm_file_set_attributes},
 		{"vm_file_get_attributes", br_vm_file_get_attributes},
 		{"vm_get_removeable_driver", br_vm_get_removable_driver},
 		{"vm_get_system_driver", br_vm_get_system_driver},
 		{"vm_get_disk_free_space", br_vm_get_disk_free_space},
+
+		{"vm_get_imei", br_vm_get_imei},
 
 		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
 		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},

@@ -111,6 +111,14 @@ void App::preparation()
 			segments_size = info->org_ro_size + info->org_rw_size + info->zi_size;
 
 			entry_point = offset_mem;
+
+			{//temp
+				std::ofstream out("unpack.bin");
+				if (out.is_open()) {
+					out.write((char*)mem_location, segments_size);
+					out.close();
+				}
+			}
 		}
 		else {
 			printf("zipped no ads is not realized\n");
@@ -173,4 +181,8 @@ MREngine::AppGraphic& get_current_app_graphic() {
 
 MREngine::Timer& get_current_app_timer() {
 	return app_tmp->timer;
+}
+
+MREngine::AppIO& get_current_app_io() {
+	return app_tmp->io;
 }
