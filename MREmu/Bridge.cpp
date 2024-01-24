@@ -10,6 +10,7 @@
 #include <vmtimer.h>
 #include <vmpromng.h>
 #include <vmgettag.h>
+#include <vmchset.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
@@ -171,6 +172,33 @@ namespace Bridge {
 		write_ret(uc, vm_delete_timer_ex(read_arg(uc, 0)));
 	}
 
+	// IO
+
+	void br_vm_file_set_attributes(uc_engine* uc) {
+		write_ret(uc, vm_file_set_attributes(
+			(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+			read_arg(uc, 1)));
+	}
+
+	void br_vm_file_get_attributes(uc_engine* uc) {
+		write_ret(uc, vm_file_get_attributes((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+	}
+
+	void br_vm_file_mkdir(uc_engine* uc) {
+		write_ret(uc, vm_file_mkdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+	}
+
+	void br_vm_get_removable_driver(uc_engine* uc) {
+		write_ret(uc, vm_get_removable_driver());
+	}
+
+	void br_vm_get_system_driver(uc_engine* uc) {
+		write_ret(uc, vm_get_system_driver());
+	}
+
+	void br_vm_get_disk_free_space(uc_engine* uc) {
+		write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+	}
 
 	// Graphic
 
@@ -221,7 +249,7 @@ namespace Bridge {
 	}
 
 	void br_vm_graphic_load_image(uc_engine* uc) {
-		write_ret(uc, 
+		write_ret(uc,
 			vm_graphic_load_image(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				read_arg(uc, 1)));
@@ -251,7 +279,18 @@ namespace Bridge {
 			)));
 	}
 
-	//ARModule
+	// CharSet
+
+	void br_vm_ascii_to_ucs2(uc_engine* uc) {
+		write_ret(uc,
+			vm_ascii_to_ucs2(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+			));
+	}
+
+	// ARModule
 
 	void br_armodule_malloc(uc_engine* uc) {
 		write_ret(uc, ADDRESS_TO_EMU(armodule.app_memory.malloc(read_arg(uc, 0))));
@@ -294,6 +333,13 @@ namespace Bridge {
 		{"vm_create_timer_ex", br_vm_create_timer_ex},
 		{"vm_delete_timer_ex", br_vm_delete_timer_ex}, // done
 
+		{"vm_file_mkdir", br_vm_file_mkdir},
+		{"vm_file_set_attributes", br_vm_file_set_attributes},
+		{"vm_file_get_attributes", br_vm_file_get_attributes},
+		{"vm_get_removeable_driver", br_vm_get_removable_driver},
+		{"vm_get_system_driver", br_vm_get_system_driver},
+		{"vm_get_disk_free_space", br_vm_get_disk_free_space},
+
 		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
 		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
 		{"vm_graphic_create_layer", br_vm_graphic_create_layer},
@@ -306,6 +352,8 @@ namespace Bridge {
 		{"vm_graphic_blt", br_vm_graphic_blt},
 
 		{"vm_load_resource", br_vm_load_resource},
+
+		{"vm_ascii_to_ucs2", br_vm_ascii_to_ucs2},
 
 		{"armodule_malloc", br_armodule_malloc},
 		{"armodule_realloc", br_armodule_realloc},

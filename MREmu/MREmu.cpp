@@ -12,6 +12,7 @@
 #include "App.h"
 
 #include "MREngine/Graphic.h"
+#include "MREngine/IO.h"
 
 sf::Clock global_clock;
 
@@ -21,13 +22,14 @@ int main() {
     Bridge::init();
 
     MREngine::Graphic graphic;
+	MREngine::IO::init();
 
     sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
     ImGui::SFML::Init(win);
     win.setFramerateLimit(60);
 
     App app;
-    app.load_from_file("RTXBlocksVxp.vxp");
+    app.load_from_file("Asphalt 6.vxp");
     app.preparation();
     app.start();
 
