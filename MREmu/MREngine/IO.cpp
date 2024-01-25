@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <imgui.h>
 #include <imgui-SFML.h>
+#include <cstring>
 
 namespace fs = std::filesystem;
 
@@ -159,8 +160,14 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	if (mode & MODE_READ)
 		fmode |= std::ios_base::in;
 
+<<<<<<< HEAD
 	if (mode & MODE_WRITE)
 		fmode |= std::ios_base::out; // | std::ios_base::_Nocreate;
+=======
+	if (fmode | MODE_WRITE)
+		fmode |= std::ios_base::out;  // TODO: _Nocreate is not available on Linux, use an alternative
+		// fmode |= std::ios_base::out | std::ios_base::_Nocreate;
+>>>>>>> Experimental Linux support
 
 	if (mode & MODE_CREATE_ALWAYS_WRITE)
 		fmode |= std::ios_base::out;
@@ -258,6 +265,10 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 	if (!f)
 		return -1;
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> Experimental Linux support
 	std::ios_base::seekdir sdir;
 
 	switch (base) {
@@ -275,6 +286,7 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		break;
 	}
 
+<<<<<<< HEAD
 	auto pos = f->tellg();
 	f->seekg(offset, sdir);
 
@@ -283,6 +295,9 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		f->seekg(pos, std::ios_base::beg);
 		return -1;
 	}
+=======
+	f.seekg((std::streamoff)offset, sdir);
+>>>>>>> Experimental Linux support
 
 	return 0;
 }
