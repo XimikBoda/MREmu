@@ -297,6 +297,15 @@ namespace Bridge {
 			));
 	}
 
+	void br_vm_gb2312_to_ucs2(uc_engine* uc) {
+		write_ret(uc,
+			vm_gb2312_to_ucs2(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+			));
+	}
+
 	// ARModule
 
 	void br_armodule_malloc(uc_engine* uc) {
@@ -419,7 +428,8 @@ namespace Bridge {
 
 		{"vm_load_resource", br_vm_load_resource},
 
-		{"vm_ascii_to_ucs2", br_vm_ascii_to_ucs2},
+		{"vm_ascii_to_ucs2", br_vm_ascii_to_ucs2 },
+		{"vm_gb2312_to_ucs2", br_vm_gb2312_to_ucs2 },
 
 		{"armodule_malloc", br_armodule_malloc},
 		{"armodule_realloc", br_armodule_realloc},

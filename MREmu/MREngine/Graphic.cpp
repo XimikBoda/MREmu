@@ -79,7 +79,24 @@ MREngine::Graphic::Graphic()
 		cfp->height = height;
 		base_buf1 = (cfp + 1);
 	}
-	//base_buf2 = Memory::shared_malloc(width * height * 2 + VM_CANVAS_DATA_OFFSET);
+	{
+		int image_size = width * height * 2;
+		void* canvas_buf = Memory::shared_malloc(VM_CANVAS_DATA_OFFSET + image_size);
+
+		if (canvas_buf == 0) abort();
+
+		MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
+
+		*cs = MREngine::canvas_signature();
+		memcpy(cs->magic, CANVAS_MAGIC, 9);
+
+		MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
+
+		*cfp = MREngine::canvas_frame_property();
+		cfp->width = width;
+		cfp->height = height;
+		base_buf2 = (cfp + 1);
+	}
 }
 
 void MREngine::Graphic::activate()
@@ -107,12 +124,23 @@ int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_col
 		return -1;
 
 	if (layers.size() == 0) {
-		//if (x != 0 || y != 0 || w != graphic->width || h != graphic->height)
-		//	return -1;
+		if (x != 0 || y != 0 || w != graphic->width || h != graphic->height)
+			return -1;
 
-		//layers.push_back({ graphic->base_buf1, x, y, w, h, trans_color });
-		layers.push_back({ graphic->base_buf1, 0, 0, graphic->width, graphic->height, trans_color });
+		layers.push_back({ graphic->base_buf1, x, y, w, h, trans_color });
 		return 0;
+	}
+	else if (layers.size() == 1) {
+		if (w > graphic->width || h > graphic->height)
+			return -1;
+
+		MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)graphic->base_buf2 - 1;
+
+		cfp->width = w;
+		cfp->height = h;
+
+		layers.push_back({ graphic->base_buf2, x, y, w, h, trans_color });
+		return 1;
 	}
 	else
 		abort();
@@ -191,8 +219,36 @@ VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
 }
 
 VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
-	memcpy(graphic->screen.data(), graphic->base_buf1, graphic->screen.size() * 2);//temp
-	return 0;
+	if (layer_handles == 0)
+		return -1;
+
+	MREngine::AppGraphic &gr = get_current_app_graphic();
+
+	for (int i = 0; i < count; ++i)
+		if (layer_handles[i] < 0 || layer_handles[i] >= gr.layers.size())
+			return -1;
+
+	for (int sy = 0; sy < graphic->height; ++sy)
+		for (int sx = 0; sx < graphic->width; ++sx)
+			for (int lid = count - 1; lid >= 0; --lid) {
+				auto& layer = gr.layers[layer_handles[lid]];
+				int lx = sx - layer.x;
+				int ly = sy - layer.y;
+				uint16_t* buf = (uint16_t*)layer.buf;
+
+				if (lx < 0 || lx >= layer.w || ly < 0 || ly >= layer.h)
+					continue;
+
+				uint16_t color = buf[ly * layer.w + lx];
+				if (int(color) == layer.trans_color)
+					continue;
+
+				graphic->screen[sy * graphic->width + sx] = color;
+				break;
+			}
+
+	//memcpy(graphic->screen.data(), graphic->base_buf1, graphic->screen.size() * 2);//temp
+	return VM_GDI_SUCCEED;
 }
 
 VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
