@@ -1,5 +1,6 @@
 #include <vmchset.h>
 #include <string>
+#include <cstring>
 #include <locale>
 #include <codecvt>
 

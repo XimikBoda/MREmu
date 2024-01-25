@@ -63,7 +63,7 @@ int MREngine::Timer::destroy(int id, bool gui)
 
 
 VMINT vm_create_timer(VMUINT32 millisec, VM_TIMERPROC_T timerproc) {
-	return get_current_app_timer().create(millisec, (uint32_t)timerproc, true);
+	return get_current_app_timer().create(millisec, (uint32_t)(((uint64_t) timerproc) & UINT32_MAX), true);
 }
 
 
@@ -73,7 +73,7 @@ VMINT vm_delete_timer(VMINT timerid) {
 
 
 VMINT vm_create_timer_ex(VMUINT32 millisec, VM_TIMERPROC_T timerproc) {
-	return get_current_app_timer().create(millisec, (uint32_t)timerproc, false);
+	return get_current_app_timer().create(millisec, (uint32_t)(((uint64_t) timerproc) & UINT32_MAX), false);
 }
 
 

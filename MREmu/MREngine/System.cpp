@@ -3,6 +3,7 @@
 #include <vmsys.h>
 #include <string>
 #include <filesystem>
+#include <cstring>
 #include <SFML/System/Clock.hpp>
 
 namespace fs = std::filesystem;
@@ -36,7 +37,7 @@ void vm_free(void* ptr) {
 
 void vm_reg_sysevt_callback(void (*f)(VMINT message, VMINT param)) {
 	MREngine::SystemCallbacks& sc = get_current_app_system_callbacks();
-	sc.sysevt = (uint32_t)f;
+	sc.sysevt = (uint32_t)(((uint64_t)f) & UINT32_MAX);
 }
 
 
@@ -52,7 +53,7 @@ VMINT vm_get_tick_count(void) {
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
 	extern fs::path vxp_path;
 
-	swprintf_s((wchar_t*)filename, 260, L"e:\\..\\..\\%s", vxp_path.wstring().c_str());
+	swprintf((wchar_t*)filename, 260, L"e:\\..\\..\\%s", vxp_path.wstring().c_str());
 	return 0;
 }
 
