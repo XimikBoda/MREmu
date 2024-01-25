@@ -353,15 +353,15 @@ namespace Bridge {
 			write_ret(uc, vm_file_read(
 				read_arg(uc, 0),
 				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				read_arg(uc, 1),
-				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+				read_arg(uc, 2),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
 		}},
 		{"vm_file_write", [](uc_engine* uc) {
 			write_ret(uc, vm_file_write(
 				read_arg(uc, 0),
 				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				read_arg(uc, 1),
-				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+				read_arg(uc, 2),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
 		}},
 		{"vm_file_commit", [](uc_engine* uc) {
 			write_ret(uc, vm_file_commit(read_arg(uc, 0)));
@@ -402,6 +402,20 @@ namespace Bridge {
 		{"vm_graphic_get_canvas_buffer", br_vm_graphic_get_canvas_buffer},
 		{"vm_graphic_load_image", br_vm_graphic_load_image},
 		{"vm_graphic_blt", br_vm_graphic_blt},
+		{"vm_graphic_fill_rect", [](uc_engine* uc) {
+			vm_graphic_fill_rect(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5),
+				read_arg(uc, 6));
+		}},
+		{"vm_graphic_setcolor", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_setcolor(
+				(vm_graphic_color*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 
 		{"vm_load_resource", br_vm_load_resource},
 
@@ -436,7 +450,8 @@ namespace Bridge {
 
 		if (ind > func_map.size())
 			abort();
-
+		if(ind)
+			printf("--%s-- called\n", func_map[ind].name.c_str());
 		func_map[ind].f(uc);
 	}
 
@@ -461,7 +476,7 @@ namespace Bridge {
 	}
 
 	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base) {
-		data_base += 0x80;
+		//data_base += 0x80;
 		uint32_t base_it = data_base - 0x80;
 
 		write_reg(uc, UC_ARM_REG_R9, data_base);

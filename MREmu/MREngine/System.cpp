@@ -1,9 +1,11 @@
 #include "System.h"
 #include "../Memory.h"
 #include <vmsys.h>
-#include <vmgettag.h>
 #include <string>
+#include <filesystem>
 #include <SFML/System/Clock.hpp>
+
+namespace fs = std::filesystem;
 
 //MRE API
 
@@ -19,6 +21,8 @@ void* vm_calloc(int size) {
 	void* adr = vm_malloc(size);
 	if (adr)
 		memset(adr, 0, size);
+
+	//printf("vm_calloc(%d) -> %#016x\n", size, adr);
 	return adr;
 }
 
@@ -46,7 +50,9 @@ VMINT vm_get_tick_count(void) {
 }
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
-	swprintf_s((wchar_t*)filename, 260, L"e:\\TEMP");
+	extern fs::path vxp_path;
+
+	swprintf_s((wchar_t*)filename, 260, L"e:\\..\\..\\%s", vxp_path.wstring().c_str());
 	return 0;
 }
 
@@ -68,13 +74,5 @@ VMUINT vm_get_sys_property(const VMINT key, VMCHAR* value, VMUINT len) { // TODO
 		memcpy(value, str, len_to_cpy);
 		return len_to_cpy;
 	}
-	return 0;
-}
-
-VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
-	//if (tag_num == 0xF) {
-	//	*(uint32_t*)buf = 1500; // TEMP
-	//	return 1;
-	//}
 	return 0;
 }

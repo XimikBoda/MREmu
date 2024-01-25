@@ -1,5 +1,6 @@
 #include "IO.h"
 #include <vmio.h>
+#include <vmgettag.h>
 #include <iostream>
 #include <filesystem>
 
@@ -248,3 +249,58 @@ VMUINT vm_get_disk_free_space(VMWSTR drv_name) {
 }
 
 
+VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
+	fs::path path = convert_path(filename);
+
+	std::fstream f(path, std::ios::in | std::ios::binary | std::ios::ate);
+
+	if (!f.good()) 
+		return GET_TAG_FILE_ERROR;
+	
+	size_t file_size = f.tellg();
+
+	if (file_size < 4 * 3)
+		return GET_TAG_FILE_ERROR;
+
+	f.seekg(file_size - 4 * 3, std::ios::beg);
+
+	uint32_t tags_offset = 0;
+	f.read((char*)&tags_offset, 4);
+
+	if (tags_offset >= file_size - 4 * 3)
+		return GET_TAG_FILE_ERROR;
+
+	uint32_t id, tag_size, pos = tags_offset;
+
+	do {
+		if (pos + 8 >= file_size)
+			return GET_TAG_ERROR;
+
+		f.seekg(pos, std::ios::beg);
+
+		f.read((char*)&id, 4);
+		f.read((char*)&tag_size, 4);
+
+		pos += 8;
+
+		if (pos + tag_size >= file_size)
+			return GET_TAG_ERROR;
+
+		if (id == tag_num)
+			break;
+
+		pos += tag_size;
+	} while (id);
+
+	if (id != tag_num)
+		return GET_TAG_NOT_FOUND;
+
+	if (*buf_size < tag_size)
+		return GET_TAG_INSUFFICIENT_BUF;
+
+	f.read((char*)buf, tag_size);
+
+	*buf_size = tag_size;
+
+	return GET_TAG_TRUE;
+}

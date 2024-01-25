@@ -306,3 +306,30 @@ void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* sr
 			buf16_dst[sy * cfp_dst->width + sx] = buf16_src[im_y * cfp_src->width + im_x];
 		}
 }
+
+
+void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMUINT16 line_color, VMUINT16 back_color) {
+	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(buf - VM_CANVAS_DATA_OFFSET);
+	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9))
+		return;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+
+	int st_x = std::max(0, x);
+	int st_y = std::max(0, y);
+
+	int end_x = std::min<int>(cfp_dst->width, x + width);
+	int end_y = std::min<int>(cfp_dst->height, y + height);
+
+	for (int sy = st_y; sy < end_y; ++sy)
+		for (int sx = st_x; sx < end_x; ++sx)
+			if (x == sx || y == sy || sx == x + width - 1 || sy == y + height - 1)
+				buf16_dst[sy * cfp_dst->width + sx] = line_color;
+			else
+				buf16_dst[sy * cfp_dst->width + sx] = back_color;
+}
+
+VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {
+	get_current_app_graphic().global_color = *color;
+	return VM_GDI_SUCCEED;
+}

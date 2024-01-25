@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <vmgraph.h>
 #include <SFML/Graphics/Texture.hpp>
 
 const char* const CANVAS_MAGIC = "MTKCANVAS"; // Do we have an app that checks for this?
@@ -58,6 +59,8 @@ namespace MREngine {
 		std::vector<layer> layers;
 
 		std::vector<std::pair<void*, sf::Texture>> canvases_list;
+
+		vm_graphic_color global_color;
 
 		int create_layer(int x, int y, int w, int h, int trans_color);
 		void* get_layer_buf(int handle);

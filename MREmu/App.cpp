@@ -31,7 +31,7 @@ void App::preparation()
 	is_zipped = tags.is_zipped();
 
 	mem_size = tags.get_ram() * 1024;
-	mem_size = std::max<size_t>(512 * 1024, mem_size);
+	mem_size = std::max<size_t>(512 * 1024 * 4, mem_size);
 
 	mem_location = Memory::shared_malloc(mem_size, 0x100000);
 	memset(mem_location, 0, mem_size);
@@ -136,7 +136,7 @@ void App::start()
 {
 	uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
 	if (is_ads) {
-		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + segments_size);
+		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + mem_size);
 	}
 	else {
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);
@@ -149,8 +149,12 @@ void App::start()
 }
 
 
+fs::path vxp_path; //very temp
+
 bool App::load_from_file(fs::path path)
 {
+	vxp_path = path;
+
 	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
 	if (!in.is_open())
 		abort();
