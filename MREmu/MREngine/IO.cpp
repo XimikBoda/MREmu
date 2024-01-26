@@ -16,10 +16,10 @@ namespace fs = std::filesystem;
 
 void MREngine::IO::init()
 {
-	fs::create_directory(".\\fs");
-	fs::create_directory(".\\fs\\e");
-	fs::create_directory(".\\fs\\c");
-	fs::create_directory(".\\fs\\d");
+	fs::create_directory("./fs");
+	fs::create_directory("./fs/e");
+	fs::create_directory("./fs/c");
+	fs::create_directory("./fs/d");
 }
 
 static void click_buttom(int key, int ev) {
@@ -82,6 +82,7 @@ fs::path convert_path(fs::path path) { // TODO rewrite this
 		res += "e\\";
 	}
 	res += path.relative_path();
+	res = res.make_preferred();
 	std::cout << "convert_path: " << path << " to " << res << '\n';
 	return res;
 }
