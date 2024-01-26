@@ -38,7 +38,7 @@ public:
 	MREngine::Timer timer;
 	MREngine::AppIO io;
 
-	void preparation();
+	bool preparation();
 	void start();
 	bool load_from_file(fs::path path);//tmp
 };

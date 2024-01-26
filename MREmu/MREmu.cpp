@@ -11,6 +11,7 @@
 #include "Cpu.h"
 #include "Bridge.h"
 #include "App.h"
+#include "AppManager.h"
 
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
@@ -18,20 +19,19 @@
 
 sf::Clock global_clock;
 
-App app;
-
 bool work = true;
 
-void mre_main() {
-	app.load_from_file("minecraft.vxp");
-	app.preparation();
-	app.start();
+AppManager* g_appManager = 0;
+
+void mre_main(AppManager* appManager_p) {
+	AppManager& appManager = *appManager_p;
 
 	sf::Clock deltaClock;
 	while (work) {
 		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
 
-		app.timer.update(delta_ms);
+		appManager.launch_apps();
+		//app.timer.update(delta_ms);
 
 		sf::sleep(sf::milliseconds(1000/60));
 	}
@@ -46,13 +46,16 @@ int main() {
 	MREngine::SIM::init();
 	MREngine::Graphic graphic;
 
-	std::thread second_thread(mre_main);
+	AppManager appManager;
+	g_appManager = &appManager;
+
+	std::thread second_thread(mre_main, &appManager);
 
     sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
     ImGui::SFML::Init(win);
     win.setFramerateLimit(60);
 
-    
+	appManager.add_app_for_launch("minecraft.vxp", true);
 
 	sf::Clock deltaClock;
 	sf::Event event;
@@ -71,8 +74,11 @@ int main() {
 		ImGui::SFML::Update(win, deltaClock.restart());
 
 		graphic.imgui_screen();
-		app.graphic.imgui_layers();
-		app.graphic.imgui_canvases();
+		App* active_app = appManager.get_active_app();
+		if (active_app) {
+			active_app->graphic.imgui_layers();
+			active_app->graphic.imgui_canvases();
+		}
 
 
 		ImGui::SFML::Render(win);

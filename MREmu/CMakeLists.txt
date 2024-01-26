@@ -9,7 +9,8 @@ add_executable (MREmu
 						"MreTags.cpp" "MreTags.h" 
 						"Disassembler.cpp" "Disassembler.h"
 						"ARModule.cpp" "ARModule.h"
-						"miniz.c" "miniz.h")
+						"AppManager.cpp" "AppManager.h"
+						"miniz.c" "miniz.h" "mutex_wrapper.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREmu PROPERTY CXX_STANDARD 20)

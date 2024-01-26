@@ -6,8 +6,6 @@
 #include <sstream>
 #include <vmsys.h>
 
-static App* app_tmp = 0; //delete this
-
 typedef struct
 {
 	uint32_t ro_offset;
@@ -21,9 +19,10 @@ typedef struct
 	uint32_t res_size;
 } compress_ads_elf_info;
 
-void App::preparation()
+bool App::preparation()
 {
-	app_tmp = this;
+	if (!tags.load(file_context))
+		return false;
 
 	resources.file_context = &file_context;
 
@@ -55,8 +54,11 @@ void App::preparation()
 		for (int i = 0; i < elf.segments.size(); ++i) {
 			const ELFIO::segment* pseg = elf.segments[i];
 
-			if (pseg->get_virtual_address() + pseg->get_memory_size() > mem_size)
-				abort();
+			if (pseg->get_virtual_address() + pseg->get_memory_size() > mem_size) {
+				printf("Segment loading error, %d bytes required, but %d allocated\n",
+					pseg->get_virtual_address() + pseg->get_memory_size(), mem_size);
+				return false;
+			}
 
 			memcpy((unsigned char*)mem_location + pseg->get_virtual_address(),
 				file_context.data() + pseg->get_offset(), pseg->get_file_size());
@@ -93,17 +95,26 @@ void App::preparation()
 		if (is_ads) {
 			uint32_t elf_info_size = *(uint32_t*)(file_context.data() + tags.tags_offset - 4);
 
-			if (elf_info_size != sizeof(compress_ads_elf_info)) abort();
+			if (elf_info_size != sizeof(compress_ads_elf_info)) {
+				printf("compress_ads_elf_info size error\n");
+				return false;
+			}
 
 			compress_ads_elf_info* info = (compress_ads_elf_info*)(file_context.data() + tags.tags_offset - 4 - elf_info_size);
 
 			uLongf dL = info->org_ro_size;
 			if(uncompress((unsigned char*)mem_location, 
-				&dL, file_context.data() + info->ro_offset, info->ro_size)) abort();
+				&dL, file_context.data() + info->ro_offset, info->ro_size)) {
+				printf("uncompress error\n");
+				return false;
+			}
 
 			dL = info->org_rw_size;
 			if (uncompress((unsigned char*)mem_location + info->org_ro_size, 
-				&dL, file_context.data() + info->rw_offset, info->rw_size)) abort();
+				&dL, file_context.data() + info->rw_offset, info->rw_size)) {
+				printf("uncompress error\n");
+				return false;
+			}
 
 			resources.offset = info->res_offset;
 			resources.size = info->res_size;
@@ -115,8 +126,9 @@ void App::preparation()
 		}
 		else {
 			printf("zipped no ads is not realized\n");
-			exit(0);
+			return false;
 		}
+		return true;
 	}
 
 	{//temp
@@ -158,36 +170,11 @@ bool App::load_from_file(fs::path path)
 
 	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
 	if (!in.is_open())
-		abort();
-		//return 0;
+		return false;
 	size_t file_size = (size_t)in.tellg();
 	in.seekg(0, std::ios::beg);
 	file_context.resize(file_size);
 	in.read((char*)file_context.data(), file_size);
 	in.close();
-	tags.load(file_context);
-}
-
-Memory::MemoryManager& get_current_app_memory() { //TODO: move to app manager
-	return app_tmp->app_memory;
-}
-
-MREngine::SystemCallbacks& get_current_app_system_callbacks() {
-	return app_tmp->system_callbacks;
-}
-
-MREngine::Resources& get_current_app_resources() {
-	return app_tmp->resources;
-}
-
-MREngine::AppGraphic& get_current_app_graphic() {
-	return app_tmp->graphic;
-}
-
-MREngine::Timer& get_current_app_timer() {
-	return app_tmp->timer;
-}
-
-MREngine::AppIO& get_current_app_io() {
-	return app_tmp->io;
+	return true;
 }

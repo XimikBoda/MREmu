@@ -187,6 +187,7 @@ void MREngine::AppGraphic::imgui_layers() {
 }
 
 void MREngine::AppGraphic::imgui_canvases() {
+	std::lock_guard lock(canvases_list_mutex);
 	if (ImGui::Begin("Canvases")) {
 		for (int i = 0; i < canvases_list.size(); ++i) {
 			auto& el = canvases_list[i];
@@ -296,6 +297,7 @@ VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 
 	cfp->offset = image_size;
 
+	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 
 	return (VMINT)ADDRESS_TO_EMU(canvas_buf);
@@ -304,6 +306,8 @@ VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 void vm_graphic_release_canvas(VMINT hcanvas) {
 	void* hcanvas_adr = ADDRESS_FROM_EMU(hcanvas);
 	auto& canvases_list = get_current_app_graphic().canvases_list;
+
+	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 
 	for (int i = 0; i < canvases_list.size(); ++i)
 		if (canvases_list[i].first == hcanvas_adr)
