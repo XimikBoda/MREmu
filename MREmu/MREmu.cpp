@@ -80,6 +80,7 @@ int main() {
 			active_app->graphic.imgui_canvases();
 		}
 
+		Cpu::imgui_REG();
 
 		ImGui::SFML::Render(win);
 		win.display();

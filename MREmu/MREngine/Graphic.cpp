@@ -108,8 +108,8 @@ void MREngine::Graphic::imgui_screen() {
 	if (ImGui::Begin("Screen")) {
 		buf_to_texture(screen.data(), width, height, screen_tex);
 		ImGui::Image(screen_tex);
-		ImGui::End();
 	}
+	ImGui::End();
 }
 
 MREngine::Graphic::~Graphic()
@@ -182,8 +182,8 @@ void MREngine::AppGraphic::imgui_layers() {
 				i, el.x, el.y, el.w, el.h, el.trans_color);
 			ImGui::Image(el.tex);
 		}
-		ImGui::End();
 	}
+	ImGui::End();
 }
 
 void MREngine::AppGraphic::imgui_canvases() {
@@ -208,8 +208,8 @@ void MREngine::AppGraphic::imgui_canvases() {
 				i, cfp->left, cfp->top, cfp->width, cfp->height);
 			ImGui::Image(el.second);
 		}
-		ImGui::End();
 	}
+	ImGui::End();
 }
 
 

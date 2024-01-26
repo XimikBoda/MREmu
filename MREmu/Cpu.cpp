@@ -1,6 +1,8 @@
 #include "Cpu.h"
 #include "Memory.h"
 #include "Disassembler.h"
+#include <imgui.h>
+#include <imgui-SFML.h>
 #include <unicorn/unicorn.h>
 #include <capstone/capstone.h>
 
@@ -43,6 +45,38 @@ namespace Cpu {
 		uc_reg_read(uc, UC_ARM_REG_LR, &v); printf(" LR=0x%08X\t", v);
 		uc_reg_read(uc, UC_ARM_REG_PC, &v); printf(" PC=0x%08X\tV:%d\tThumb:%d\n", v, (cpsr & (1 << 28)) >> 28, (cpsr & (1 << 5)) >> 5);
 		printf("==============================================================\n");
+	}
+
+	void imgui_REG() {
+		uint32_t v, cpsr;
+		std::string reg_nms[7] = { "SP", "LR", "PC", "N", "Z", "C", "V" };
+		int reg_nbs[3] = { UC_ARM_REG_SP, UC_ARM_REG_LR, UC_ARM_REG_PC };
+
+		uc_reg_read(uc, UC_ARM_REG_CPSR, &cpsr);
+
+		if (ImGui::Begin("CPU REG")) {
+			ImGui::PushItemWidth(80);
+			for (int i = 0; i < 16; ++i) {
+				std::string name = (i <= 12 ? ((i < 10 ? " R" : "R") + std::to_string(i)) : " " + reg_nms[i - 13]);
+				int reg = (i <= 12 ? UC_ARM_REG_R0 + i : reg_nbs[i - 13]);
+				uc_reg_read(uc, reg, &v);
+				if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U32, &v, 0, 0, "%08X", ImGuiInputTextFlags_CharsHexadecimal)) {
+					uc_reg_write(uc, reg, &v);
+				}
+				ImGui::SameLine();
+				if (i % 4 == 3) {
+					if (ImGui::CheckboxFlags(reg_nms[i / 4 + 3].c_str(), &cpsr, 1 << (31 - i / 4)))
+						uc_reg_write(uc, UC_ARM_REG_CPSR, &cpsr);
+				}
+			}
+
+			ImGui::PopItemWidth();
+			if (ImGui::Button("Print to console"))
+				printREG(uc);
+			if (ImGui::Button("Clear console"))
+				system("cls");
+		}
+		ImGui::End();
 	}
 
 	static void print_code(unsigned char* data, int size) {
