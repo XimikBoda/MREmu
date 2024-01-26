@@ -1,4 +1,5 @@
 ﻿#include <iostream>
+#include <thread>
 
 #include "imgui.h"
 #include "imgui-SFML.h"
@@ -17,23 +18,41 @@
 
 sf::Clock global_clock;
 
+App app;
+
+bool work = true;
+
+void mre_main() {
+	app.load_from_file("minecraft.vxp");
+	app.preparation();
+	app.start();
+
+	sf::Clock deltaClock;
+	while (work) {
+		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
+
+		app.timer.update(delta_ms);
+
+		sf::sleep(sf::milliseconds(1000/60));
+	}
+}
+
 int main() {
     Memory::init(128 * 1024 * 1024);
     Cpu::init();
     Bridge::init();
 
-    MREngine::Graphic graphic;
 	MREngine::IO::init();
 	MREngine::SIM::init();
+	MREngine::Graphic graphic;
+
+	std::thread second_thread(mre_main);
 
     sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
     ImGui::SFML::Init(win);
     win.setFramerateLimit(60);
 
-    App app;
-    app.load_from_file("peanut_2500k.vxp");
-    app.preparation();
-    app.start();
+    
 
 	sf::Clock deltaClock;
 	sf::Event event;
@@ -49,20 +68,21 @@ int main() {
 				break;
 			}
 		}
-		uint32_t delta_ms = deltaClock.getElapsedTime().asMilliseconds();
 		ImGui::SFML::Update(win, deltaClock.restart());
 
 		graphic.imgui_screen();
 		app.graphic.imgui_layers();
 		app.graphic.imgui_canvases();
 
-		app.timer.update(delta_ms);
 
 		ImGui::SFML::Render(win);
 		win.display();
 		win.clear();
 	}
-	ImGui::SFML::Shutdown();
 
+	work = false;
+	second_thread.join();
+
+	ImGui::SFML::Shutdown();
     return 0;
 }
