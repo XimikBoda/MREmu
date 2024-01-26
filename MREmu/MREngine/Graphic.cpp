@@ -146,6 +146,27 @@ int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_col
 		abort();
 }
 
+int MREngine::AppGraphic::create_layer_ex(int x, int y, int w, int h, int trans_color, int mode, void* buf) {
+	if (!graphic)
+		return -1;
+
+	if (mode != VM_BUF)//todo
+		abort();
+
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)((unsigned char*)buf - VM_CANVAS_DATA_OFFSET);
+	if (memcmp(cs->magic, CANVAS_MAGIC, 9)) {
+		cs = (MREngine::canvas_signature*)((unsigned char*)buf);
+		if (memcmp(cs->magic, CANVAS_MAGIC, 9))
+			return -1;
+	}
+	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
+	unsigned short* buf16 = (unsigned short*)(cfp + 1);
+
+	layers.push_back({ buf16, x, y, w, h, trans_color });
+
+	return layers.size() - 1;
+}
+
 void* MREngine::AppGraphic::get_layer_buf(int handle) {
 	if (handle < 0 || handle >= layers.size())
 		return 0;
@@ -214,6 +235,10 @@ VMINT vm_graphic_create_layer(VMINT x, VMINT y, VMINT width, VMINT height, VMINT
 	return get_current_app_graphic().create_layer(x, y, width, height, trans_color);
 }
 
+VM_GDI_HANDLE vm_graphic_create_layer_ex(VMINT x, VMINT y, VMINT width, VMINT height, VMINT trans_color, VMINT mode, VMUINT8* buf) {
+	return get_current_app_graphic().create_layer_ex(x, y, width, height, trans_color, mode, buf);
+}
+
 VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
 	return (VMUINT8*)get_current_app_graphic().get_layer_buf(handle);
 }
@@ -222,7 +247,7 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 	if (layer_handles == 0)
 		return -1;
 
-	MREngine::AppGraphic &gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = get_current_app_graphic();
 
 	for (int i = 0; i < count; ++i)
 		if (layer_handles[i] < 0 || layer_handles[i] >= gr.layers.size())
@@ -383,6 +408,10 @@ void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 				buf16_dst[sy * cfp_dst->width + sx] = line_color;
 			else
 				buf16_dst[sy * cfp_dst->width + sx] = back_color;
+}
+
+void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
+	//TODO
 }
 
 VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {

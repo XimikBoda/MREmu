@@ -112,17 +112,18 @@ void App::preparation()
 
 			entry_point = offset_mem;
 
-			{//temp
-				std::ofstream out("unpack.bin");
-				if (out.is_open()) {
-					out.write((char*)mem_location, segments_size);
-					out.close();
-				}
-			}
 		}
 		else {
 			printf("zipped no ads is not realized\n");
 			exit(0);
+		}
+	}
+
+	{//temp
+		std::ofstream out("unpack.bin");
+		if (out.is_open()) {
+			out.write((char*)mem_location, segments_size);
+			out.close();
 		}
 	}
 
@@ -136,7 +137,7 @@ void App::start()
 {
 	uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
 	if (is_ads) {
-		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + mem_size);
+		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + mem_size+ 0x100);
 	}
 	else {
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);

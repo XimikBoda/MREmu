@@ -63,6 +63,7 @@ namespace MREngine {
 		vm_graphic_color global_color;
 
 		int create_layer(int x, int y, int w, int h, int trans_color);
+		int create_layer_ex(int x, int y, int w, int h, int trans_color, int mode, void*buf);
 		void* get_layer_buf(int handle);
 
 		void imgui_layers();

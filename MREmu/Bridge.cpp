@@ -409,6 +409,16 @@ namespace Bridge {
 		{"vm_graphic_create_canvas", br_vm_graphic_create_canvas},
 		{"vm_graphic_release_canvas", br_vm_graphic_release_canvas},
 		{"vm_graphic_get_canvas_buffer", br_vm_graphic_get_canvas_buffer},
+		{"vm_graphic_create_layer_ex", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_create_layer_ex(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5),
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 6))));
+		}},
 		{"vm_graphic_load_image", br_vm_graphic_load_image},
 		{"vm_graphic_blt", br_vm_graphic_blt},
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
@@ -420,6 +430,13 @@ namespace Bridge {
 				read_arg(uc, 4),
 				read_arg(uc, 5),
 				read_arg(uc, 6));
+		}},
+		{"vm_graphic_set_clip", [](uc_engine* uc) {
+			vm_graphic_set_clip(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3));
 		}},
 		{"vm_graphic_setcolor", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_setcolor(

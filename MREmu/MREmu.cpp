@@ -31,7 +31,7 @@ int main() {
     win.setFramerateLimit(60);
 
     App app;
-    app.load_from_file("Asphalt 6.vxp");
+    app.load_from_file("peanut_2500k.vxp");
     app.preparation();
     app.start();
 
