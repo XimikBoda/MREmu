@@ -1,6 +1,7 @@
 #include "Memory.h"
 #include <malloc.h>
 #include <stdlib.h>
+#include <cstring>
 
 #ifndef WIN32
 #define _aligned_malloc(size, alignment) aligned_alloc((alignment), (size))

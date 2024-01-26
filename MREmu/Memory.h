@@ -22,6 +22,8 @@ void* ADDRESS_FROM_EMU(uint32_t x);
 #define ADDRESS_FROM_EMU(x) (x)
 #endif // X64MODE
 
+#define FUNC_TO_UINT32(x) (uint32_t)(((size_t)(x))&UINT32_MAX)
+
 extern void* shared_memory_prt;
 extern uint64_t shared_memory_offset;
 extern size_t shared_memory_size;

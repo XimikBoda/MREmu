@@ -1,6 +1,7 @@
 #include "SIM.h"
 #include "../Memory.h"
 #include <vmsim.h>
+#include <cstring>
 
 static void* imei_ptr = 0;
 

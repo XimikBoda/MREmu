@@ -1,4 +1,5 @@
 #include "MreTags.h"
+#include <cstring>
 
 void MreTags::load(std::vector<unsigned char>& file)
 {

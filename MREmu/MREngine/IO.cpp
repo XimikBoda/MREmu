@@ -3,15 +3,16 @@
 #include <vmgettag.h>
 #include <iostream>
 #include <filesystem>
+#include <cstring>
 
 namespace fs = std::filesystem;
 
 void MREngine::IO::init()
 {
-	fs::create_directory(".\\fs");
-	fs::create_directory(".\\fs\\e");
-	fs::create_directory(".\\fs\\c");
-	fs::create_directory(".\\fs\\d");
+	fs::create_directory("./fs");
+	fs::create_directory("./fs/e");
+	fs::create_directory("./fs/c");
+	fs::create_directory("./fs/d");
 }
 
 fs::path convert_path(const VMWSTR str) { // TODO rewrite this
@@ -29,6 +30,7 @@ fs::path convert_path(const VMWSTR str) { // TODO rewrite this
 		res += "e\\";
 	}
 	res += path.relative_path();
+	res = res.make_preferred();
 	std::cout << "convert_path: " << path << " to " << res << '\n';
 	return res;
 }
@@ -44,7 +46,8 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		fmode |= std::ios_base::in;
 
 	if (fmode | MODE_WRITE)
-		fmode |= std::ios_base::out | std::ios_base::_Nocreate;
+		fmode |= std::ios_base::out;  // TODO: _Nocreate is not available on Linux, use an alternative
+		// fmode |= std::ios_base::out | std::ios_base::_Nocreate;
 
 	if (fmode | MODE_CREATE_ALWAYS_WRITE)
 		fmode |= std::ios_base::out;
@@ -138,7 +141,7 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		return -1;
 
 
-	std::ios_base::seekdir sdir = 0;
+	std::ios_base::seekdir sdir;
 
 	switch (base) {
 	case BASE_BEGIN:
@@ -155,7 +158,7 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		break;
 	}
 
-	f.seekg(offset, base);
+	f.seekg((std::streamoff)offset, sdir);
 
 	return 0;
 }
