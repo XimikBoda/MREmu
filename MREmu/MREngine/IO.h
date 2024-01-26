@@ -9,7 +9,7 @@ namespace MREngine {
 
 	class AppIO{
 	public:
-		std::vector<std::fstream> files;
+		std::vector<std::fstream*> files;
 	};
 };
 

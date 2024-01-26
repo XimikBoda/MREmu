@@ -52,18 +52,22 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	if (fmode | MODE_APPEND)
 		fmode |= std::ios_base::out | std::ios_base::app;
 
-	io.files.resize(io.files.size() + 1);
+	std::fstream* f = new std::fstream;
 
-	std::fstream& f = io.files[io.files.size() - 1];
+	f->open(path, fmode);
 
-	f.open(path, fmode);
-
-	if (!f.good()) {
-		io.files.resize(io.files.size() - 1);
+	if (!f->good()) {
+		delete f;
 		return -1;
 	}
 
-	//io.files.push_back(f);
+	for(int i=0; i< io.files.size(); ++i)
+		if (io.files[i] == 0) {
+			io.files[i] = f;
+			return i;
+		}
+
+	io.files.push_back(f);
 
 	return io.files.size() - 1;
 }
@@ -74,7 +78,14 @@ void vm_file_close(VMFILE handle) {
 	if (handle < 0 || handle >= io.files.size())
 		return;
 
-	io.files[handle].close();
+	if (io.files[handle]) {
+		io.files[handle]->close();
+		delete io.files[handle];
+		io.files[handle] = 0; //todo
+
+		while (io.files.size() && io.files[io.files.size() - 1] == 0)
+			io.files.resize(io.files.size() - 1);
+	}
 }
 
 VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
@@ -83,14 +94,13 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 	if (handle < 0 || handle >= io.files.size())
 		return -1;
 
-	auto& f = io.files[handle];
-
-	if (!f.good())
+	auto f = io.files[handle];
+	if (!f)
 		return -1;
 
-	f.read((char*)data, length);
+	f->read((char*)data, length);
 
-	*nread = f.gcount();
+	*nread = f->gcount();
 	return *nread;
 }
 
@@ -100,14 +110,13 @@ VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 	if (handle < 0 || handle >= io.files.size())
 		return -1;
 
-	auto& f = io.files[handle];
-
-	if (!f.good())
+	auto f = io.files[handle];
+	if (!f)
 		return -1;
 
-	f.write((char*)data, length);
+	f->write((char*)data, length);
 
-	*written = f.gcount();
+	*written = f->gcount();
 	return *written;
 }
 
@@ -117,12 +126,11 @@ VMINT vm_file_commit(VMFILE handle) {
 	if (handle < 0 || handle >= io.files.size())
 		return -1;
 
-	auto& f = io.files[handle];
-
-	if (!f.good())
+	auto f = io.files[handle];
+	if (!f)
 		return -1;
 
-	f.flush();
+	f->flush();
 	return 0;
 }
 
@@ -132,11 +140,9 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 	if (handle < 0 || handle >= io.files.size())
 		return -1;
 
-	auto& f = io.files[handle];
-
-	if (!f.good())
+	auto f = io.files[handle];
+	if (!f)
 		return -1;
-
 
 	std::ios_base::seekdir sdir = 0;
 
@@ -155,7 +161,7 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		break;
 	}
 
-	f.seekg(offset, base);
+	f->seekg(offset, base);
 
 	return 0;
 }
@@ -166,12 +172,11 @@ VMINT vm_file_tell(VMFILE handle) {
 	if (handle < 0 || handle >= io.files.size())
 		return -1;
 
-	auto& f = io.files[handle];
-
-	if (!f.good())
+	auto f = io.files[handle];
+	if (!f)
 		return -1;
 
-	return f.tellg();
+	return f->tellg();
 }
 
 VMINT vm_file_is_eof(VMFILE handle) {
@@ -180,12 +185,11 @@ VMINT vm_file_is_eof(VMFILE handle) {
 	if (handle < 0 || handle >= io.files.size())
 		return -1;
 
-	auto& f = io.files[handle];
-
-	if (!f.good())
+	auto f = io.files[handle];
+	if (!f)
 		return -1;
 
-	return f.eof();
+	return f->eof();
 }
 
 VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
@@ -194,17 +198,16 @@ VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 	if (handle < 0 || handle >= io.files.size())
 		return -1;
 
-	auto& f = io.files[handle];
+	auto f = io.files[handle];
+	if (!f)
+		return -1;;
 
-	if (!f.good())
-		return -1;
+	size_t pos = f->tellg();
+	f->seekg(0, std::ios_base::end);
 
-	size_t pos = f.tellg();
-	f.seekg(0, std::ios_base::end);
+	*file_size = f->tellg();
 
-	*file_size = f.tellg();
-
-	f.seekg(pos, std::ios_base::beg);
+	f->seekg(pos, std::ios_base::beg);
 
 	return 0;
 }
@@ -254,9 +257,9 @@ VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { //
 
 	std::fstream f(path, std::ios::in | std::ios::binary | std::ios::ate);
 
-	if (!f.good()) 
+	if (!f.good())
 		return GET_TAG_FILE_ERROR;
-	
+
 	size_t file_size = f.tellg();
 
 	if (file_size < 4 * 3)
