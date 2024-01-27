@@ -1,6 +1,6 @@
 #include "MreTags.h"
 
-void MreTags::load(std::vector<unsigned char>& file)
+bool MreTags::load(std::vector<unsigned char>& file)
 {
 	raw_tags.clear();
 	raw_tags.resize(0x34);
@@ -8,7 +8,7 @@ void MreTags::load(std::vector<unsigned char>& file)
 	size_t file_size = file.size();
 
 	if (file_size < 4 * 3)
-		abort();//TODO
+		return false;
 
 	tags_offset = *(uint32_t*)&file[file_size - 4 * 3];
 
@@ -16,14 +16,14 @@ void MreTags::load(std::vector<unsigned char>& file)
 
 	do {
 		if (pos + 8 >= file_size)
-			abort();//TODO
+			return false;
 
 		id = *(uint32_t*)&file[pos];
 		tag_size = *(uint32_t*)&file[pos + 4];
 		pos += 8;
 
 		if (pos + tag_size >= file_size)
-			abort();//TODO
+			return false;
 
 		raw_tags[id].resize(tag_size);
 		if (tag_size)
@@ -31,6 +31,8 @@ void MreTags::load(std::vector<unsigned char>& file)
 
 		pos += tag_size;
 	} while (id);
+
+	return true;
 }
 
 bool MreTags::is_ads()

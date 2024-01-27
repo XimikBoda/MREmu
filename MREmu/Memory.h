@@ -38,11 +38,10 @@ namespace Memory {
 		size_t free_memory_size = 0;
 		std::vector<memory_region_t> regions;
 	public:
-		MemoryManager() = default;
-		MemoryManager(size_t start_adr, size_t size);
+		void setup(size_t start_adr, size_t size);
 
 		size_t malloc(size_t size, size_t align = 8); // align is 8 righd? //todo
-		size_t malloc_topmost(size_t size);
+		size_t malloc_topmost(size_t size, size_t align);
 
 		size_t realloc(size_t addr, size_t size);
 

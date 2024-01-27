@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
+#include <mutex>
 #include <vmgraph.h>
 #include <SFML/Graphics/Texture.hpp>
+#include "../mutex_wrapper.h"
 
 const char* const CANVAS_MAGIC = "MTKCANVAS"; // Do we have an app that checks for this?
 
@@ -59,6 +61,7 @@ namespace MREngine {
 		std::vector<layer> layers;
 
 		std::vector<std::pair<void*, sf::Texture>> canvases_list;
+		mutex_wrapper canvases_list_mutex;
 
 		vm_graphic_color global_color;
 

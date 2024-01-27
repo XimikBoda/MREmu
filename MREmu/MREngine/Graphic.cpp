@@ -108,8 +108,8 @@ void MREngine::Graphic::imgui_screen() {
 	if (ImGui::Begin("Screen")) {
 		buf_to_texture(screen.data(), width, height, screen_tex);
 		ImGui::Image(screen_tex);
-		ImGui::End();
 	}
+	ImGui::End();
 }
 
 MREngine::Graphic::~Graphic()
@@ -182,11 +182,12 @@ void MREngine::AppGraphic::imgui_layers() {
 				i, el.x, el.y, el.w, el.h, el.trans_color);
 			ImGui::Image(el.tex);
 		}
-		ImGui::End();
 	}
+	ImGui::End();
 }
 
 void MREngine::AppGraphic::imgui_canvases() {
+	std::lock_guard lock(canvases_list_mutex);
 	if (ImGui::Begin("Canvases")) {
 		for (int i = 0; i < canvases_list.size(); ++i) {
 			auto& el = canvases_list[i];
@@ -207,8 +208,8 @@ void MREngine::AppGraphic::imgui_canvases() {
 				i, cfp->left, cfp->top, cfp->width, cfp->height);
 			ImGui::Image(el.second);
 		}
-		ImGui::End();
 	}
+	ImGui::End();
 }
 
 
@@ -296,6 +297,7 @@ VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 
 	cfp->offset = image_size;
 
+	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 
 	return (VMINT)ADDRESS_TO_EMU(canvas_buf);
@@ -304,6 +306,8 @@ VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 void vm_graphic_release_canvas(VMINT hcanvas) {
 	void* hcanvas_adr = ADDRESS_FROM_EMU(hcanvas);
 	auto& canvases_list = get_current_app_graphic().canvases_list;
+
+	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 
 	for (int i = 0; i < canvases_list.size(); ++i)
 		if (canvases_list[i].first == hcanvas_adr)
@@ -353,6 +357,32 @@ VMINT vm_graphic_load_image(VMUINT8* img, VMINT img_len) {
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 
 	return (VMINT)ADDRESS_TO_EMU(canvas_buf);
+}
+
+struct frame_prop* vm_graphic_get_img_property(VMINT hcanvas, VMUINT8 frame_index) {
+	if (hcanvas == 0)
+		return 0;
+
+	static struct frame_prop* info = (frame_prop*)Memory::shared_malloc(sizeof(frame_prop));
+
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(ADDRESS_FROM_EMU(hcanvas));
+	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
+		return 0;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
+
+	//TODO frame index
+
+	info->flag = cfp_dst->flag;
+	info->left = cfp_dst->left;
+	info->top = cfp_dst->top;
+	info->width = cfp_dst->width;
+	info->height = cfp_dst->height;
+	info->delay_time = cfp_dst->delay * 10; //todo check this
+	info->trans_color_index = cfp_dst->trans_color_index;
+	info->trans_color = cfp_dst->trans_color;
+	info->offset = cfp_dst->offset;
+
+	return info;
 }
 
 void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,

@@ -8,7 +8,7 @@ public:
 
 	uint32_t tags_offset;
 
-	void load(std::vector<unsigned char>&file);
+	bool load(std::vector<unsigned char>&file);
 
 	bool is_ads();
 	bool is_simple_ads();

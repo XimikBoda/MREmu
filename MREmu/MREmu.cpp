@@ -1,4 +1,5 @@
 ﻿#include <iostream>
+#include <thread>
 
 #include "imgui.h"
 #include "imgui-SFML.h"
@@ -10,6 +11,7 @@
 #include "Cpu.h"
 #include "Bridge.h"
 #include "App.h"
+#include "AppManager.h"
 
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
@@ -17,23 +19,48 @@
 
 sf::Clock global_clock;
 
+bool work = true;
+
+AppManager* g_appManager = 0;
+
+void mre_main(AppManager* appManager_p) {
+	AppManager& appManager = *appManager_p;
+
+	sf::Clock deltaClock;
+	while (work) {
+		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
+
+		appManager.launch_apps();
+		appManager.process_keyboard_events();
+		//app.timer.update(delta_ms);
+		App* active_app = appManager.get_active_app();
+		if (active_app) {
+			active_app->timer.update(delta_ms);
+		}
+
+		//sf::sleep(sf::milliseconds(1000/60));
+	}
+}
+
 int main() {
     Memory::init(128 * 1024 * 1024);
     Cpu::init();
     Bridge::init();
 
-    MREngine::Graphic graphic;
 	MREngine::IO::init();
 	MREngine::SIM::init();
+	MREngine::Graphic graphic;
+
+	AppManager appManager;
+	g_appManager = &appManager;
+
+	std::thread second_thread(mre_main, &appManager);
 
     sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
     ImGui::SFML::Init(win);
     win.setFramerateLimit(60);
 
-    App app;
-    app.load_from_file("peanut_2500k.vxp");
-    app.preparation();
-    app.start();
+	appManager.add_app_for_launch("minecraft.vxp", true);
 
 	sf::Clock deltaClock;
 	sf::Event event;
@@ -49,20 +76,27 @@ int main() {
 				break;
 			}
 		}
-		uint32_t delta_ms = deltaClock.getElapsedTime().asMilliseconds();
 		ImGui::SFML::Update(win, deltaClock.restart());
 
 		graphic.imgui_screen();
-		app.graphic.imgui_layers();
-		app.graphic.imgui_canvases();
+		App* active_app = appManager.get_active_app();
+		if (active_app) {
+			active_app->graphic.imgui_layers();
+			active_app->graphic.imgui_canvases();
+		}
 
-		app.timer.update(delta_ms);
+		Cpu::imgui_REG();
+
+		MREngine::IO::imgui_keyboard();
 
 		ImGui::SFML::Render(win);
 		win.display();
 		win.clear();
 	}
-	ImGui::SFML::Shutdown();
 
+	work = false;
+	second_thread.join();
+
+	ImGui::SFML::Shutdown();
     return 0;
 }
