@@ -128,7 +128,6 @@ bool App::preparation()
 			printf("zipped no ads is not realized\n");
 			return false;
 		}
-		return true;
 	}
 
 	{//temp
@@ -139,10 +138,11 @@ bool App::preparation()
 		}
 	}
 
-	app_memory = Memory::MemoryManager((size_t)mem_location, mem_size);
+	app_memory.setup((size_t)mem_location, mem_size);
 	app_memory.malloc(segments_size); // for "protect" code
 
 	resources.scan();
+	return true;
 }
 
 void App::start()

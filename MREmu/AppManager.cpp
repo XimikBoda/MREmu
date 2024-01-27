@@ -35,6 +35,8 @@ void AppManager::launch_apps()
 	active_app_id = apps.size() - 1;
 	current_work_app_id = apps.size() - 1;
 
+	apps[current_work_app_id].resources.file_context = &(apps[current_work_app_id].file_context); //todo
+
 	apps[current_work_app_id].start();
 }
 

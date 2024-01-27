@@ -53,7 +53,7 @@ namespace Memory {
 
 		shared_memory_offset = (uint64_t)shared_memory_prt - shared_memory_in_emu_start;
 
-		shared_memory = MemoryManager((uint64_t)shared_memory_prt, shared_memory_size);
+		shared_memory.setup((uint64_t)shared_memory_prt, shared_memory_size);
 	}
 
 
@@ -88,11 +88,12 @@ namespace Memory {
 		_aligned_free(shared_memory_prt);
 	}
 
-	MemoryManager::MemoryManager(size_t start_adr, size_t size)
+	void MemoryManager::setup(size_t start_adr, size_t size)
 	{
 		this->start_adr = start_adr;
 		this->mem_size = size;
 		free_memory_size = this->mem_size;
+		regions.clear();
 	}
 
 	size_t MemoryManager::malloc(size_t size, size_t align)

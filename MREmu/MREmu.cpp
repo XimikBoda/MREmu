@@ -32,8 +32,12 @@ void mre_main(AppManager* appManager_p) {
 
 		appManager.launch_apps();
 		//app.timer.update(delta_ms);
+		App* active_app = appManager.get_active_app();
+		if (active_app) {
+			active_app->timer.update(delta_ms);
+		}
 
-		sf::sleep(sf::milliseconds(1000/60));
+		//sf::sleep(sf::milliseconds(1000/60));
 	}
 }
 
