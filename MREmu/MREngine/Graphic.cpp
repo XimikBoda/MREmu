@@ -359,6 +359,32 @@ VMINT vm_graphic_load_image(VMUINT8* img, VMINT img_len) {
 	return (VMINT)ADDRESS_TO_EMU(canvas_buf);
 }
 
+struct frame_prop* vm_graphic_get_img_property(VMINT hcanvas, VMUINT8 frame_index) {
+	if (hcanvas == 0)
+		return 0;
+
+	static struct frame_prop* info = (frame_prop*)Memory::shared_malloc(sizeof(frame_prop));
+
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(ADDRESS_FROM_EMU(hcanvas));
+	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
+		return 0;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
+
+	//TODO frame index
+
+	info->flag = cfp_dst->flag;
+	info->left = cfp_dst->left;
+	info->top = cfp_dst->top;
+	info->width = cfp_dst->width;
+	info->height = cfp_dst->height;
+	info->delay_time = cfp_dst->delay * 10; //todo check this
+	info->trans_color_index = cfp_dst->trans_color_index;
+	info->trans_color = cfp_dst->trans_color;
+	info->offset = cfp_dst->offset;
+
+	return info;
+}
+
 void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,
 	VMINT x_src, VMINT y_src, VMINT width, VMINT height, VMINT frame_index) {
 	if (dst_disp_buf == 0 || src_disp_buf == 0)

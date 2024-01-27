@@ -424,6 +424,12 @@ namespace Bridge {
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 6))));
 		}},
 		{"vm_graphic_load_image", br_vm_graphic_load_image},
+		{"vm_graphic_get_img_property", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(
+				vm_graphic_get_img_property(
+					read_arg(uc, 0),
+					read_arg(uc, 1))));
+		}},
 		{"vm_graphic_blt", br_vm_graphic_blt},
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
 			vm_graphic_fill_rect(
