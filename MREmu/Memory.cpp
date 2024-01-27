@@ -110,7 +110,7 @@ namespace Memory {
 			new_adr = ((new_adr / align) + 1) * align;
 
 		if (new_adr + size > start_adr + mem_size)
-			return malloc_topmost(size);
+			return malloc_topmost(size, align);
 		else {
 			regions.push_back({ new_adr, size });
 			free_memory_size -= size;
@@ -118,9 +118,20 @@ namespace Memory {
 		}
 	}
 
-	size_t MemoryManager::malloc_topmost(size_t size)
+	size_t MemoryManager::malloc_topmost(size_t size, size_t align)
 	{
-		printf("%s:%d, malloc_topmost() not completed\n", __FILE__, __LINE__);
+		//printf("%s:%d, malloc_topmost() not completed\n", __FILE__, __LINE__);
+		for (int i = 0; i < regions.size() - 1; ++i) {
+			size_t new_adr = regions[i].adr + regions[i].size;
+			if (new_adr % align != 0)
+				new_adr = ((new_adr / align) + 1) * align;
+
+			if (new_adr + size < regions[i + 1].adr) {
+				regions.insert(regions.begin() + i + 1, { new_adr, size });
+				free_memory_size -= size;
+				return new_adr;
+			}
+		}
 		return 0; //TODO
 	}
 

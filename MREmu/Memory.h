@@ -41,7 +41,7 @@ namespace Memory {
 		void setup(size_t start_adr, size_t size);
 
 		size_t malloc(size_t size, size_t align = 8); // align is 8 righd? //todo
-		size_t malloc_topmost(size_t size);
+		size_t malloc_topmost(size_t size, size_t align);
 
 		size_t realloc(size_t addr, size_t size);
 
