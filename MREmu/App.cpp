@@ -164,9 +164,11 @@ void App::start()
 
 fs::path vxp_path; //very temp
 
-bool App::load_from_file(fs::path path)
+bool App::load_from_file(fs::path path, bool local)
 {
 	vxp_path = path;
+	if (local)
+		abort(); // temp
 
 	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
 	if (!in.is_open())

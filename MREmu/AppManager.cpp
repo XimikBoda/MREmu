@@ -1,10 +1,10 @@
 #include "AppManager.h"
 #include "Bridge.h"
 
-void AppManager::add_app_for_launch(fs::path path, bool global)
+void AppManager::add_app_for_launch(fs::path path, bool local)
 {
 	std::lock_guard lock(launch_queue_mutex);
-	launch_queue.push({ path, global });
+	launch_queue.push({ path, local });
 }
 
 void AppManager::launch_apps()
@@ -21,12 +21,9 @@ void AppManager::launch_apps()
 
 	App app; 
 
-	if (launch_data.global) {
-		if (!app.load_from_file(launch_data.path))
-			return;
-	}
-	else
+	if (!app.load_from_file(launch_data.path, launch_data.local))
 		return;
+
 
 	if (!app.preparation())
 		return;

@@ -16,6 +16,7 @@
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
 #include "MREngine/SIM.h"
+#include <cmdparser.hpp>
 
 sf::Clock global_clock;
 
@@ -38,14 +39,23 @@ void mre_main(AppManager* appManager_p) {
 			active_app->timer.update(delta_ms);
 		}
 
-		//sf::sleep(sf::milliseconds(1000/60));
+		sf::sleep(sf::milliseconds(1000 / 60));
 	}
 }
 
-int main() {
-    Memory::init(128 * 1024 * 1024);
-    Cpu::init();
-    Bridge::init();
+int main(int argc, char** argv) {
+	cli::Parser parser(argc, argv);
+	{
+		parser.set_optional<std::string>("", "", "", "Path to vxp");
+		parser.set_optional<bool>("-l", "-path_is_local", false, "Set to run from local filesystem");
+	}
+	parser.run_and_exit_if_error();
+	auto app_path = parser.get<std::string>("");
+	bool path_is_local = parser.get<bool>("-l");
+
+	Memory::init(128 * 1024 * 1024);
+	Cpu::init();
+	Bridge::init();
 
 	MREngine::IO::init();
 	MREngine::SIM::init();
@@ -56,11 +66,22 @@ int main() {
 
 	std::thread second_thread(mre_main, &appManager);
 
-    sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
-    ImGui::SFML::Init(win);
-    win.setFramerateLimit(60);
+	sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
+	ImGui::SFML::Init(win);
+	win.setFramerateLimit(60);
 
-	appManager.add_app_for_launch("minecraft.vxp", true);
+	if (app_path.size())
+		if (fs::exists(app_path) || path_is_local)
+			appManager.add_app_for_launch("minecraft.vxp", path_is_local);
+		else {
+			printf("vxp file don't exists\n");
+			exit(1);
+		}
+	else {
+		printf("vxp file not specified\n");
+		exit(1);
+	}
+
 
 	sf::Clock deltaClock;
 	sf::Event event;
@@ -98,5 +119,5 @@ int main() {
 	second_thread.join();
 
 	ImGui::SFML::Shutdown();
-    return 0;
+	return 0;
 }

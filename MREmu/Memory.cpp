@@ -120,7 +120,6 @@ namespace Memory {
 
 	size_t MemoryManager::malloc_topmost(size_t size, size_t align)
 	{
-		//printf("%s:%d, malloc_topmost() not completed\n", __FILE__, __LINE__);
 		for (int i = 0; i < regions.size() - 1; ++i) {
 			size_t new_adr = regions[i].adr + regions[i].size;
 			if (new_adr % align != 0)
@@ -132,7 +131,7 @@ namespace Memory {
 				return new_adr;
 			}
 		}
-		return 0; //TODO
+		return 0;
 	}
 
 	size_t MemoryManager::realloc(size_t addr, size_t size)

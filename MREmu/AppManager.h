@@ -8,7 +8,7 @@ namespace fs = std::filesystem;
 
 struct launch_el {
 	fs::path path; 
-	bool global;
+	bool local;
 };
 
 struct keyboard_event_el {
@@ -28,7 +28,7 @@ public:
 	int active_app_id = -1;
 	int current_work_app_id = -1;
 
-	void add_app_for_launch(fs::path path, bool global);
+	void add_app_for_launch(fs::path path, bool local);
 	void launch_apps();
 
 	void add_keyboard_event(int event, int keycode);

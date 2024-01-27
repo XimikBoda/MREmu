@@ -40,5 +40,5 @@ public:
 
 	bool preparation();
 	void start();
-	bool load_from_file(fs::path path);//tmp
+	bool load_from_file(fs::path path, bool local);//tmp
 };
