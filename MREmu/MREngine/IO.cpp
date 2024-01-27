@@ -1,8 +1,11 @@
 #include "IO.h"
+#include "..\Memory.h"
 #include <vmio.h>
 #include <vmgettag.h>
 #include <iostream>
 #include <filesystem>
+#include <imgui.h>
+#include <imgui-SFML.h>
 
 namespace fs = std::filesystem;
 
@@ -12,6 +15,52 @@ void MREngine::IO::init()
 	fs::create_directory(".\\fs\\e");
 	fs::create_directory(".\\fs\\c");
 	fs::create_directory(".\\fs\\d");
+}
+
+static void click_buttom(int key, int ev) {
+	add_keyboard_event((ev == 0) ? (VM_KEY_EVENT_DOWN) : (VM_KEY_EVENT_UP), key);
+}
+struct Keys {
+	char name[20] = "";
+	int code = 0;
+};
+Keys keys[3 * 7] =
+{
+	{"Left S",VM_KEY_LEFT_SOFTKEY},
+	{"UP",VM_KEY_UP},
+	{"Right S",VM_KEY_RIGHT_SOFTKEY},
+	{"LEFT",VM_KEY_LEFT},
+	{"OK",VM_KEY_OK},
+	{"RIGHT",VM_KEY_RIGHT},
+	{" ",VM_KEY_FN},
+	{"Down",VM_KEY_DOWN},
+	{" ",VM_KEY_FN},
+	{"1.,",VM_KEY_NUM1},
+	{"2abc",VM_KEY_NUM2},
+	{"3def",VM_KEY_NUM3},
+	{"4ghi",VM_KEY_NUM4},
+	{"5jkl",VM_KEY_NUM5},
+	{"6mno",VM_KEY_NUM6},
+	{"7pqrs",VM_KEY_NUM7},
+	{"8tuv",VM_KEY_NUM8},
+	{"9wxyz",VM_KEY_NUM9},
+	{"*",VM_KEY_POUND},
+	{"0",VM_KEY_NUM0},
+	{"#",VM_KEY_STAR},
+};
+
+void MREngine::IO::imgui_keyboard() {
+	ImVec2 v = { 60,20 };
+	ImGui::Begin("KeyBoard");
+	for (int i = 0; i < 3 * 7; ++i) {
+		if (i % 3 != 0)
+			ImGui::SameLine();
+		if (ImGui::Button(keys[i].name, v))
+			click_buttom(keys[i].code, 1);
+		if (ImGui::IsItemClicked())
+			click_buttom(keys[i].code, 0);
+	}
+	ImGui::End();
 }
 
 fs::path convert_path(const VMWSTR str) { // TODO rewrite this
@@ -31,6 +80,12 @@ fs::path convert_path(const VMWSTR str) { // TODO rewrite this
 	res += path.relative_path();
 	std::cout << "convert_path: " << path << " to " << res << '\n';
 	return res;
+}
+
+void vm_reg_keyboard_callback(vm_key_handler_t handler) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	io.key_handler = (uint32_t)handler;
 }
 
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {

@@ -31,6 +31,7 @@ void mre_main(AppManager* appManager_p) {
 		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
 
 		appManager.launch_apps();
+		appManager.process_keyboard_events();
 		//app.timer.update(delta_ms);
 		App* active_app = appManager.get_active_app();
 		if (active_app) {
@@ -85,6 +86,8 @@ int main() {
 		}
 
 		Cpu::imgui_REG();
+
+		MREngine::IO::imgui_keyboard();
 
 		ImGui::SFML::Render(win);
 		win.display();

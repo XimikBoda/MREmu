@@ -1,4 +1,5 @@
 #include "AppManager.h"
+#include "Bridge.h"
 
 void AppManager::add_app_for_launch(fs::path path, bool global)
 {
@@ -38,6 +39,33 @@ void AppManager::launch_apps()
 	apps[current_work_app_id].resources.file_context = &(apps[current_work_app_id].file_context); //todo
 
 	apps[current_work_app_id].start();
+}
+
+void AppManager::add_keyboard_event(int event, int keycode)
+{
+	std::lock_guard lock(keyboard_events_queue_mutex);
+	keyboard_events_queue.push({ event, keycode });
+}
+
+void AppManager::process_keyboard_events()
+{
+	while (keyboard_events_queue.size()) {
+		keyboard_event_el ke;
+		{
+			std::lock_guard lock(keyboard_events_queue_mutex);
+			ke = keyboard_events_queue.front();
+			keyboard_events_queue.pop();
+		}
+
+		current_work_app_id = active_app_id;
+
+		if (current_work_app_id < 0 || current_work_app_id >= apps.size())
+			return;
+
+		App& cur_app = apps[current_work_app_id];
+		if (cur_app.io.key_handler)
+			Bridge::run_cpu(cur_app.io.key_handler, 2, ke.event, ke.keycode);
+	}
 }
 
 App* AppManager::get_active_app()
@@ -88,4 +116,9 @@ MREngine::Timer& get_current_app_timer() {
 
 MREngine::AppIO& get_current_app_io() {
 	return get_cur_app()->io;
+}
+
+void add_keyboard_event(int event, int keycode) {
+	if (g_appManager)
+		g_appManager->add_keyboard_event(event, keycode);
 }

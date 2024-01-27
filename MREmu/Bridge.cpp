@@ -349,6 +349,10 @@ namespace Bridge {
 		{"vm_create_timer_ex", br_vm_create_timer_ex},
 		{"vm_delete_timer_ex", br_vm_delete_timer_ex}, // done
 
+		{"vm_reg_keyboard_callback", [](uc_engine* uc) {
+			vm_reg_keyboard_callback(
+				(vm_key_handler_t)read_arg(uc, 0));
+		}},
 		{"vm_file_open", [](uc_engine* uc) {
 			write_ret(uc, vm_file_open(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
