@@ -44,23 +44,26 @@ void mre_main(AppManager* appManager_p) {
 }
 
 int main(int argc, char** argv) {
+	std::cout << "MREmu - MRE (MAUI Runtime Environment) emulator for launching vxp files\n";
 	cli::Parser parser(argc, argv);
 	{
-		parser.set_optional<std::string>("", "", "", "Path to vxp");
+		parser.set_optional<std::string>("", "", "minecraft.vxp", "Path to vxp");
 		parser.set_optional<bool>("-l", "-path_is_local", false, "Set to run from local filesystem");
+		parser.set_optional<bool>("-s", "-silence", false, "Disable logging to console");
 	}
 	parser.run_and_exit_if_error();
 	auto app_path = parser.get<std::string>("");
 	bool path_is_local = parser.get<bool>("-l");
+	bool silence = parser.get<bool>("-s");
 
 	if (!app_path.size()) {
-		printf("vxp file not specified\n");
+		printf("vxp file not found\n");
 		exit(1);
 	}
 
 	Memory::init(128 * 1024 * 1024);
 	Cpu::init();
-	Bridge::init();
+	Bridge::init(silence);
 
 	MREngine::IO::init();
 	MREngine::SIM::init();
