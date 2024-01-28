@@ -19,6 +19,8 @@ const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
 extern uc_engine* uc;
 uc_hook trace;
 
+bool silence = false;
+
 namespace Bridge {
 	struct br_func {
 		std::string name;
@@ -477,7 +479,8 @@ namespace Bridge {
 		if (ret == 0)
 			ret = armodule.vm_get_sym_entry(symbol);
 
-		printf("vm_get_sym_entry(%s) -> %08x\n", symbol, ret);
+		if (!silence)
+			printf("vm_get_sym_entry(%s) -> %08x\n", symbol, ret);
 
 		return ret;
 	}
@@ -487,12 +490,14 @@ namespace Bridge {
 
 		if (ind > func_map.size())
 			abort();
-		if(ind)
+		if(ind && !silence)
 			printf("--%s-- called\n", func_map[ind].name.c_str());
 		func_map[ind].f(uc);
 	}
 
-	void init() {
+	void init(bool silence_flag) {
+		silence = silence_flag;
+
 		size_t func_count = func_map.size();
 
 		func_ptr = (unsigned char*)Memory::shared_malloc(func_count * 2 + 2);
