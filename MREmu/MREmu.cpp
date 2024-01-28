@@ -53,6 +53,11 @@ int main(int argc, char** argv) {
 	auto app_path = parser.get<std::string>("");
 	bool path_is_local = parser.get<bool>("-l");
 
+	if (!app_path.size()) {
+		printf("vxp file not specified\n");
+		exit(1);
+	}
+
 	Memory::init(128 * 1024 * 1024);
 	Cpu::init();
 	Bridge::init();
@@ -70,18 +75,12 @@ int main(int argc, char** argv) {
 	ImGui::SFML::Init(win);
 	win.setFramerateLimit(60);
 
-	if (app_path.size())
-		if (fs::exists(app_path) || path_is_local)
-			appManager.add_app_for_launch("minecraft.vxp", path_is_local);
-		else {
-			printf("vxp file don't exists\n");
-			exit(1);
-		}
+	if (fs::exists(app_path) || path_is_local)
+		appManager.add_app_for_launch(app_path, path_is_local);
 	else {
-		printf("vxp file not specified\n");
+		printf("vxp file don't exists\n");
 		exit(1);
 	}
-
 
 	sf::Clock deltaClock;
 	sf::Event event;
