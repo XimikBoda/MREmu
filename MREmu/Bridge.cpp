@@ -71,284 +71,102 @@ namespace Bridge {
 	}
 
 
-	void br_vm_get_sym_entry(uc_engine* uc) {
-		write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-	}
-
-	// System
-
-	void br_vm_get_malloc_stat(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(vm_get_malloc_stat()));
-	}
-
-	void br_vm_malloc(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(vm_malloc(read_arg(uc, 0))));
-	}
-
-	void br_vm_calloc(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(vm_calloc(read_arg(uc, 0))));
-	}
-
-	void br_vm_realloc(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(
-			vm_realloc((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1))));
-	}
-
-	void br_vm_free(uc_engine* uc) {
-		vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
-	}
-
-	void br_vm_reg_sysevt_callback(uc_engine* uc) {
-		vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
-	}
-
-	void br_vm_get_mre_total_mem_size(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(vm_get_mre_total_mem_size()));
-	}
-
-	void br_vm_get_tick_count(uc_engine* uc) {
-		write_ret(uc, vm_get_tick_count());
-	}
-
-	void br_vm_get_exec_filename(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(
-			vm_get_exec_filename(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)))));
-	}
-
-	void br_vm_get_sys_property(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(
-			vm_get_sys_property(
-				read_arg(uc, 0),
-				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				read_arg(uc, 2))));
-	}
-
-	void br_vm_get_vm_tag(uc_engine* uc) {
-		write_ret(uc,
-			vm_get_vm_tag(
-				(short*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				(void*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-				(int*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
-	}
-
-	// Program manager
-
-	void br_vm_pmng_get_current_handle(uc_engine* uc) {
-		write_ret(uc, vm_pmng_get_current_handle());
-	}
-
-	void br_vm_reg_msg_proc(uc_engine* uc) {
-		vm_reg_msg_proc((VM_MESSAGE_PROC)read_arg(uc, 0));
-	}
-
-	void br_vm_post_msg(uc_engine* uc) {
-		write_ret(uc,
-			vm_post_msg(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3)));
-	}
-
-	// Timer
-
-	void br_vm_create_timer(uc_engine* uc) {
-		write_ret(uc, vm_create_timer(read_arg(uc, 0),
-			(VM_TIMERPROC_T)read_arg(uc, 1)));
-	}
-
-	void br_vm_delete_timer(uc_engine* uc) {
-		write_ret(uc, vm_delete_timer(read_arg(uc, 0)));
-	}
-
-	void br_vm_create_timer_ex(uc_engine* uc) {
-		write_ret(uc, vm_create_timer_ex(read_arg(uc, 0),
-			(VM_TIMERPROC_T)read_arg(uc, 1)));
-	}
-
-	void br_vm_delete_timer_ex(uc_engine* uc) {
-		write_ret(uc, vm_delete_timer_ex(read_arg(uc, 0)));
-	}
-
-	// IO
-
-	void br_vm_file_set_attributes(uc_engine* uc) {
-		write_ret(uc, vm_file_set_attributes(
-			(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-			read_arg(uc, 1)));
-	}
-
-	void br_vm_file_get_attributes(uc_engine* uc) {
-		write_ret(uc, vm_file_get_attributes((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-	}
-
-	void br_vm_file_mkdir(uc_engine* uc) {
-		write_ret(uc, vm_file_mkdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-	}
-
-	void br_vm_get_removable_driver(uc_engine* uc) {
-		write_ret(uc, vm_get_removable_driver());
-	}
-
-	void br_vm_get_system_driver(uc_engine* uc) {
-		write_ret(uc, vm_get_system_driver());
-	}
-
-	void br_vm_get_disk_free_space(uc_engine* uc) {
-		write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-	}
-
-	// SIM
-
-	void br_vm_get_imei(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(vm_get_imei()));
-	}
-
-	// Graphic
-
-	void br_vm_graphic_get_screen_width(uc_engine* uc) {
-		write_ret(uc, vm_graphic_get_screen_width());
-	}
-
-	void br_vm_graphic_get_screen_height(uc_engine* uc) {
-		write_ret(uc, vm_graphic_get_screen_height());
-	}
-
-	void br_vm_graphic_create_layer(uc_engine* uc) {
-		write_ret(uc,
-			vm_graphic_create_layer(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4)));
-	}
-
-	void br_vm_graphic_get_layer_buffer(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
-	}
-
-	void br_vm_graphic_flush_layer(uc_engine* uc) {
-		write_ret(uc, vm_graphic_flush_layer(
-			(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-			read_arg(uc, 1)));
-	}
-
-	void br_vm_graphic_create_canvas(uc_engine* uc) {
-		write_ret(uc,
-			vm_graphic_create_canvas(
-				read_arg(uc, 0),
-				read_arg(uc, 1)));
-	}
-
-	void br_vm_graphic_release_canvas(uc_engine* uc) {
-		vm_graphic_release_canvas(
-			read_arg(uc, 0));
-	}
-
-	void br_vm_graphic_get_canvas_buffer(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(
-			vm_graphic_get_canvas_buffer(
-				read_arg(uc, 0))));
-	}
-
-	void br_vm_graphic_load_image(uc_engine* uc) {
-		write_ret(uc,
-			vm_graphic_load_image(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)));
-	}
-
-	void br_vm_graphic_blt(uc_engine* uc) {
-		vm_graphic_blt(
-			(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-			read_arg(uc, 1),
-			read_arg(uc, 2),
-			(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-			read_arg(uc, 4),
-			read_arg(uc, 5),
-			read_arg(uc, 6),
-			read_arg(uc, 7),
-			read_arg(uc, 8)
-		);
-	}
-
-	// Resources
-
-	void br_vm_load_resource(uc_engine* uc) {
-		write_ret(uc,
-			ADDRESS_TO_EMU(vm_load_resource(
-				(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-			)));
-	}
-
-	// CharSet
-
-	void br_vm_ascii_to_ucs2(uc_engine* uc) {
-		write_ret(uc,
-			vm_ascii_to_ucs2(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
-			));
-	}
-
-	void br_vm_gb2312_to_ucs2(uc_engine* uc) {
-		write_ret(uc,
-			vm_gb2312_to_ucs2(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
-			));
-	}
-
-	// ARModule
-
-	void br_armodule_malloc(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(armodule.app_memory.malloc(read_arg(uc, 0))));
-	}
-
-	void br_armodule_realloc(uc_engine* uc) {
-		write_ret(uc, ADDRESS_TO_EMU(
-			armodule.app_memory.realloc(
-				(size_t)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1))));
-	}
-
-	void br_armodule_free(uc_engine* uc) {
-		armodule.app_memory.free((size_t)ADDRESS_FROM_EMU(read_arg(uc, 0)));
-	}
-
 	std::vector<br_func> func_map =
 	{
-		{"vm_get_sym_entry", br_vm_get_sym_entry},
+		{"vm_get_sym_entry", [](uc_engine* uc) {
+			write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 
-		{"vm_get_malloc_stat", br_vm_get_malloc_stat},
-		{"vm_malloc", br_vm_malloc},
-		{"vm_calloc", br_vm_calloc},
-		{"vm_realloc", br_vm_realloc},
-		{"vm_free", br_vm_free},
-		{"vm_reg_sysevt_callback", br_vm_reg_sysevt_callback},
-		{"vm_get_mre_total_mem_size", br_vm_get_mre_total_mem_size},
-		{"vm_get_tick_count", br_vm_get_tick_count},
-		{"vm_get_exec_filename", br_vm_get_exec_filename},
-		{"vm_get_sys_property", br_vm_get_sys_property},
 
-		{"vm_get_vm_tag", br_vm_get_vm_tag},
 
-		{"vm_pmng_get_current_handle", br_vm_pmng_get_current_handle},
-		{"vm_reg_msg_proc", br_vm_reg_msg_proc},
-		{"vm_post_msg", br_vm_post_msg},
+		// System
+		{"vm_get_malloc_stat", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_get_malloc_stat()));
+		}},
+		{"vm_malloc", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_malloc(read_arg(uc, 0))));
+		}},
+		{"vm_calloc", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_calloc(read_arg(uc, 0))));
+		}},
+		{"vm_realloc", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(
+				vm_realloc((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1))));
+		}},
+		{"vm_free", [](uc_engine* uc) {
+			vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+		}},
+		{"vm_reg_sysevt_callback", [](uc_engine* uc) {
+			vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
+		}},
+		{"vm_get_mre_total_mem_size", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_get_mre_total_mem_size()));
+		}},
+		{"vm_get_tick_count", [](uc_engine* uc) {
+			write_ret(uc, vm_get_tick_count());
+		}},
+		{"vm_get_exec_filename", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(
+				vm_get_exec_filename(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)))));
+		}},
+		{"vm_get_sys_property", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(
+				vm_get_sys_property(
+					read_arg(uc, 0),
+					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2))));
+		}},
 
-		{"vm_create_timer", br_vm_create_timer},
-		{"vm_delete_timer", br_vm_delete_timer},
-		{"vm_create_timer_ex", br_vm_create_timer_ex},
-		{"vm_delete_timer_ex", br_vm_delete_timer_ex}, // done
+		{"vm_get_vm_tag", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_vm_tag(
+					(short*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+					(int*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
+		}},
 
+
+
+		// Program manager
+		{"vm_pmng_get_current_handle", [](uc_engine* uc) {
+			write_ret(uc, vm_pmng_get_current_handle());
+		}},
+		{"vm_reg_msg_proc", [](uc_engine* uc) {
+			vm_reg_msg_proc((VM_MESSAGE_PROC)read_arg(uc, 0));
+		}},
+		{"vm_post_msg", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_post_msg(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					read_arg(uc, 2),
+					read_arg(uc, 3)));
+		}},
+
+
+
+		// Timer
+		{"vm_create_timer", [](uc_engine* uc) {
+			write_ret(uc, vm_create_timer(read_arg(uc, 0),
+				(VM_TIMERPROC_T)read_arg(uc, 1)));
+		}},
+		{"vm_delete_timer", [](uc_engine* uc) {
+			write_ret(uc, vm_delete_timer(read_arg(uc, 0)));
+		}},
+		{"vm_create_timer_ex", [](uc_engine* uc) {
+			write_ret(uc, vm_create_timer_ex(read_arg(uc, 0),
+				(VM_TIMERPROC_T)read_arg(uc, 1)));
+		}},
+		{"vm_delete_timer_ex", [](uc_engine* uc) {
+			write_ret(uc, vm_delete_timer_ex(read_arg(uc, 0)));
+		}}, // done
+
+
+
+		// IO
 		{"vm_reg_keyboard_callback", [](uc_engine* uc) {
 			vm_reg_keyboard_callback(
 				(vm_key_handler_t)read_arg(uc, 0));
@@ -396,23 +214,75 @@ namespace Bridge {
 				read_arg(uc, 0),
 				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
 		}},
-		{"vm_file_mkdir", br_vm_file_mkdir},
-		{"vm_file_set_attributes", br_vm_file_set_attributes},
-		{"vm_file_get_attributes", br_vm_file_get_attributes},
-		{"vm_get_removeable_driver", br_vm_get_removable_driver},
-		{"vm_get_system_driver", br_vm_get_system_driver},
-		{"vm_get_disk_free_space", br_vm_get_disk_free_space},
+		{"vm_file_mkdir",  [](uc_engine* uc) {
+			write_ret(uc, vm_file_mkdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_file_set_attributes",  [](uc_engine* uc) {
+			write_ret(uc, vm_file_set_attributes(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1)));
+		}},
+		{"vm_file_get_attributes",  [](uc_engine* uc) {
+			write_ret(uc, vm_file_get_attributes((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_get_removeable_driver", [](uc_engine* uc) {
+			write_ret(uc, vm_get_removable_driver());
+		}},
+		{"vm_get_system_driver", [](uc_engine* uc) {
+			write_ret(uc, vm_get_system_driver());
+		}},
+		{"vm_get_disk_free_space", [](uc_engine* uc) {
+			write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 
-		{"vm_get_imei", br_vm_get_imei},
 
-		{"vm_graphic_get_screen_width", br_vm_graphic_get_screen_width},
-		{"vm_graphic_get_screen_height", br_vm_graphic_get_screen_height},
-		{"vm_graphic_create_layer", br_vm_graphic_create_layer},
-		{"vm_graphic_get_layer_buffer", br_vm_graphic_get_layer_buffer},
-		{"vm_graphic_flush_layer", br_vm_graphic_flush_layer},
-		{"vm_graphic_create_canvas", br_vm_graphic_create_canvas},
-		{"vm_graphic_release_canvas", br_vm_graphic_release_canvas},
-		{"vm_graphic_get_canvas_buffer", br_vm_graphic_get_canvas_buffer},
+
+		// SIM
+		{"vm_get_imei", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_get_imei()));
+		}},
+
+
+
+		// Graphic
+		{"vm_graphic_get_screen_width", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_screen_width());
+		}},
+		{"vm_graphic_get_screen_height", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_screen_height());
+		}},
+		{"vm_graphic_create_layer", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_graphic_create_layer(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					read_arg(uc, 2),
+					read_arg(uc, 3),
+					read_arg(uc, 4)));
+		}},
+		{"vm_graphic_get_layer_buffer", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
+		}},
+		{"vm_graphic_flush_layer", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_flush_layer(
+				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1)));
+		}},
+		{"vm_graphic_create_canvas", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_graphic_create_canvas(
+					read_arg(uc, 0),
+					read_arg(uc, 1)));
+		}},
+		{"vm_graphic_release_canvas", [](uc_engine* uc) {
+			vm_graphic_release_canvas(
+				read_arg(uc, 0));
+		}},
+		{"vm_graphic_get_canvas_buffer", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(
+				vm_graphic_get_canvas_buffer(
+					read_arg(uc, 0))));
+		}},
 		{"vm_graphic_create_layer_ex", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_create_layer_ex(
 				read_arg(uc, 0),
@@ -423,14 +293,31 @@ namespace Bridge {
 				read_arg(uc, 5),
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 6))));
 		}},
-		{"vm_graphic_load_image", br_vm_graphic_load_image},
+		{"vm_graphic_load_image", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_graphic_load_image(
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1)));
+		}},
 		{"vm_graphic_get_img_property", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(
 				vm_graphic_get_img_property(
 					read_arg(uc, 0),
 					read_arg(uc, 1))));
 		}},
-		{"vm_graphic_blt", br_vm_graphic_blt},
+		{"vm_graphic_blt", [](uc_engine* uc) {
+			vm_graphic_blt(
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4),
+				read_arg(uc, 5),
+				read_arg(uc, 6),
+				read_arg(uc, 7),
+				read_arg(uc, 8)
+			);
+		}},
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
 			vm_graphic_fill_rect(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -453,14 +340,52 @@ namespace Bridge {
 				(vm_graphic_color*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 
-		{"vm_load_resource", br_vm_load_resource},
 
-		{"vm_ascii_to_ucs2", br_vm_ascii_to_ucs2 },
-		{"vm_gb2312_to_ucs2", br_vm_gb2312_to_ucs2 },
 
-		{"armodule_malloc", br_armodule_malloc},
-		{"armodule_realloc", br_armodule_realloc},
-		{"armodule_free", br_armodule_free},
+		// Resources
+		{"vm_load_resource", [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_load_resource(
+					(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				)));
+		}},
+
+
+
+		// CharSet
+		{"vm_ascii_to_ucs2", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_ascii_to_ucs2(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
+		}},
+		{"vm_gb2312_to_ucs2", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_gb2312_to_ucs2(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
+		}},
+
+
+
+		// ARModule
+		{"armodule_malloc", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(armodule.app_memory.malloc(read_arg(uc, 0))));
+		}},
+		{"armodule_realloc", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(
+				armodule.app_memory.realloc(
+					(size_t)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1))));
+		}},
+		{"armodule_free", [](uc_engine* uc) {
+			armodule.app_memory.free((size_t)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+		}},
 	};
 
 	int vm_get_sym_entry(const char* symbol) {
