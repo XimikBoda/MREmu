@@ -1,4 +1,5 @@
 #include "System.h"
+#include "IO.h"
 #include "../Memory.h"
 #include <vmsys.h>
 #include <string>
@@ -50,9 +51,8 @@ VMINT vm_get_tick_count(void) {
 }
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
-	extern fs::path vxp_path;
-
-	swprintf_s((wchar_t*)filename, 260, L"e:\\..\\..\\%s", vxp_path.wstring().c_str());
+	fs::path path = get_current_app_path();
+	swprintf_s((wchar_t*)filename, 260, L"%s", path.wstring().c_str());
 	return 0;
 }
 

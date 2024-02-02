@@ -1,5 +1,6 @@
 #include "IO.h"
 #include "..\Memory.h"
+#include "..\MreTags.h"
 #include <vmio.h>
 #include <vmgettag.h>
 #include <iostream>
@@ -63,11 +64,10 @@ void MREngine::IO::imgui_keyboard() {
 	ImGui::End();
 }
 
-fs::path convert_path(const VMWSTR str) { // TODO rewrite this
-	fs::path path = (wchar_t*)str, res = ".\\fs\\";
-	//if(string(res.string())== string(path.string(),res.string().length()))
-	if (path.begin() != path.end() && (++path.begin()) != path.end() && path.begin()->string() == "." && (++path.begin())->string() == "fs")
-		return path;
+fs::path convert_path(fs::path path) { // TODO rewrite this
+	fs::path res = ".\\fs\\";
+	//if (path.begin() != path.end() && (++path.begin()) != path.end() && path.begin()->string() == "." && (++path.begin())->string() == "fs")
+	//	return path;
 	auto litter = path.root_name().string();
 	if (litter.size()) {
 		litter.resize(2);
@@ -81,6 +81,13 @@ fs::path convert_path(const VMWSTR str) { // TODO rewrite this
 	std::cout << "convert_path: " << path << " to " << res << '\n';
 	return res;
 }
+
+fs::path convert_path(const VMWSTR str) {
+	fs::path path = (wchar_t*)str; //TODO: fix for linux
+
+	return convert_path(path);
+}
+
 
 void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 	MREngine::AppIO& io = get_current_app_io();
@@ -116,7 +123,7 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		return -1;
 	}
 
-	for(int i=0; i< io.files.size(); ++i)
+	for (int i = 0; i < io.files.size(); ++i)
 		if (io.files[i] == 0) {
 			io.files[i] = f;
 			return i;
@@ -308,6 +315,13 @@ VMUINT vm_get_disk_free_space(VMWSTR drv_name) {
 
 
 VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
+	if (filename[0] == '@') {
+		fs::path vpath = (wchar_t*)filename;
+		uint32_t adr;
+		sscanf(vpath.stem().string().c_str(), "%d", &adr);
+		return vm_get_vm_tag_from_rom((VMUINT8*)ADDRESS_FROM_EMU(adr), tag_num, buf, buf_size);
+	}
+
 	fs::path path = convert_path(filename);
 
 	std::fstream f(path, std::ios::in | std::ios::binary | std::ios::ate);
@@ -357,6 +371,29 @@ VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { //
 		return GET_TAG_INSUFFICIENT_BUF;
 
 	f.read((char*)buf, tag_size);
+
+	*buf_size = tag_size;
+
+	return GET_TAG_TRUE;
+}
+
+VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size) {
+	MreTags* tags = get_tags_by_mem_adr(ADDRESS_TO_EMU(rom));
+	if (!tags)
+		return GET_TAG_ERROR;
+
+	if (tag_num < 0 || tag_num >= tags->raw_tags.size())
+		return GET_TAG_NOT_FOUND;
+
+	int tag_size = tags->raw_tags[tag_num].size();
+
+	if (tag_size == 0)
+		return GET_TAG_NOT_FOUND;
+
+	if (*buf_size < tag_size)
+		return GET_TAG_INSUFFICIENT_BUF;
+
+	memcpy(buf, tags->raw_tags[tag_num].data(), tag_size);
 
 	*buf_size = tag_size;
 

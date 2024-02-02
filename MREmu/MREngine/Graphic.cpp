@@ -354,6 +354,7 @@ VMINT vm_graphic_load_image(VMUINT8* img, VMINT img_len) {
 		image_buf[i] = VM_COLOR_888_TO_565(c.r, c.g, c.b);
 	}
 
+	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 
 	return (VMINT)ADDRESS_TO_EMU(canvas_buf);

@@ -18,6 +18,9 @@ class App
 public:
 	std::vector<unsigned char> file_context;
 
+	fs::path path;
+	fs::path real_path;
+	bool path_is_local = false;
 
 	void* mem_location = 0;
 	size_t offset_mem;

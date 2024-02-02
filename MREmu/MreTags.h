@@ -16,3 +16,5 @@ public:
 
 	unsigned int get_ram();
 };
+
+MreTags* get_tags_by_mem_adr(size_t offset_mem);

@@ -1,6 +1,9 @@
 #pragma once
 #include <vector>
 #include <fstream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace MREngine {
 	namespace IO {
@@ -16,6 +19,9 @@ namespace MREngine {
 	};
 };
 
+
 MREngine::AppIO& get_current_app_io();
+fs::path get_current_app_path();
 
 void add_keyboard_event(int event, int keycode);
+fs::path convert_path(fs::path path);

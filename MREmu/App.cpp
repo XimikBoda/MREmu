@@ -6,6 +6,8 @@
 #include <sstream>
 #include <vmsys.h>
 
+using namespace std::string_literals;
+
 typedef struct
 {
 	uint32_t ro_offset;
@@ -36,6 +38,9 @@ bool App::preparation()
 	memset(mem_location, 0, mem_size);
 
 	offset_mem = ADDRESS_TO_EMU(mem_location);
+
+	if (!path_is_local)
+		path = "@:\\"s + std::to_string(offset_mem) + ".rom"s;
 
 	if (!is_zipped)
 	{
@@ -161,16 +166,18 @@ void App::start()
 	}
 }
 
-
-fs::path vxp_path; //very temp
-
 bool App::load_from_file(fs::path path, bool local)
 {
-	vxp_path = path;
-	if (local)
-		abort(); // temp
+	path_is_local = local;
 
-	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
+	if (path_is_local) {
+		real_path = convert_path(path);
+		this->path = path;
+	}
+	else
+		real_path = path;
+
+	std::ifstream in(real_path, std::ios::in | std::ios::binary | std::ios::ate);
 	if (!in.is_open())
 		return false;
 	size_t file_size = (size_t)in.tellg();

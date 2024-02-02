@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
 
 	if (app_path.size())
 		if (fs::exists(app_path) || path_is_local)
-			appManager.add_app_for_launch("minecraft.vxp", path_is_local);
+			appManager.add_app_for_launch(app_path, path_is_local);
 		else {
 			printf("vxp file don't exists\n");
 			exit(1);

@@ -115,6 +115,22 @@ MREngine::AppIO& get_current_app_io() {
 	return get_cur_app()->io;
 }
 
+fs::path get_current_app_path() {
+	return get_cur_app()->path;
+}
+
+MreTags* get_tags_by_mem_adr(size_t offset_mem) {
+	if (!g_appManager)
+		return 0;
+
+	auto &apps = g_appManager->apps;
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i].offset_mem == offset_mem)
+			return &apps[i].tags;
+
+	return 0;
+}
+
 void add_keyboard_event(int event, int keycode) {
 	if (g_appManager)
 		g_appManager->add_keyboard_event(event, keycode);
