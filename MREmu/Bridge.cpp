@@ -71,7 +71,7 @@ namespace Bridge {
 	}
 
 
-	std::vector<br_func> func_map =
+	std::vector<br_func> func_map = 
 	{
 		{"vm_get_sym_entry", [](uc_engine* uc) {
 			write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));

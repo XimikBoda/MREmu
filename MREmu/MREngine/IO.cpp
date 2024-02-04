@@ -83,7 +83,7 @@ fs::path convert_path(fs::path path) { // TODO rewrite this
 }
 
 fs::path convert_path(const VMWSTR str) {
-	fs::path path = (wchar_t*)str; //TODO: fix for linux
+	fs::path path = std::u16string((char16_t*)str); //TODO: fix for linux
 
 	return convert_path(path);
 }
