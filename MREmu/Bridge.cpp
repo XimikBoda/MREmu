@@ -335,6 +335,26 @@ namespace Bridge {
 				read_arg(uc, 9)
 			);
 		}},
+		{"vm_graphic_rotate", [](uc_engine* uc) { //WRONG
+			vm_graphic_rotate(
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4),
+				read_arg(uc, 5)
+			);
+		}},
+		{"vm_graphic_mirror", [](uc_engine* uc) {
+			vm_graphic_mirror(
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4),
+				read_arg(uc, 5)
+			);
+		}},
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
 			vm_graphic_fill_rect(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
