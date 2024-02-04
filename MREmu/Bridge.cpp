@@ -80,6 +80,9 @@ namespace Bridge {
 
 
 		// System
+		{"vm_get_time", [](uc_engine* uc) {
+			write_ret(uc, vm_get_time((vm_time_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 		{"vm_get_malloc_stat", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_get_malloc_stat()));
 		}},

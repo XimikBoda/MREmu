@@ -10,6 +10,18 @@ namespace fs = std::filesystem;
 
 //MRE API
 
+VMINT vm_get_time(vm_time_t* time) {
+	std::time_t t = std::time(nullptr);
+	std::tm* const pTInfo = std::localtime(&t);
+	time->year = 1900 + pTInfo->tm_year;
+	time->mon = pTInfo->tm_mon;
+	time->day = pTInfo->tm_mday;
+	time->hour = pTInfo->tm_hour;
+	time->min = pTInfo->tm_min;
+	time->sec = pTInfo->tm_sec;
+	return 0;
+}
+
 malloc_stat_t* vm_get_malloc_stat(void) {
 	return 0; //TODO: make this correct
 }
