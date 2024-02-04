@@ -298,6 +298,18 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 	return VM_GDI_SUCCEED;
 }
 
+
+VM_GDI_RESULT vm_graphic_translate_layer(VMINT handle, VMINT tx, VMINT ty) {
+	MREngine::AppGraphic& gr = get_current_app_graphic();
+
+	if (handle < 0 || handle >= gr.layers.size())
+		return -1;
+
+	gr.layers[handle].x = tx;
+	gr.layers[handle].y = ty;
+	return VM_GDI_SUCCEED;
+}
+
 VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 	int image_size = width * height * 2;
 	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
@@ -514,7 +526,7 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 	if (buf == 0 || src_buf == 0)
 		return;
 
-	return; // wrong realization
+	//return; // wrong realization
 
 	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(buf - VM_CANVAS_DATA_OFFSET);
 	MREngine::canvas_signature* cs_src = (MREngine::canvas_signature*)(src_buf);
@@ -557,7 +569,7 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 			int im_x = sx - x_des;
 			int im_y = sy - y_des;
 
-			if(degrees == VM_ROTATE_DEGREE_90)
+			if (degrees == VM_ROTATE_DEGREE_90)
 				std::swap(im_x, im_y);
 
 			if (degrees == VM_ROTATE_DEGREE_180)
@@ -616,13 +628,102 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 
 			if (direction == VM_MIRROR_X)
 				im_x = width - im_x - 1;
-			else if (direction == VM_MIRROR_X)
+			else if (direction == VM_MIRROR_Y)
 				im_y = height - im_y - 1;
 
 			unsigned short scr_color = buf16_src[im_y * cfp_src->width + im_x];
 			if (!flag || scr_color != trans_color)
 				buf16_dst[sy * cfp_dst->width + sx] = scr_color;
 		}
+}
+
+void vm_graphic_set_pixel(VMUINT8* buf, VMINT x, VMINT y, VMUINT16 color) {
+	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(buf - VM_CANVAS_DATA_OFFSET);
+	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9))
+		return;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+
+	int left = 0;
+	int top = 0;
+	int right = cfp_dst->width;
+	int bottom = cfp_dst->height;
+
+	auto& clip = get_current_app_graphic().clip;
+	if (clip.flag) {
+		if (left < clip.left)
+			left = clip.left;
+		if (top < clip.top)
+			top = clip.top;
+		if (right > clip.right)
+			right = clip.right;
+		if (bottom > clip.bottom)
+			bottom = clip.bottom;
+	}
+
+	if (x < left || x >= right || y < top || y >= bottom)
+		return;
+
+	buf16_dst[y * cfp_dst->width + x] = color;
+}
+
+void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUINT16 color) {
+	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(buf - VM_CANVAS_DATA_OFFSET);
+	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9))
+		return;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+
+	if (x0 == x1 && y0 == y1)
+		return vm_graphic_set_pixel(buf, x0, y0, color);
+
+	int left = 0;
+	int top = 0;
+	int right = cfp_dst->width;
+	int bottom = cfp_dst->height;
+
+	auto& clip = get_current_app_graphic().clip;
+	if (clip.flag) {
+		if (left < clip.left)
+			left = clip.left;
+		if (top < clip.top)
+			top = clip.top;
+		if (right > clip.right)
+			right = clip.right;
+		if (bottom > clip.bottom)
+			bottom = clip.bottom;
+	}
+	if (abs(x1 - x0) >= abs(y1 - y0)) {
+		if (x0 < x1) {
+			std::swap(x0, x1);
+			std::swap(y0, y1);
+		}
+		int st_x = std::max(left, x0);
+		int end_x = std::max(right, x1 + 1);
+
+		for (int x = st_x; x < end_x; ++x) {
+			int y = y1 - (x1 - x) * (y1 - y0) / (x1 - x0);
+			if (y < top || y >= bottom)
+				continue;
+
+			buf16_dst[y * cfp_dst->width + x] = color;
+		}
+	}else {
+		if (y0 < y1) {
+			std::swap(x0, x1);
+			std::swap(y0, y1);
+		}
+		int st_y = std::max(top, y0);
+		int end_y = std::max(bottom, y1 + 1);
+
+		for (int y = st_y; y < end_y; ++y) {
+			int x = x1 - (y1 - y) * (x1 - x0) / (y1 - y0);
+			if (x < left || x >= right)
+				continue;
+
+			buf16_dst[y * cfp_dst->width + x] = color;
+		}
+	}
 }
 
 
@@ -659,6 +760,81 @@ void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 				buf16_dst[sy * cfp_dst->width + sx] = back_color;
 }
 
+bool is_point_in_path(int x, int y, vm_graphic_point* point, VMINT npoints) {
+	int j = npoints - 1;
+	bool c = false;
+	for (int i = 0; i < npoints; ++i) {
+		if (x == point[i].x && y == point[i].y)
+			return true;
+		if ((point[i].y > y) != (point[j].y > y)) {
+			int slope = (x - point[i].x) * (point[j].y - point[i].y) - (point[j].x - point[i].x) * (y - point[i].y);
+			if (slope == 0)
+				return true;
+			if ((slope < 0) != (point[j].y < point[i].y))
+				c = !c;
+		}
+		j = i;
+	}
+	return c;
+}
+
+void vm_graphic_fill_polygon(VMINT handle, vm_graphic_point* point, VMINT npoints) {
+	if (npoints == 0)
+		return;
+
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+
+	int st_x = point[0].x, st_y = point[0].y;
+	int end_x = st_x, end_y = st_y;
+
+	for (int i = 1; i < npoints; ++i) {
+		if (st_x > point[i].x)
+			st_x = point[i].x;
+		if (st_y > point[i].y)
+			st_y = point[i].y;
+		if (end_x < point[i].x)
+			end_x = point[i].x;
+		if (end_y < point[i].y)
+			end_y = point[i].y;
+	}
+	++end_x, ++end_y;
+
+	if (st_x < 0)
+		st_x = 0;
+	if (st_y < 0)
+		st_y = 0;
+	if (end_x > layer.w)
+		end_x = layer.w;
+	if (end_y > layer.h)
+		end_y = layer.h;
+
+
+	auto& clip = get_current_app_graphic().clip;
+	if (clip.flag) {
+		if (st_x < clip.left)
+			st_x = clip.left;
+		if (st_y < clip.top)
+			st_y = clip.top;
+		if (end_x > clip.right)
+			end_x = clip.right;
+		if (end_y > clip.bottom)
+			end_y = clip.bottom;
+	}
+
+	unsigned short color = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short* buf16_dst = (unsigned short*)layer.buf;
+
+	for (int sy = st_y; sy < end_y; ++sy)
+		for (int sx = st_x; sx < end_x; ++sx)
+			if (is_point_in_path(sx, sy, point, npoints))
+				buf16_dst[sy * layer.w + sx] = color;
+}
+
 void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 	auto& clip = get_current_app_graphic().clip;
 
@@ -667,7 +843,6 @@ void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 	clip.right = x2;
 	clip.bottom = y2;
 	clip.flag = (char)1;
-	//printf("vm_graphic_set_clip(%d, %d, %d, %d)\n", x1, y1, x2, y2);
 }
 
 VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {

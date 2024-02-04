@@ -271,6 +271,13 @@ namespace Bridge {
 				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				read_arg(uc, 1)));
 		}},
+		{"vm_graphic_translate_layer", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_graphic_translate_layer(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					read_arg(uc, 2)));
+		}},
 		{"vm_graphic_create_canvas", [](uc_engine* uc) {
 			write_ret(uc,
 				vm_graphic_create_canvas(
@@ -355,6 +362,22 @@ namespace Bridge {
 				read_arg(uc, 5)
 			);
 		}},
+		{ "vm_graphic_set_pixel", [](uc_engine* uc) {
+			vm_graphic_set_pixel(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3));
+		} },
+		{ "vm_graphic_line", [](uc_engine* uc) {
+			vm_graphic_line(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5));
+		} },
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
 			vm_graphic_fill_rect(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -364,6 +387,12 @@ namespace Bridge {
 				read_arg(uc, 4),
 				read_arg(uc, 5),
 				read_arg(uc, 6));
+		}},
+		{"vm_graphic_fill_polygon", [](uc_engine* uc) {
+			vm_graphic_fill_polygon(
+				read_arg(uc, 0),
+				(vm_graphic_point*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2));
 		}},
 		{"vm_graphic_set_clip", [](uc_engine* uc) {
 			vm_graphic_set_clip(
