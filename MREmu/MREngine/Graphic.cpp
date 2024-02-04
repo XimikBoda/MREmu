@@ -694,7 +694,7 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 			bottom = clip.bottom;
 	}
 	if (abs(x1 - x0) >= abs(y1 - y0)) {
-		if (x0 < x1) {
+		if (x0 > x1) {
 			std::swap(x0, x1);
 			std::swap(y0, y1);
 		}
@@ -709,7 +709,7 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 			buf16_dst[y * cfp_dst->width + x] = color;
 		}
 	}else {
-		if (y0 < y1) {
+		if (y0 > y1) {
 			std::swap(x0, x1);
 			std::swap(y0, y1);
 		}
