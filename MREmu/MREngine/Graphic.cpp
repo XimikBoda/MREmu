@@ -1,4 +1,5 @@
 #include "Graphic.h"
+#include "Graphic.h"
 #include "../Memory.h"
 #include <imgui.h>
 #include <imgui-SFML.h>
@@ -44,12 +45,18 @@ void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
 	if (pix_data.size() < w * h * 4)
 		pix_data.resize(w * h * 4);
 
+	unsigned short trans_color = cfp->trans_color;
+	bool flag = cfp->flag;
+
 	unsigned short* buf16 = (unsigned short*)(cfp + 1);
 	for (int i = 0; i < w * h; ++i) {
+		if (flag && trans_color == buf16[i])
+			pix_data[i * 4 + 3] = 0x00;
+		else
+			pix_data[i * 4 + 3] = 0xFF;
 		pix_data[i * 4 + 0] = VM_COLOR_GET_RED(buf16[i]);
 		pix_data[i * 4 + 1] = VM_COLOR_GET_GREEN(buf16[i]);
 		pix_data[i * 4 + 2] = VM_COLOR_GET_BLUE(buf16[i]);
-		pix_data[i * 4 + 3] = 0xFF;
 	}
 	sf::Image im;
 	im.create(w, h, &pix_data[0]);
@@ -167,6 +174,16 @@ int MREngine::AppGraphic::create_layer_ex(int x, int y, int w, int h, int trans_
 	return layers.size() - 1;
 }
 
+int MREngine::AppGraphic::delete_layer(int handle)
+{
+	if (handle < 0 || handle != layers.size() - 1) // TODO check this;
+		return -1;
+
+	layers.erase(layers.begin() + handle);
+
+	return 0;
+}
+
 void* MREngine::AppGraphic::get_layer_buf(int handle) {
 	if (handle < 0 || handle >= layers.size())
 		return 0;
@@ -238,6 +255,10 @@ VMINT vm_graphic_create_layer(VMINT x, VMINT y, VMINT width, VMINT height, VMINT
 
 VM_GDI_HANDLE vm_graphic_create_layer_ex(VMINT x, VMINT y, VMINT width, VMINT height, VMINT trans_color, VMINT mode, VMUINT8* buf) {
 	return get_current_app_graphic().create_layer_ex(x, y, width, height, trans_color, mode, buf);
+}
+
+VMINT vm_graphic_delete_layer(VMINT handle) {
+	return get_current_app_graphic().delete_layer(handle);
 }
 
 VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
@@ -419,6 +440,45 @@ void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* sr
 		}
 }
 
+void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,
+	VMINT x_src, VMINT y_src, VMINT width, VMINT height, VMINT frame_index, VMINT alpha) {
+	if (dst_disp_buf == 0 || src_disp_buf == 0)
+		return;
+
+	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(dst_disp_buf - VM_CANVAS_DATA_OFFSET);
+	MREngine::canvas_signature* cs_src = (MREngine::canvas_signature*)(src_disp_buf);
+	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9) || memcmp(cs_src->magic, CANVAS_MAGIC, 9))
+		return;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+	unsigned short* buf16_src = (unsigned short*)(cfp_src + 1);
+
+	if (x_src + width > cfp_src->width)
+		width = cfp_src->width - x_src;
+	if (y_src + height > cfp_src->height)
+		height = cfp_src->height - y_src;
+
+	int st_x = std::max(0, x_dest);
+	int st_y = std::max(0, y_dest);
+
+	int end_x = std::min<int>(cfp_dst->width, x_dest + width);
+	int end_y = std::min<int>(cfp_dst->height, y_dest + height);
+
+	bool flag = cfp_src->flag;
+	unsigned short trans_color = cfp_src->trans_color;
+
+	//TODO alpha blend
+
+	for (int sy = st_y; sy < end_y; ++sy)
+		for (int sx = st_x; sx < end_x; ++sx) {
+			int im_x = sx - x_dest + x_src;
+			int im_y = sy - y_dest + y_src;
+			if (!flag || buf16_src[im_y * cfp_src->width + im_x] != trans_color)
+				buf16_dst[sy * cfp_dst->width + sx] = buf16_src[im_y * cfp_src->width + im_x];
+		}
+}
+
 
 void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMUINT16 line_color, VMUINT16 back_color) {
 	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(buf - VM_CANVAS_DATA_OFFSET);
@@ -447,5 +507,17 @@ void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 
 VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {
 	get_current_app_graphic().global_color = *color;
+	return VM_GDI_SUCCEED;
+}
+
+VM_GDI_RESULT vm_graphic_canvas_set_trans_color(VMINT hcanvas, VMINT trans_color) {
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(ADDRESS_FROM_EMU(hcanvas));
+	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
+		return VM_GDI_FAILED;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
+
+	//TODO frame index
+	cfp_dst->flag = 1;
+	cfp_dst->trans_color = trans_color;
 	return VM_GDI_SUCCEED;
 }

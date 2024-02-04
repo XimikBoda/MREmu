@@ -260,6 +260,9 @@ namespace Bridge {
 					read_arg(uc, 3),
 					read_arg(uc, 4)));
 		}},
+		{ "vm_graphic_delete_layer", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_delete_layer(read_arg(uc, 0)));
+		} },
 		{"vm_graphic_get_layer_buffer", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
 		}},
@@ -318,6 +321,20 @@ namespace Bridge {
 				read_arg(uc, 8)
 			);
 		}},
+		{"vm_graphic_blt_ex", [](uc_engine* uc) {
+			vm_graphic_blt_ex(
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4),
+				read_arg(uc, 5),
+				read_arg(uc, 6),
+				read_arg(uc, 7),
+				read_arg(uc, 8),
+				read_arg(uc, 9)
+			);
+		}},
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
 			vm_graphic_fill_rect(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -338,6 +355,11 @@ namespace Bridge {
 		{"vm_graphic_setcolor", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_setcolor(
 				(vm_graphic_color*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_graphic_canvas_set_trans_color", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_canvas_set_trans_color(
+				read_arg(uc, 0),
+				read_arg(uc, 1)));
 		}},
 
 
@@ -412,8 +434,8 @@ namespace Bridge {
 
 		if (ind > func_map.size())
 			abort();
-		if(ind)
-			printf("--%s-- called\n", func_map[ind].name.c_str());
+		//if(ind)
+		//	printf("--%s-- called\n", func_map[ind].name.c_str());
 		func_map[ind].f(uc);
 	}
 
