@@ -4,6 +4,7 @@
 #include <vmio.h>
 #include <vmgettag.h>
 #include <iostream>
+#include <cstring>
 #include <filesystem>
 #include <imgui.h>
 #include <imgui-SFML.h>

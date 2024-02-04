@@ -3,6 +3,7 @@
 #include "../Memory.h"
 #include <vmsys.h>
 #include <string>
+#include <cstring>
 #include <filesystem>
 #include <SFML/System/Clock.hpp>
 
@@ -49,7 +50,7 @@ void vm_free(void* ptr) {
 
 void vm_reg_sysevt_callback(void (*f)(VMINT message, VMINT param)) {
 	MREngine::SystemCallbacks& sc = get_current_app_system_callbacks();
-	sc.sysevt = (uint32_t)f;
+	sc.sysevt = FUNC_TO_UINT32(f);
 }
 
 

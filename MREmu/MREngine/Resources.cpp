@@ -1,4 +1,5 @@
 #include "Resources.h"
+#include <cstring>
 #include <vmres.h>
 
 void MREngine::Resources::scan()
