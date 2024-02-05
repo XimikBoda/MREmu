@@ -146,7 +146,8 @@ bool App::preparation()
 	app_memory.setup((size_t)mem_location, mem_size);
 	app_memory.malloc(segments_size); // for "protect" code
 
-	resources.scan();
+	if(resources.size)
+		resources.scan();
 	return true;
 }
 
