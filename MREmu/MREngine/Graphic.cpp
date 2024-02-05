@@ -699,7 +699,7 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 			std::swap(y0, y1);
 		}
 		int st_x = std::max(left, x0);
-		int end_x = std::max(right, x1 + 1);
+		int end_x = std::min(right, x1 + 1);
 
 		for (int x = st_x; x < end_x; ++x) {
 			int y = y1 - (x1 - x) * (y1 - y0) / (x1 - x0);
@@ -714,7 +714,7 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 			std::swap(y0, y1);
 		}
 		int st_y = std::max(top, y0);
-		int end_y = std::max(bottom, y1 + 1);
+		int end_y = std::min(bottom, y1 + 1);
 
 		for (int y = st_y; y < end_y; ++y) {
 			int x = x1 - (y1 - y) * (x1 - x0) / (y1 - y0);
