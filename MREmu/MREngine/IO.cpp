@@ -1,6 +1,6 @@
 #include "IO.h"
-#include "..\Memory.h"
-#include "..\MreTags.h"
+#include "../Memory.h"
+#include "../MreTags.h"
 #include <vmio.h>
 #include <vmgettag.h>
 #include <iostream>
@@ -93,7 +93,7 @@ fs::path convert_path(const VMWSTR str) {
 void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	io.key_handler = (uint32_t)handler;
+	io.key_handler = FUNC_TO_UINT32(handler);
 }
 
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
@@ -107,7 +107,7 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		fmode |= std::ios_base::in;
 
 	if (fmode | MODE_WRITE)
-		fmode |= std::ios_base::out | std::ios_base::_Nocreate;
+		fmode |= std::ios_base::out; // | std::ios_base::_Nocreate;
 
 	if (fmode | MODE_CREATE_ALWAYS_WRITE)
 		fmode |= std::ios_base::out;
@@ -207,7 +207,7 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 	if (!f)
 		return -1;
 
-	std::ios_base::seekdir sdir = 0;
+	std::ios_base::seekdir sdir;
 
 	switch (base) {
 	case BASE_BEGIN:
@@ -224,7 +224,7 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		break;
 	}
 
-	f->seekg(offset, base);
+	f->seekg(offset, sdir);
 
 	return 0;
 }

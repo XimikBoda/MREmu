@@ -503,7 +503,7 @@ namespace Bridge {
 
 		idle_p = ADDRESS_TO_EMU(func_ptr + func_count * 2) | 1;
 
-		uc_hook_add(uc, &trace, UC_HOOK_CODE, bridge_hoock, 0,
+		uc_hook_add(uc, &trace, UC_HOOK_CODE, (void*)bridge_hoock, 0,
 			ADDRESS_TO_EMU(func_ptr), ADDRESS_TO_EMU(func_ptr + func_count * 2 - 1));
 
 		armodule.init(vm_get_sym_entry("armodule_malloc"),
