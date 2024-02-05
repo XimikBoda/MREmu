@@ -5,6 +5,7 @@
 #include <vmgettag.h>
 #include <iostream>
 #include <cstring>
+#include <regex>
 #include <filesystem>
 #include <imgui.h>
 #include <imgui-SFML.h>
@@ -89,6 +90,56 @@ fs::path convert_path(const VMWSTR str) {
 	return convert_path(path);
 }
 
+static void replaceAll(std::string& str, const std::string& from, const std::string& to) {
+	if (from.empty())
+		return;
+	size_t start_pos = 0;
+	while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+		str.replace(start_pos, from.length(), to);
+		start_pos += to.length();
+	}
+}
+
+MREngine::find_el::find_el(fs::path path_f) {
+	path = convert_path(path_f);
+	lfolder = path_f.parent_path();
+
+	find_recv = false;
+	std::string find_line = path.filename().string();
+	if (find_line.size()) {
+		replaceAll(find_line, "*", ".*");
+		try {
+			find_reg = std::regex(find_line);
+			find_recv = true;
+		}
+		catch (...) {
+			printf("regex faild\n");
+		}
+	}
+
+	if (!fs::exists(path.parent_path()))
+		return;
+
+	di = fs::directory_iterator(path.parent_path());
+
+	first = true;
+}
+
+fs::path MREngine::find_el::next() {
+	fs::directory_iterator end_itr;
+	if (first)
+		first = false;
+	else
+		di++;
+
+	while (find_recv && di != end_itr && !std::regex_match(di->path().filename().string(), find_reg))
+		di++;
+	if (di == end_itr)
+		return "";
+	fs::path res = lfolder;
+	res += di->path().filename();
+	return res;
+}
 
 void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 	MREngine::AppIO& io = get_current_app_io();
@@ -300,6 +351,86 @@ VMINT vm_file_get_attributes(const VMWSTR filename) {
 			res |= VM_FS_ATTR_READ_ONLY;
 	}
 	return res;
+}
+
+VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
+	if (info == 0 || pathname == 0)
+		return -1;
+	MREngine::find_el find((char16_t*)pathname);
+
+	fs::path el = find.next();
+
+	if (el.empty())
+		return -1;
+
+	info->filename[el.u16string().copy((char16_t*)info->filename, 260)] = 0;
+
+	MREngine::AppIO& io = get_current_app_io();
+	io.find.push_back(find);
+	return io.find.size() - 1;
+}
+VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.find.size())
+		return -1;
+
+	auto& f = io.find[handle];
+	fs::path el = f.next();
+
+	if (el.empty())
+		return -1;
+
+
+	info->filename[el.u16string().copy((char16_t*)info->filename, 260)] = 0;
+
+	return 0;
+}
+void vm_find_close(VMINT handle) {
+	//todo
+}
+
+VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
+	if (direntry == 0 || pathname == 0)
+		return -1;
+
+	MREngine::find_el find((char16_t*)pathname);
+
+	fs::path el = find.next();
+
+	if (el.empty())
+		return -1;
+
+	direntry->filefullname[el.u16string().copy((char16_t*)direntry->filefullname, 260)]=0;
+	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
+	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
+
+	MREngine::AppIO& io = get_current_app_io();
+	io.find_ext.push_back(find);
+	return io.find_ext.size()-1;
+	//todo
+}
+
+VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	if (handle < 0 || handle >= io.find_ext.size())
+		return -1;
+
+	auto &f = io.find_ext[handle];
+	fs::path el = f.next();
+
+	if (el.empty())
+		return -1;
+
+	direntry->filefullname[el.u16string().copy((char16_t*)direntry->filefullname, 260)] = 0;
+	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
+	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
+
+	return 0;
+}
+void vm_find_close_ext(VMINT handle) {
+	//todo
 }
 
 VMINT vm_get_removable_driver(void) {

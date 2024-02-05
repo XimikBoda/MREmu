@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <fstream>
+#include <regex>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -11,9 +12,25 @@ namespace MREngine {
 		void imgui_keyboard();
 	};
 
+	struct find_el{
+		fs::directory_iterator di;
+		std::regex find_reg;
+		fs::path lfolder;
+		fs::path path;
+		bool find_recv;
+		bool first = true;
+
+		find_el(fs::path path_f);
+
+		fs::path next();
+	};
+
 	class AppIO{
 	public:
 		std::vector<std::fstream*> files;
+
+		std::vector<find_el> find;
+		std::vector<find_el> find_ext;
 
 		uint32_t key_handler = 0;
 	};

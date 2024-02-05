@@ -228,6 +228,32 @@ namespace Bridge {
 		{"vm_file_get_attributes",  [](uc_engine* uc) {
 			write_ret(uc, vm_file_get_attributes((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{"vm_find_first",  [](uc_engine* uc) {
+			write_ret(uc, vm_find_first(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(vm_fileinfo_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
+		{"vm_find_next",  [](uc_engine* uc) {
+			write_ret(uc, vm_find_next(
+				read_arg(uc, 0),
+				(vm_fileinfo_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
+		{"vm_find_close",  [](uc_engine* uc) {
+			vm_find_close(read_arg(uc, 0));
+		}},
+		{"vm_find_first_ext",  [](uc_engine* uc) {
+			write_ret(uc, vm_find_first_ext(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(vm_fileinfo_ext*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
+		{"vm_find_next_ext",  [](uc_engine* uc) {
+			write_ret(uc, vm_find_next_ext(
+				read_arg(uc, 0),
+				(vm_fileinfo_ext*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
+		{"vm_find_close_ext",  [](uc_engine* uc) {
+			vm_find_close_ext(read_arg(uc, 0));
+		}},
 		{"vm_get_removeable_driver", [](uc_engine* uc) {
 			write_ret(uc, vm_get_removable_driver());
 		}},

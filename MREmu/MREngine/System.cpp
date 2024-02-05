@@ -65,9 +65,7 @@ VMINT vm_get_tick_count(void) {
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
 	fs::path path = get_current_app_path();
-	std::u16string u16path = path.u16string();
-	std::u16string_view srtv((char16_t*)filename, 260);
-	srtv = u16path;
+	filename[path.u16string().copy((char16_t*)filename, 260)]=0;
 	return 0;
 }
 
