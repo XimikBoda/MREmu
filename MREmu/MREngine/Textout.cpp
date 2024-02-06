@@ -40,7 +40,15 @@ VMINT vm_graphic_get_string_height(VMWSTR str) {
 	return vm_graphic_get_character_height();
 }
 
-VMINT vm_graphic_measure_character(VMWCHAR c, VMINT* width, VMINT* height);
+VMINT vm_graphic_measure_character(VMWCHAR c, VMINT* width, VMINT* height) {
+	if (width == 0 || height == 0)
+		return VM_GDI_FAILED;
+
+	*width = vm_graphic_get_character_width(c);
+	*height = vm_graphic_get_character_height();
+
+	return VM_GDI_SUCCEED;
+}
 
 VMINT vm_graphic_get_character_info(VMWCHAR c, vm_graphic_char_info* char_info) {
 	if (char_info == 0)

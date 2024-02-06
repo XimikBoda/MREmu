@@ -14,6 +14,11 @@
 #include <vmsim.h>
 #include <vmstdlib.h>
 
+extern "C" {
+	VMINT vm_is_support_wifi(void); // Becouse we have some problem with vmsock.h
+	VMINT vm_wifi_is_connected(void);
+}
+
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
 
@@ -128,7 +133,6 @@ namespace Bridge {
 					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 					read_arg(uc, 2))));
 		}},
-
 		{"vm_get_vm_tag", [](uc_engine* uc) {
 			write_ret(uc,
 				vm_get_vm_tag(
@@ -136,6 +140,9 @@ namespace Bridge {
 					read_arg(uc, 1),
 					(void*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
 					(int*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
+		}},
+		{"vm_switch_power_saving_mode", [](uc_engine* uc) {
+			write_ret(uc, vm_switch_power_saving_mode((power_saving_mode_enum)read_arg(uc, 0)));
 		}},
 
 
@@ -273,6 +280,9 @@ namespace Bridge {
 		}},
 		{"vm_get_disk_free_space", [](uc_engine* uc) {
 			write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_is_support_keyborad", [](uc_engine* uc) {
+			write_ret(uc, vm_is_support_keyborad());
 		}},
 
 
@@ -495,6 +505,12 @@ namespace Bridge {
 			write_ret(uc, vm_graphic_get_string_height(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{"vm_graphic_measure_character", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_measure_character(
+				read_arg(uc, 0),
+				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+		}},
 		{"vm_graphic_get_character_info", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_get_character_info(
 				read_arg(uc, 0),
@@ -611,6 +627,16 @@ namespace Bridge {
 		{"vm_wstrlen", [](uc_engine* uc) {
 			write_ret(uc,vm_wstrlen(
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+
+
+
+		// Sock
+		{"vm_is_support_wifi", [](uc_engine* uc) {
+			write_ret(uc, vm_is_support_wifi());
+		}},
+		{"vm_wifi_is_connected", [](uc_engine* uc) {
+			write_ret(uc, vm_wifi_is_connected());
 		}},
 
 

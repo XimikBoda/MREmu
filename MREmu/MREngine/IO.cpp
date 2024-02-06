@@ -455,6 +455,10 @@ VMUINT vm_get_disk_free_space(VMWSTR drv_name) {
 	return 256 * 1024 * 1024;
 }
 
+VMINT vm_is_support_keyborad(void) {
+	return 1;
+}
+
 
 VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
 	if (filename[0] == '@') {

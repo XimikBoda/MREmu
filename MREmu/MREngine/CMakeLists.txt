@@ -10,7 +10,7 @@ add_library (MREngine
 						"SIM.cpp" "SIM.h"
 						"CharSet.cpp"
 						"Textout.cpp" 
-						"STDLib.cpp")
+						"STDLib.cpp" "Sock.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREngine PROPERTY CXX_STANDARD 20)

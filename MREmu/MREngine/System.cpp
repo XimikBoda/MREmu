@@ -98,3 +98,7 @@ VMUINT vm_get_sys_property(const VMINT key, VMCHAR* value, VMUINT len) { // TODO
 	}
 	return 0;
 }
+
+VMINT vm_switch_power_saving_mode(power_saving_mode_enum mode){
+	return 0;
+}
