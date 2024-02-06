@@ -391,14 +391,14 @@ namespace Bridge {
 				read_arg(uc, 5)
 			);
 		}},
-		{ "vm_graphic_set_pixel", [](uc_engine* uc) {
+		{"vm_graphic_set_pixel", [](uc_engine* uc) {
 			vm_graphic_set_pixel(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				read_arg(uc, 1),
 				read_arg(uc, 2),
 				read_arg(uc, 3));
-		} },
-		{ "vm_graphic_line", [](uc_engine* uc) {
+		}},
+		{"vm_graphic_line", [](uc_engine* uc) {
 			vm_graphic_line(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				read_arg(uc, 1),
@@ -406,7 +406,7 @@ namespace Bridge {
 				read_arg(uc, 3),
 				read_arg(uc, 4),
 				read_arg(uc, 5));
-		} },
+		}},
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
 			vm_graphic_fill_rect(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -416,6 +416,14 @@ namespace Bridge {
 				read_arg(uc, 4),
 				read_arg(uc, 5),
 				read_arg(uc, 6));
+		}},
+		{"vm_graphic_fill_rect_ex", [](uc_engine* uc) {
+			vm_graphic_fill_rect_ex(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4));
 		}},
 		{"vm_graphic_fill_polygon", [](uc_engine* uc) {
 			vm_graphic_fill_polygon(
@@ -441,6 +449,61 @@ namespace Bridge {
 		}},
 
 
+
+		// Textout
+		{"vm_graphic_get_character_height", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_character_height());
+		}},
+		{"vm_graphic_get_character_width", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_character_width(
+				read_arg(uc, 0)));
+		}},
+		{"vm_graphic_get_string_width", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_string_width(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_graphic_get_string_height", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_string_height(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_graphic_set_font", [](uc_engine* uc) {
+			vm_graphic_set_font(
+				(font_size_t)read_arg(uc, 0));
+		}},
+		{"vm_graphic_textout", [](uc_engine* uc) {
+			vm_graphic_textout(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4),
+				read_arg(uc, 5));
+		}},
+		{"vm_font_set_font_size", [](uc_engine* uc) {
+			write_ret(uc, vm_font_set_font_size(
+				read_arg(uc, 0)));
+		}},
+		{"vm_font_set_font_style", [](uc_engine* uc) {
+			write_ret(uc, vm_font_set_font_style(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2)));
+		}},
+		{"vm_graphic_textout_to_layer", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_textout_to_layer(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4)));
+		}},
+		{"vm_graphic_get_string_baseline", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_string_baseline(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_graphic_is_use_vector_font", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_is_use_vector_font());
+		}},
 
 		// Resources
 		{"vm_load_resource", [](uc_engine* uc) {

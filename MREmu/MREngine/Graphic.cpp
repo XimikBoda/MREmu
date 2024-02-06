@@ -1,12 +1,11 @@
 #include "Graphic.h"
-#include "Graphic.h"
 #include "../Memory.h"
 #include <imgui.h>
 #include <imgui-SFML.h>
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 
-static MREngine::Graphic* graphic = 0; // Do I really need this?
+MREngine::Graphic* graphic = 0; // Do I really need this?
 
 void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 	static std::vector<unsigned char> pix_data;
@@ -104,6 +103,7 @@ MREngine::Graphic::Graphic()
 		cfp->height = height;
 		base_buf2 = (cfp + 1);
 	}
+	graphic = this;
 }
 
 void MREngine::Graphic::activate()
@@ -758,6 +758,20 @@ void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 				buf16_dst[sy * cfp_dst->width + sx] = line_color;
 			else
 				buf16_dst[sy * cfp_dst->width + sx] = back_color;
+}
+
+void vm_graphic_fill_rect_ex(VMINT handle, VMINT  x, VMINT  y, VMINT  width, VMINT  height) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+
+	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+
+	vm_graphic_fill_rect((VMUINT8*)layer.buf, x, y, width, height, c, c);
+;
 }
 
 bool is_point_in_path(int x, int y, vm_graphic_point* point, VMINT npoints) {
