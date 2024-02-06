@@ -14,3 +14,7 @@ void MREngine::SIM::init()
 VMSTR vm_get_imei(void) {
 	return (VMSTR)imei_ptr;
 }
+
+VMINT vm_sim_card_count(void) {
+	return 1;
+}

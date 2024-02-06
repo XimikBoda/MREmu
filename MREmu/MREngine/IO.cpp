@@ -275,6 +275,9 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 
 	f->seekg(offset, sdir);
 
+	if(!f->good())
+		return -1;
+
 	return 0;
 }
 
@@ -322,6 +325,15 @@ VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 	f->seekg(pos, std::ios_base::beg);
 
 	return 0;
+}
+
+VMINT vm_file_delete(const VMWSTR filename) {
+	fs::path path = convert_path(filename);
+
+	if (fs::remove(path))
+		return 0;
+	else
+		return -1;
 }
 
 VMINT vm_file_mkdir(const VMWSTR dirname) {

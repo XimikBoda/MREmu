@@ -83,6 +83,12 @@ namespace Bridge {
 		{"vm_get_time", [](uc_engine* uc) {
 			write_ret(uc, vm_get_time((vm_time_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{"vm_get_curr_utc", [](uc_engine* uc) {
+			write_ret(uc, vm_get_curr_utc((VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_get_sys_time_zone", [](uc_engine* uc) {
+			write_ret(uc, vm_get_sys_time_zone());
+		}},
 		{"vm_get_malloc_stat", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_get_malloc_stat()));
 		}},
@@ -217,6 +223,10 @@ namespace Bridge {
 				read_arg(uc, 0),
 				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
 		}},
+		{"vm_file_delete", [](uc_engine* uc) {
+			write_ret(uc, vm_file_delete(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 		{"vm_file_mkdir",  [](uc_engine* uc) {
 			write_ret(uc, vm_file_mkdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
@@ -270,6 +280,10 @@ namespace Bridge {
 		{"vm_get_imei", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_get_imei()));
 		}},
+			
+		{"vm_sim_card_count", [](uc_engine* uc) {
+			write_ret(uc, vm_sim_card_count());
+		}},
 
 
 
@@ -289,9 +303,9 @@ namespace Bridge {
 					read_arg(uc, 3),
 					read_arg(uc, 4)));
 		}},
-		{ "vm_graphic_delete_layer", [](uc_engine* uc) {
+		{"vm_graphic_delete_layer", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_delete_layer(read_arg(uc, 0)));
-		} },
+		}},
 		{"vm_graphic_get_layer_buffer", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
 		}},
@@ -438,6 +452,9 @@ namespace Bridge {
 				read_arg(uc, 2),
 				read_arg(uc, 3));
 		}},
+		{"vm_graphic_is_r2l_state", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_is_r2l_state());
+		}},
 		{"vm_graphic_setcolor", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_setcolor(
 				(vm_graphic_color*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
@@ -466,6 +483,11 @@ namespace Bridge {
 			write_ret(uc, vm_graphic_get_string_height(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{"vm_graphic_get_character_info", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_character_info(
+				read_arg(uc, 0),
+				(vm_graphic_char_info*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
 		{"vm_graphic_set_font", [](uc_engine* uc) {
 			vm_graphic_set_font(
 				(font_size_t)read_arg(uc, 0));
@@ -478,6 +500,16 @@ namespace Bridge {
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 3)),
 				read_arg(uc, 4),
 				read_arg(uc, 5));
+		}},
+		{"vm_graphic_textout_by_baseline", [](uc_engine* uc) {
+			vm_graphic_textout_by_baseline(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4),
+				read_arg(uc, 5),
+				read_arg(uc, 6));
 		}},
 		{"vm_font_set_font_size", [](uc_engine* uc) {
 			write_ret(uc, vm_font_set_font_size(
@@ -511,6 +543,14 @@ namespace Bridge {
 				ADDRESS_TO_EMU(vm_load_resource(
 					(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				)));
+		}},
+		{"vm_resource_get_data", [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_resource_get_data(
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					read_arg(uc, 2)
 				)));
 		}},
 

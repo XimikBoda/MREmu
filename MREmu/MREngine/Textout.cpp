@@ -42,7 +42,26 @@ VMINT vm_graphic_get_string_height(VMWSTR str) {
 
 VMINT vm_graphic_measure_character(VMWCHAR c, VMINT* width, VMINT* height);
 
-VMINT vm_graphic_get_character_info(VMWCHAR c, vm_graphic_char_info* char_info);
+VMINT vm_graphic_get_character_info(VMWCHAR c, vm_graphic_char_info* char_info) {
+	if (char_info == 0)
+		return -1;
+
+	int data_offset = ((unsigned int*)unifont_15_1_04_bin)[c];
+
+	if (data_offset == 0)
+		return -1;
+
+	int ch_d = unifont_15_1_04_bin[data_offset];
+	int ch_w = ch_d & 0xF;
+
+	char_info->dwidth = ch_w - (ch_d >> 4);
+	char_info->width = ch_w + 1;
+	char_info->height = 16;
+	char_info->ascent = 2;
+	char_info->descent = 0;
+
+	return 0;
+}
 
 void vm_graphic_set_font(font_size_t size) {
 }
@@ -120,7 +139,9 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	}
 }
 
-void vm_graphic_textout_by_baseline(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT length, VMUINT16 color, VMINT baseline);
+void vm_graphic_textout_by_baseline(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT length, VMUINT16 color, VMINT baseline) {
+	vm_graphic_textout(disp_buf, x, y, s, length, color); //TODO
+}
 
 VM_GDI_RESULT vm_font_set_font_size(VMINT size) {
 	return VM_GDI_SUCCEED;

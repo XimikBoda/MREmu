@@ -66,3 +66,16 @@ VMUINT8* vm_load_resource(char* res_name, VMINT* res_size) {
 
 	return (VMUINT8*)adr;
 }
+
+VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
+	MREngine::Resources& resources = get_current_app_resources();
+	if (data == 0)
+		return -1;
+
+	if(offset + size >= resources.file_context->size())
+		return -1;
+
+	memcpy(data, resources.file_context->data() + offset, size);
+	return 0;
+	
+}

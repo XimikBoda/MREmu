@@ -23,6 +23,15 @@ VMINT vm_get_time(vm_time_t* time) {
 	return 0;
 }
 
+VMINT vm_get_curr_utc(VMUINT* utc) {
+	*utc = std::time(nullptr);
+	return 0;
+}
+
+float vm_get_sys_time_zone(void) {
+	return 0;
+}
+
 malloc_stat_t* vm_get_malloc_stat(void) {
 	return 0; //TODO: make this correct
 }
