@@ -4,6 +4,7 @@
 #include <imgui-SFML.h>
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
+#include <vmpromng.h>
 
 MREngine::Graphic* graphic = 0; // Do I really need this?
 
@@ -860,7 +861,22 @@ void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 	clip.top = y1;
 	clip.right = x2;
 	clip.bottom = y2;
-	clip.flag = (char)1;
+	clip.flag = 1;
+}
+
+void vm_graphic_reset_clip(void) {
+	auto& clip = get_current_app_graphic().clip;
+
+	clip.left = 0;
+	clip.top = 0;
+	clip.right = graphic->width;
+	clip.bottom = graphic->height;
+	clip.flag = 0;
+}
+
+void vm_graphic_flush_screen(void) {
+	void add_system_event(int phandle, int message, int param);
+	add_system_event(vm_pmng_get_current_handle(), VM_MSG_PAINT, 0);
 }
 
 VMINT vm_graphic_is_r2l_state(void) {

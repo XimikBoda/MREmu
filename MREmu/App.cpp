@@ -160,11 +160,6 @@ void App::start()
 	else {
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);
 	}
-
-	if (system_callbacks.sysevt) { //tmp
-		Bridge::run_cpu(system_callbacks.sysevt, 2, VM_MSG_CREATE, 0);
-		Bridge::run_cpu(system_callbacks.sysevt, 2, VM_MSG_PAINT, 0);
-	}
 }
 
 bool App::load_from_file(fs::path path, bool local)

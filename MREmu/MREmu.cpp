@@ -32,6 +32,7 @@ void mre_main(AppManager* appManager_p) {
 		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
 
 		appManager.launch_apps();
+		appManager.process_system_events();
 		appManager.process_keyboard_events();
 		appManager.process_message_events();
 		//app.timer.update(delta_ms);

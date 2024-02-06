@@ -41,6 +41,9 @@ void AppManager::launch_apps()
 	apps[current_work_app_id].system_callbacks.ph_app_id = ph_app_id;
 
 	apps[current_work_app_id].start();
+
+	add_system_event(ph_app_id, VM_MSG_CREATE, 0);
+	add_system_event(ph_app_id, VM_MSG_PAINT, 0);
 }
 
 void AppManager::add_keyboard_event(int event, int keycode)
@@ -102,8 +105,43 @@ void AppManager::process_message_events()
 
 		App& cur_app = apps[current_work_app_id];
 		if (cur_app.system_callbacks.msg_proc)
-			Bridge::run_cpu(cur_app.io.key_handler, 4, 
+			Bridge::run_cpu(cur_app.system_callbacks.msg_proc, 4,
 				me.phandle_sender, me.msg_id, me.wparam, me.lparam);
+	}
+}
+
+void AppManager::add_system_event(int phandle, int message, int param)
+{
+	std::lock_guard lock(system_events_queue_mutex);
+	system_events_queue.push({ phandle, message, param });
+}
+
+void AppManager::process_system_events()
+{
+	while (system_events_queue.size()) {
+		system_event_el se;
+		{
+			std::lock_guard lock(system_events_queue_mutex);
+			se = system_events_queue.front();
+			system_events_queue.pop();
+		}
+
+		int app_id = -1;
+
+		for (int i = 0; i < apps.size(); ++i)
+			if (apps[i].system_callbacks.ph_app_id == se.phandle) {
+				app_id = i;
+				break;
+			}
+
+		if (app_id == -1)
+			continue;
+
+		current_work_app_id = app_id;
+
+		App& cur_app = apps[current_work_app_id];
+		if (cur_app.system_callbacks.sysevt)
+			Bridge::run_cpu(cur_app.system_callbacks.sysevt, 2, se.message, se.param);
 	}
 }
 
@@ -184,4 +222,10 @@ void add_message_event(int phandle, unsigned int msg_id,
 	if (g_appManager)
 		g_appManager->add_message_event(phandle, msg_id, wparam, 
 			lparam, phandle_sender);
+}
+
+void add_system_event(int phandle, int message, int param)
+{
+	if (g_appManager)
+		g_appManager->add_system_event(phandle, message, param);
 }

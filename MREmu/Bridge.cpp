@@ -458,6 +458,12 @@ namespace Bridge {
 				read_arg(uc, 2),
 				read_arg(uc, 3));
 		}},
+		{"vm_graphic_reset_clip", [](uc_engine* uc) {
+			vm_graphic_reset_clip();
+		}},
+		{"vm_graphic_flush_screen", [](uc_engine* uc) {
+			vm_graphic_flush_screen();
+		}},
 		{"vm_graphic_is_r2l_state", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_is_r2l_state());
 		}},

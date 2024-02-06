@@ -24,6 +24,12 @@ struct message_event_el {
 	int phandle_sender;
 };
 
+struct system_event_el {
+	int phandle;
+	int message;
+	int param;
+};
+
 class AppManager {
 	std::queue<launch_el> launch_queue;
 	std::mutex launch_queue_mutex;
@@ -34,6 +40,9 @@ class AppManager {
 
 	std::queue<message_event_el> message_events_queue;
 	std::mutex message_events_queue_mutex;
+
+	std::queue<system_event_el> system_events_queue;
+	std::mutex system_events_queue_mutex;
 public:
 	std::vector<App> apps;
 	int active_app_id = -1;
@@ -48,6 +57,9 @@ public:
 	void add_message_event(int phandle, unsigned int msg_id, 
 		int wparam, int lparam, int phandle_sender);
 	void process_message_events();
+
+	void add_system_event(int phandle, int message, int param);
+	void process_system_events();
 
 	App* get_active_app();
 	App* get_current_work_app_id();
