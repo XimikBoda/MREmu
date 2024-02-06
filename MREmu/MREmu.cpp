@@ -33,6 +33,7 @@ void mre_main(AppManager* appManager_p) {
 
 		appManager.launch_apps();
 		appManager.process_keyboard_events();
+		appManager.process_message_events();
 		//app.timer.update(delta_ms);
 		App* active_app = appManager.get_active_app();
 		if (active_app) {

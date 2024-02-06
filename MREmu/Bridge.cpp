@@ -12,6 +12,7 @@
 #include <vmgettag.h>
 #include <vmchset.h>
 #include <vmsim.h>
+#include <vmstdlib.h>
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
@@ -277,10 +278,12 @@ namespace Bridge {
 
 
 		// SIM
+		{"vm_has_sim_card", [](uc_engine* uc) {
+			write_ret(uc, vm_has_sim_card());
+		}},
 		{"vm_get_imei", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_get_imei()));
 		}},
-			
 		{"vm_sim_card_count", [](uc_engine* uc) {
 			write_ret(uc, vm_sim_card_count());
 		}},
@@ -320,6 +323,9 @@ namespace Bridge {
 					read_arg(uc, 0),
 					read_arg(uc, 1),
 					read_arg(uc, 2)));
+		}},
+		{"vm_graphic_get_bits_per_pixel", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_bits_per_pixel());
 		}},
 		{"vm_graphic_create_canvas", [](uc_engine* uc) {
 			write_ret(uc,
@@ -537,6 +543,8 @@ namespace Bridge {
 			write_ret(uc, vm_graphic_is_use_vector_font());
 		}},
 
+
+
 		// Resources
 		{"vm_load_resource", [](uc_engine* uc) {
 			write_ret(uc,
@@ -589,6 +597,14 @@ namespace Bridge {
 			write_ret(uc,
 				vm_get_language_ssc(
 					(VMINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+
+
+
+		// STDLib
+		{"vm_wstrlen", [](uc_engine* uc) {
+			write_ret(uc,vm_wstrlen(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 
 

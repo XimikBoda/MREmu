@@ -11,6 +11,10 @@ void MREngine::SIM::init()
 	memcpy(imei_ptr, "1234567890123456", 17);
 }
 
+VMINT vm_has_sim_card(void) {
+	return TRUE;
+}
+
 VMSTR vm_get_imei(void) {
 	return (VMSTR)imei_ptr;
 }

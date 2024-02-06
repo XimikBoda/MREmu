@@ -310,6 +310,10 @@ VM_GDI_RESULT vm_graphic_translate_layer(VMINT handle, VMINT tx, VMINT ty) {
 	return VM_GDI_SUCCEED;
 }
 
+VMINT vm_graphic_get_bits_per_pixel(void) {
+	return 2;
+}
+
 VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 	int image_size = width * height * 2;
 	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
