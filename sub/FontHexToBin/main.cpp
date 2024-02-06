@@ -34,7 +34,7 @@ int first_bite(unsigned char c, int def = 17) {
 }
 int last_bite(unsigned char c, int def = -1) {
 	for (int i = 0; i < 8; ++i)
-		if ((c >> 7) & 1)
+		if ((c >> i) & 1)
 			return 7 - i;
 	return def;
 }
@@ -80,8 +80,8 @@ int main(int argc, char** argv)
 		for (int i = 0; i < 16; ++i)
 			for (int j = 0; j < byte_for_line; ++j) {
 				unsigned char byte = str_to_byte(&hexline[(i * byte_for_line + j) * 2]);
-				first = min(first, first_bite(byte));
-				last = max(last, last_bite(byte));
+				first = min(first, first_bite(byte) + j * 8) ;
+				last = max(last, last_bite(byte) + j * 8) ;
 				data[i * byte_for_line + j + 2] = byte;
 			}
 
@@ -101,8 +101,8 @@ int main(int argc, char** argv)
 		}*/
 	}
 
-	vector<unsigned char> final_data(0X10000*4 + arr_size, 0);
-	int curr_offset = 0X10000*4;
+	vector<unsigned char> final_data(0X10000 * 4 + arr_size, 0);
+	int curr_offset = 0X10000 * 4;
 
 	for (int i = 0; i < arr.size(); ++i) {
 		((unsigned int*)final_data.data())[arr[i].first] = curr_offset;

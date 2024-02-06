@@ -103,7 +103,6 @@ MREngine::Graphic::Graphic()
 		cfp->height = height;
 		base_buf2 = (cfp + 1);
 	}
-	font_is_ready = font.loadFromFile("NotoSansSymbols-VariableFont_wght.ttf");
 	graphic = this;
 }
 

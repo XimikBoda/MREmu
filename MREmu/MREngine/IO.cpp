@@ -136,9 +136,7 @@ fs::path MREngine::find_el::next() {
 		di++;
 	if (di == end_itr)
 		return "";
-	fs::path res = lfolder;
-	res += di->path().filename();
-	return res;
+	return lfolder / di->path().filename();
 }
 
 void vm_reg_keyboard_callback(vm_key_handler_t handler) {
