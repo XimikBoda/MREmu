@@ -3,6 +3,7 @@
 #include <mutex>
 #include <vmgraph.h>
 #include <SFML/Graphics/Texture.hpp>
+#include <SFML/Graphics/Font.hpp>
 #include "../mutex_wrapper.h"
 
 const char* const CANVAS_MAGIC = "MTKCANVAS"; // Do we have an app that checks for this?
@@ -11,6 +12,9 @@ namespace MREngine {
 	class Graphic {
 	public:
 		int width = 240, height = 320;
+
+		sf::Font font;
+		bool font_is_ready = false; //temp
 
 		sf::Texture screen_tex;
 
