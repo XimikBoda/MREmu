@@ -533,6 +533,23 @@ namespace Bridge {
 					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
 				));
 		}},
+		{"vm_ucs2_to_ascii", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_ucs2_to_ascii(
+					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
+		}},
+		{"vm_get_language", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_language());
+		}},
+		{"vm_get_language_ssc", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_language_ssc(
+					(VMINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 
 
 
