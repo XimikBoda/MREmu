@@ -9,17 +9,43 @@ VMINT vm_graphic_get_character_height(void) {
 	return 16; // temp
 }
 
-VMINT vm_graphic_get_character_width(VMWCHAR c);
+VMINT vm_graphic_get_character_width(VMWCHAR c) {
+	int data_offset = ((unsigned int*)unifont_15_1_04_bin)[c];
 
-VMINT vm_graphic_get_string_width(VMWSTR str);
+	if (data_offset == 0)
+		return 0;
 
-VMINT vm_graphic_get_string_height(VMWSTR str);
+	int ch_d = unifont_15_1_04_bin[data_offset];
+	int ch_w = ch_d & 0xF;
+	return ch_w + 1;
+}
+
+VMINT vm_graphic_get_string_width(VMWSTR str) {
+	int w = 0;
+	for (int i = 0; str[i]; ++i) {
+		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[str[i]];
+
+		if (data_offset == 0)
+			continue;
+
+		int ch_d = unifont_15_1_04_bin[data_offset];
+		int ch_w = ch_d & 0xF;
+
+		w += ch_w + 1;
+	}
+	return w;
+}
+
+VMINT vm_graphic_get_string_height(VMWSTR str) {
+	return vm_graphic_get_character_height();
+}
 
 VMINT vm_graphic_measure_character(VMWCHAR c, VMINT* width, VMINT* height);
 
 VMINT vm_graphic_get_character_info(VMWCHAR c, vm_graphic_char_info* char_info);
 
-void vm_graphic_set_font(font_size_t size);
+void vm_graphic_set_font(font_size_t size) {
+}
 
 void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT length, VMUINT16 color) {
 	if (disp_buf == 0)
@@ -54,6 +80,9 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	int x_off = x;
 	for (int i = 0; s[i]; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[s[i]];
+
+		if (data_offset == 0)
+			continue;
 
 		int ch_d = unifont_15_1_04_bin[data_offset];
 		int ch_w = ch_d & 0xF;
@@ -93,9 +122,13 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 
 void vm_graphic_textout_by_baseline(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT length, VMUINT16 color, VMINT baseline);
 
-VM_GDI_RESULT vm_font_set_font_size(VMINT size);
+VM_GDI_RESULT vm_font_set_font_size(VMINT size) {
+	return VM_GDI_SUCCEED;
+}
 
-VM_GDI_RESULT vm_font_set_font_style(VMINT bold, VMINT italic, VMINT underline);
+VM_GDI_RESULT vm_font_set_font_style(VMINT bold, VMINT italic, VMINT underline) {
+	return VM_GDI_SUCCEED;
+}
 
 VM_GDI_RESULT vm_graphic_textout_to_layer(VMINT handle, VMINT x, VMINT y, VMWSTR s, VMINT length) {
 	auto& layers = get_current_app_graphic().layers;
@@ -110,11 +143,15 @@ VM_GDI_RESULT vm_graphic_textout_to_layer(VMINT handle, VMINT x, VMINT y, VMWSTR
 	return VM_GDI_SUCCEED;
 }
 
-VMINT vm_graphic_get_string_baseline(VMWSTR string);
+VMINT vm_graphic_get_string_baseline(VMWSTR string) {
+	return 2;
+}
 
 VM_GDI_RESULT vm_graphic_textout_to_layer_by_baseline(VMINT handle, VMINT x, VMINT y, VMWSTR s, VMINT length, VMINT baseline);
 
-VMINT vm_graphic_is_use_vector_font(void);
+VMINT vm_graphic_is_use_vector_font(void) {
+	return FALSE;
+}
 
 VM_GDI_RESULT vm_graphic_draw_abm_text(VMINT handle, VMINT x, VMINT y, VMINT color, VMUINT8* font_data, VMINT font_width, VMINT font_height);
 
