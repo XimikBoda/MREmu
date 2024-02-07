@@ -11,7 +11,8 @@ add_library (MREngine
 						"Sock.cpp" "Sock.h"
 						"CharSet.cpp"
 						"Textout.cpp" 
-						"STDLib.cpp")
+						"STDLib.cpp" 
+						"ItemsMng.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREngine PROPERTY CXX_STANDARD 20)

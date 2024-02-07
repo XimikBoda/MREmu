@@ -1,4 +1,5 @@
 #pragma once
+#include "ItemsMng.h"
 #include <vector>
 #include <fstream>
 #include <regex>
@@ -20,17 +21,19 @@ namespace MREngine {
 		bool find_recv;
 		bool first = true;
 
+		find_el() = default;
 		find_el(fs::path path_f);
+		find_el(const find_el&) = default;
 
 		fs::path next();
 	};
 
 	class AppIO{
 	public:
-		std::vector<std::fstream*> files;
+		ItemsMng<std::fstream*> files;
 
-		std::vector<find_el> find;
-		std::vector<find_el> find_ext;
+		ItemsMng<find_el> find;
+		ItemsMng<find_el> find_ext;
 
 		uint32_t key_handler = 0;
 	};

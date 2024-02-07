@@ -173,40 +173,29 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		return -1;
 	}
 
-	for (int i = 0; i < io.files.size(); ++i)
-		if (io.files[i] == 0) {
-			io.files[i] = f;
-			return i;
-		}
-
-	io.files.push_back(f);
-
-	return io.files.size() - 1;
+	return io.files.push(f);
 }
 
 void vm_file_close(VMFILE handle) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
-		return;
-
-	if (io.files[handle]) {
-		io.files[handle]->close();
-		delete io.files[handle];
-		io.files[handle] = 0; //todo
-
-		while (io.files.size() && io.files[io.files.size() - 1] == 0)
-			io.files.resize(io.files.size() - 1);
+	if (io.files.is_active(handle)) {
+		auto& el = io.files[handle];
+		el->close();
+		delete el;
+		el = NULL;
+		io.files.remove(handle);
 	}
 }
 
 VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
+	if (!io.files.is_active(handle))
 		return -1;
 
-	auto f = io.files[handle];
+	auto& f = io.files[handle];
+
 	if (!f)
 		return -1;
 
@@ -219,10 +208,11 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
+	if (!io.files.is_active(handle))
 		return -1;
 
-	auto f = io.files[handle];
+	auto& f = io.files[handle];
+
 	if (!f)
 		return -1;
 
@@ -235,10 +225,11 @@ VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 VMINT vm_file_commit(VMFILE handle) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
+	if (!io.files.is_active(handle))
 		return -1;
 
-	auto f = io.files[handle];
+	auto& f = io.files[handle];
+
 	if (!f)
 		return -1;
 
@@ -249,10 +240,11 @@ VMINT vm_file_commit(VMFILE handle) {
 VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
+	if (!io.files.is_active(handle))
 		return -1;
 
-	auto f = io.files[handle];
+	auto& f = io.files[handle];
+
 	if (!f)
 		return -1;
 
@@ -284,23 +276,24 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 VMINT vm_file_tell(VMFILE handle) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
+	if (!io.files.is_active(handle))
 		return -1;
 
-	auto f = io.files[handle];
+	auto& f = io.files[handle];
+
 	if (!f)
 		return -1;
-
 	return f->tellg();
 }
 
 VMINT vm_file_is_eof(VMFILE handle) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
+	if (!io.files.is_active(handle))
 		return -1;
 
-	auto f = io.files[handle];
+	auto& f = io.files[handle];
+
 	if (!f)
 		return -1;
 
@@ -310,12 +303,13 @@ VMINT vm_file_is_eof(VMFILE handle) {
 VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.files.size())
+	if (!io.files.is_active(handle))
 		return -1;
 
-	auto f = io.files[handle];
+	auto& f = io.files[handle];
+
 	if (!f)
-		return -1;;
+		return -1;
 
 	size_t pos = f->tellg();
 	f->seekg(0, std::ios_base::end);
@@ -376,13 +370,13 @@ VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
 	info->filename[el.u16string().copy((char16_t*)info->filename, 260)] = 0;
 
 	MREngine::AppIO& io = get_current_app_io();
-	io.find.push_back(find);
-	return io.find.size() - 1;
+
+	return io.find.push(find);
 }
 VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.find.size())
+	if (!io.find.is_active(handle))
 		return -1;
 
 	auto& f = io.find[handle];
@@ -397,7 +391,9 @@ VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 	return 0;
 }
 void vm_find_close(VMINT handle) {
-	//todo
+	MREngine::AppIO& io = get_current_app_io();
+
+	io.find.remove(handle);
 }
 
 VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
@@ -414,17 +410,17 @@ VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
 	direntry->filefullname[el.u16string().copy((char16_t*)direntry->filefullname, 260)]=0;
 	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
 	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
+	//todo
 
 	MREngine::AppIO& io = get_current_app_io();
-	io.find_ext.push_back(find);
-	return io.find_ext.size()-1;
-	//todo
+
+	return io.find_ext.push(find);
 }
 
 VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (handle < 0 || handle >= io.find_ext.size())
+	if (!io.find_ext.is_active(handle))
 		return -1;
 
 	auto &f = io.find_ext[handle];
@@ -440,7 +436,9 @@ VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 	return 0;
 }
 void vm_find_close_ext(VMINT handle) {
-	//todo
+	MREngine::AppIO& io = get_current_app_io();
+	
+	io.find_ext.remove(handle);
 }
 
 VMINT vm_get_removable_driver(void) {

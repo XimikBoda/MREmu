@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "ItemsMng.h"
 #include <vector>
 
 namespace MREngine {
@@ -8,12 +8,11 @@ namespace MREngine {
 		size_t time = 0;
 		size_t cur_val = 0;
 		uint32_t adr = 0;
-		bool active = false;
 	};
 	class Timer {
 	public:
-		std::vector<timer_el> gui_timers;
-		std::vector<timer_el> timers;
+		ItemsMng<timer_el> gui_timers;
+		ItemsMng<timer_el> timers;
 
 		void update(size_t delta_ms);
 

@@ -44,9 +44,7 @@ extern "C" {
 		VMINT(*callback)(vm_soc_dns_result*));
 
     VMINT vm_tcp_connect(const char* host, const VMINT port, const VMINT apn,
-        void (*callback)(VMINT handle, VMINT event)) {
-        
-    }
+        void (*callback)(VMINT handle, VMINT event));
 
     void vm_tcp_close(VMINT handle);
 
