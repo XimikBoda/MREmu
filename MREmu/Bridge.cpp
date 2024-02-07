@@ -14,10 +14,7 @@
 #include <vmsim.h>
 #include <vmstdlib.h>
 
-extern "C" {
-	VMINT vm_is_support_wifi(void); // Becouse we have some problem with vmsock.h
-	VMINT vm_wifi_is_connected(void);
-}
+#include "MREngine/Sock.h"
 
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
@@ -637,6 +634,15 @@ namespace Bridge {
 		}},
 		{"vm_wifi_is_connected", [](uc_engine* uc) {
 			write_ret(uc, vm_wifi_is_connected());
+		}},
+		{"vm_soc_get_host_by_name", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_soc_get_host_by_name(
+					read_arg(uc, 0),
+					(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+					(VMINT(*)(vm_soc_dns_result*))ADDRESS_FROM_EMU(read_arg(uc, 3))
+				));
 		}},
 
 

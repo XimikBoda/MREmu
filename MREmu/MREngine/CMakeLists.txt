@@ -8,9 +8,10 @@ add_library (MREngine
 						"ProgramManager.cpp" "ProgramManager.h"
 						"IO.cpp" "IO.h"
 						"SIM.cpp" "SIM.h"
+						"Sock.cpp" "Sock.h"
 						"CharSet.cpp"
 						"Textout.cpp" 
-						"STDLib.cpp" "Sock.cpp")
+						"STDLib.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREngine PROPERTY CXX_STANDARD 20)

@@ -17,6 +17,7 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
 endif()
 
 target_link_libraries(MREmu sfml-graphics)
+target_link_libraries(MREmu sfml-network)
 target_link_libraries(MREmu imgui)
 target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu capstone)
