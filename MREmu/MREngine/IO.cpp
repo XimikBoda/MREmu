@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cstring>
 #include <regex>
+#include <codecvt>
 #include <filesystem>
 #include <imgui.h>
 #include <imgui-SFML.h>
@@ -132,7 +133,10 @@ fs::path MREngine::find_el::next() {
 	else
 		di++;
 
-	while (find_recv && di != end_itr && !std::regex_match(di->path().filename().string(), find_reg))
+	std::wstring_convert<std::codecvt_utf8<char16_t>, char16_t> converter;
+
+	while (find_recv && di != end_itr && 
+		!std::regex_match(converter.to_bytes(di->path().filename().u16string()), find_reg))
 		di++;
 	if (di == end_itr)
 		return "";
