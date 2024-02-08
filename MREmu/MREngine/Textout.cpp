@@ -79,8 +79,6 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	if (disp_buf == 0)
 		return;
 
-	std::wcout << "textout " << x << ' ' << y << ' ' << std::wstring((wchar_t*)s, length) << '\n';
-
 	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(disp_buf - VM_CANVAS_DATA_OFFSET);
 	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9))
 		return;

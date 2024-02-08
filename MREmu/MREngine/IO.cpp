@@ -203,7 +203,6 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 	if (!f)
 		return -1;
 
-	//printf("read(%d, %d) before(%d)\n", handle, length, (int)f->tellg());
 	f->read((char*)data, length);
 
 	*nread = f->gcount();
@@ -227,7 +226,6 @@ VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 	if (!f)
 		return -1;
 
-	//printf("write(%d, %d) before(%d)\n", handle, length, (int)f->tellg());
 	f->write((char*)data, length);
 
 	*written = length;
@@ -277,7 +275,6 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		break;
 	}
 
-	//printf("seek(%d, %d, %d) before(%d)\n", handle, offset, base, (int)f->tellg());
 	auto pos = f->tellg();
 	f->seekg(offset, sdir);
 
@@ -300,7 +297,7 @@ VMINT vm_file_tell(VMFILE handle) {
 
 	if (!f)
 		return -1;
-	//printf("tell(%d)->%d\n", handle, (int)f->tellg());
+
 	return f->tellg();
 }
 
