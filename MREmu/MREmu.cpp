@@ -47,6 +47,8 @@ int main(int argc, char** argv) {
 	auto app_path = parser.get<std::string>("");
 	bool path_is_local = parser.get<bool>("-l");
 
+	fs::current_path(fs::path(argv[0]).parent_path());
+
 	Memory::init(128 * 1024 * 1024);
 	Cpu::init();
 	Bridge::init();
