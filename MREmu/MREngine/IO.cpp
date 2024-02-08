@@ -156,16 +156,16 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 
 	std::ios_base::openmode fmode = std::ios_base::binary;
 
-	if (fmode | MODE_READ)
+	if (mode & MODE_READ)
 		fmode |= std::ios_base::in;
 
-	if (fmode | MODE_WRITE)
+	if (mode & MODE_WRITE)
 		fmode |= std::ios_base::out; // | std::ios_base::_Nocreate;
 
-	if (fmode | MODE_CREATE_ALWAYS_WRITE)
+	if (mode & MODE_CREATE_ALWAYS_WRITE)
 		fmode |= std::ios_base::out;
 
-	if (fmode | MODE_APPEND)
+	if (mode & MODE_APPEND)
 		fmode |= std::ios_base::out | std::ios_base::app;
 
 	std::fstream* f = new std::fstream;
@@ -203,9 +203,16 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 	if (!f)
 		return -1;
 
+	//printf("read(%d, %d) before(%d)\n", handle, length, (int)f->tellg());
 	f->read((char*)data, length);
 
 	*nread = f->gcount();
+
+	if (f->eof()) {
+		f->clear();
+		f->seekg(0, std::ios_base::end);
+	}
+
 	return *nread;
 }
 
@@ -220,9 +227,10 @@ VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 	if (!f)
 		return -1;
 
+	//printf("write(%d, %d) before(%d)\n", handle, length, (int)f->tellg());
 	f->write((char*)data, length);
 
-	*written = f->gcount();
+	*written = length;
 	return *written;
 }
 
@@ -269,10 +277,15 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		break;
 	}
 
+	//printf("seek(%d, %d, %d) before(%d)\n", handle, offset, base, (int)f->tellg());
+	auto pos = f->tellg();
 	f->seekg(offset, sdir);
 
-	if(!f->good())
+	if (!f->good()) {
+		f->clear();
+		f->seekg(pos, std::ios_base::beg);
 		return -1;
+	}
 
 	return 0;
 }
@@ -287,6 +300,7 @@ VMINT vm_file_tell(VMFILE handle) {
 
 	if (!f)
 		return -1;
+	//printf("tell(%d)->%d\n", handle, (int)f->tellg());
 	return f->tellg();
 }
 
@@ -315,7 +329,7 @@ VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 	if (!f)
 		return -1;
 
-	size_t pos = f->tellg();
+	auto pos = f->tellg();
 	f->seekg(0, std::ios_base::end);
 
 	*file_size = f->tellg();
@@ -332,6 +346,17 @@ VMINT vm_file_delete(const VMWSTR filename) {
 		return 0;
 	else
 		return -1;
+}
+
+VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
+	fs::path old_path = convert_path(filename);
+	fs::path new_path = convert_path(newname);
+
+	if (!fs::exists(old_path))
+		return -1;
+
+	fs::rename(old_path, new_path);
+	return 0;
 }
 
 VMINT vm_file_mkdir(const VMWSTR dirname) {
@@ -411,9 +436,11 @@ VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
 	if (el.empty())
 		return -1;
 
-	direntry->filefullname[el.u16string().copy((char16_t*)direntry->filefullname, 260)]=0;
+	direntry->filefullname[el.filename().u16string().copy((char16_t*)direntry->filefullname, 260)]=0;
 	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
 	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
+	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
+	direntry->filesize = fs::file_size(convert_path(el));
 	//todo
 
 	MREngine::AppIO& io = get_current_app_io();
@@ -433,9 +460,11 @@ VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 	if (el.empty())
 		return -1;
 
-	direntry->filefullname[el.u16string().copy((char16_t*)direntry->filefullname, 260)] = 0;
+	direntry->filefullname[el.filename().u16string().copy((char16_t*)direntry->filefullname, 260)] = 0;
 	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
 	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
+	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
+	direntry->filesize = fs::file_size(convert_path(el));
 
 	return 0;
 }

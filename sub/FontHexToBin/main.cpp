@@ -80,13 +80,13 @@ int main(int argc, char** argv)
 		for (int i = 0; i < 16; ++i)
 			for (int j = 0; j < byte_for_line; ++j) {
 				unsigned char byte = str_to_byte(&hexline[(i * byte_for_line + j) * 2]);
-				first = min(first, first_bite(byte) + j * 8) ;
-				last = max(last, last_bite(byte) + j * 8) ;
+				first = min(first, first_bite(byte) + j * 8);
+				last = max(last, last_bite(byte) + j * 8);
 				data[i * byte_for_line + j + 2] = byte;
 			}
 
 		if (first == 17)
-			data[0] = 0x0F;
+			data[0] = byte_for_line * 8 - 1;
 		else
 			data[0] = (first << 4) | last;
 

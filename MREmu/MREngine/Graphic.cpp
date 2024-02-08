@@ -880,7 +880,7 @@ void vm_graphic_flush_screen(void) {
 }
 
 VMINT vm_graphic_is_r2l_state(void) {
-	return 1;
+	return 0;
 }
 
 VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {

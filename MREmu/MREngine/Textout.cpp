@@ -2,6 +2,7 @@
 #include "../Memory.h"
 #include <vmgraph.h>
 #include "unifont.h"
+#include <iostream>
 
 extern MREngine::Graphic* graphic;
 
@@ -33,7 +34,7 @@ VMINT vm_graphic_get_string_width(VMWSTR str) {
 
 		w += ch_w + 1;
 	}
-	return w;
+	return w+1;
 }
 
 VMINT vm_graphic_get_string_height(VMWSTR str) {
@@ -78,6 +79,8 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	if (disp_buf == 0)
 		return;
 
+	std::wcout << "textout " << x << ' ' << y << ' ' << std::wstring((wchar_t*)s, length) << '\n';
+
 	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(disp_buf - VM_CANVAS_DATA_OFFSET);
 	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9))
 		return;
@@ -105,7 +108,7 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	int end_y = std::min<int>(bottom, y + 16);
 
 	int x_off = x;
-	for (int i = 0; s[i]; ++i) {
+	for (int i = 0; i < length; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)s[i]];
 
 		if (data_offset == 0)
