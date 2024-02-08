@@ -379,8 +379,10 @@ VMINT vm_file_get_attributes(const VMWSTR filename) {
 			res |= VM_FS_ATTR_DIR;
 		if (!(int)(std::filesystem::status(path).permissions() & fs::perms::owner_write))
 			res |= VM_FS_ATTR_READ_ONLY;
+		return res;
 	}
-	return res;
+	else
+		return -1;
 }
 
 VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
@@ -393,7 +395,8 @@ VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
 	if (el.empty())
 		return -1;
 
-	info->filename[el.u16string().copy((char16_t*)info->filename, 260)] = 0;
+	info->filename[el.filename().u16string().copy((char16_t*)info->filename, 260)] = 0;
+	info->size = fs::file_size(convert_path(el));
 
 	MREngine::AppIO& io = get_current_app_io();
 
@@ -412,7 +415,8 @@ VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 		return -1;
 
 
-	info->filename[el.u16string().copy((char16_t*)info->filename, 260)] = 0;
+	info->filename[el.filename().u16string().copy((char16_t*)info->filename, 260)] = 0;
+	info->size = fs::file_size(convert_path(el));
 
 	return 0;
 }

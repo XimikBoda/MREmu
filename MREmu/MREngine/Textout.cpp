@@ -106,7 +106,7 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	int end_y = std::min<int>(bottom, y + 16);
 
 	int x_off = x;
-	for (int i = 0; i < length; ++i) {
+	for (int i = 0; i < length && s[i]; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)s[i]];
 
 		if (data_offset == 0)

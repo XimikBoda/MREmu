@@ -258,6 +258,13 @@ VM_GDI_HANDLE vm_graphic_create_layer_ex(VMINT x, VMINT y, VMINT width, VMINT he
 	return get_current_app_graphic().create_layer_ex(x, y, width, height, trans_color, mode, buf);
 }
 
+VM_GDI_HANDLE vm_graphic_create_layer_cf(vm_graphic_color_famat cf, VMINT x, VMINT y, VMINT width, VMINT height, vm_graphic_color_argb* trans_color, VMINT mode, VMUINT8* buf, VMINT buf_size) {
+	if (cf != VM_GRAPHIC_COLOR_FORMAT_16)
+		return -1;
+
+	return vm_graphic_create_layer_ex(x, y, width, height, -1, mode, buf);
+}
+
 VMINT vm_graphic_delete_layer(VMINT handle) {
 	return get_current_app_graphic().delete_layer(handle);
 }
@@ -339,6 +346,13 @@ VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 
 	return (VMINT)ADDRESS_TO_EMU(canvas_buf);
+}
+
+VMINT vm_graphic_create_canvas_cf(vm_graphic_color_famat cf, VMINT width, VMINT height) {
+	if (cf != VM_GRAPHIC_COLOR_FORMAT_16)
+		return -1;
+
+	return vm_graphic_create_canvas(width, height);
 }
 
 void vm_graphic_release_canvas(VMINT hcanvas) {
