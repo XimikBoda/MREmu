@@ -61,6 +61,8 @@ public:
 	void add_system_event(int phandle, int message, int param);
 	void process_system_events();
 
+	void update(size_t delta_ms);
+
 	App* get_active_app();
 	App* get_current_work_app_id();
 };

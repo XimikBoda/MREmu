@@ -1,4 +1,29 @@
+#pragma once
+#include "ItemsMng.h"
+#include <SFML/Network/TcpSocket.hpp>
+#include <memory>
 #include <vmsys.h>
+
+#define SOCK_TMP_BUF_SIZE 1024
+
+namespace MREngine {
+    struct tcp_el {
+        std::shared_ptr<sf::TcpSocket> soc;
+        uint32_t callback;
+        bool is_connected = false;
+        bool is_disconnected = false;
+        uint8_t receive_tmp_buf[SOCK_TMP_BUF_SIZE];
+        size_t receive_tmp_buf_pos = 0;
+    };
+
+    class AppSock {
+    public:
+        ItemsMng<tcp_el> tcps;
+        void update();
+    };
+}
+
+MREngine::AppSock& get_current_app_sock();
 
 #define VM_SOC_DNS_MAX_ADDR 5
 
@@ -33,6 +58,13 @@ typedef struct
 	VMINT error_cause; /* vm_ps_cause_enum */
 }vm_soc_dns_result;
 
+#define VM_TCP_EVT_CONNECTED	1
+#define VM_TCP_EVT_CAN_WRITE	2
+#define VM_TCP_EVT_CAN_READ		3
+#define VM_TCP_EVT_PIPE_BROKEN	4
+#define VM_TCP_EVT_HOST_NOT_FOUND	5
+#define VM_TCP_EVT_PIPE_CLOSED	6
+
 extern "C" {
 	VMINT vm_is_support_wifi(void); // Becouse we have some problem with vmsock.h
 	VMINT vm_wifi_is_connected(void);
@@ -51,6 +83,4 @@ extern "C" {
     VMINT vm_tcp_read(VMINT handle, void* buf, VMINT len);
 
     VMINT vm_tcp_write(VMINT handle, void* buf, VMINT len);
-
-    VMINT vm_is_support_wifi(void);
 }

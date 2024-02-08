@@ -31,15 +31,7 @@ void mre_main(AppManager* appManager_p) {
 	while (work) {
 		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
 
-		appManager.launch_apps();
-		appManager.process_system_events();
-		appManager.process_keyboard_events();
-		appManager.process_message_events();
-		//app.timer.update(delta_ms);
-		App* active_app = appManager.get_active_app();
-		if (active_app) {
-			active_app->timer.update(delta_ms);
-		}
+		appManager.update(delta_ms);
 
 		sf::sleep(sf::milliseconds(1000 / 60));
 	}

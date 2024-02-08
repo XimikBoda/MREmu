@@ -10,7 +10,7 @@ VMINT vm_graphic_get_character_height(void) {
 }
 
 VMINT vm_graphic_get_character_width(VMWCHAR c) {
-	int data_offset = ((unsigned int*)unifont_15_1_04_bin)[c];
+	int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)c];
 
 	if (data_offset == 0)
 		return 0;
@@ -23,7 +23,7 @@ VMINT vm_graphic_get_character_width(VMWCHAR c) {
 VMINT vm_graphic_get_string_width(VMWSTR str) {
 	int w = 0;
 	for (int i = 0; str[i]; ++i) {
-		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[str[i]];
+		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)str[i]];
 
 		if (data_offset == 0)
 			continue;
@@ -54,7 +54,7 @@ VMINT vm_graphic_get_character_info(VMWCHAR c, vm_graphic_char_info* char_info) 
 	if (char_info == 0)
 		return -1;
 
-	int data_offset = ((unsigned int*)unifont_15_1_04_bin)[c];
+	unsigned int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)c];
 
 	if (data_offset == 0)
 		return -1;
@@ -106,7 +106,7 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 
 	int x_off = x;
 	for (int i = 0; s[i]; ++i) {
-		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[s[i]];
+		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)s[i]];
 
 		if (data_offset == 0)
 			continue;
@@ -184,7 +184,24 @@ VMINT vm_graphic_is_use_vector_font(void) {
 
 VM_GDI_RESULT vm_graphic_draw_abm_text(VMINT handle, VMINT x, VMINT y, VMINT color, VMUINT8* font_data, VMINT font_width, VMINT font_height);
 
-VMUINT vm_graphic_get_char_num_in_width(VMWCHAR* string, VMUINT width, VMINT  checklinebreak, VMUINT gap);
+VMUINT vm_graphic_get_char_num_in_width(VMWCHAR* string, VMUINT width, VMINT  checklinebreak, VMUINT gap) {
+	int w = 0, i = 0;
+	for (i = 0; string[i]; ++i) {
+		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)string[i]];
+
+		if (data_offset == 0)
+			continue;
+
+		int ch_d = unifont_15_1_04_bin[data_offset];
+		int ch_w = ch_d & 0xF;
+
+		if (width >= w && width < w + ch_w + 1 + gap)
+			return i;
+
+		w += ch_w + 1 + gap;
+	}
+	return i;
+}
 
 VMUINT vm_graphic_get_char_num_in_width_ex(VMWCHAR* string, VMUINT width, VMINT  checklinebreak, VMUINT gap);
 

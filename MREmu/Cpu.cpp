@@ -147,5 +147,9 @@ namespace Cpu {
 		//uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ, hook_read, 0, 1, 0);
 		//uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, hook_code, 0, 0, 0x100000000);
 	}
-
+	void trace_on() {
+		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE, hook_write, 0, 1, 0);
+		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ, hook_read, 0, 1, 0);
+		uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, hook_code, 0, 0, 0x100000000);
+	}
 };

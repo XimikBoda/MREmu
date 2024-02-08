@@ -145,6 +145,20 @@ void AppManager::process_system_events()
 	}
 }
 
+void AppManager::update(size_t delta_ms) {
+	launch_apps();
+	process_system_events();
+	process_keyboard_events();
+	process_message_events();
+	for (int i = 0; i < apps.size(); ++i) {
+		current_work_app_id = i;
+		bool active = active_app_id == current_work_app_id;
+
+		apps[i].timer.update(delta_ms);//active
+		apps[i].sock.update();
+	}
+}
+
 App* AppManager::get_active_app()
 {
 	if (active_app_id < 0 || active_app_id >= apps.size())
@@ -193,6 +207,10 @@ MREngine::Timer& get_current_app_timer() {
 
 MREngine::AppIO& get_current_app_io() {
 	return get_cur_app()->io;
+}
+
+MREngine::AppSock& get_current_app_sock() {
+	return get_cur_app()->sock;
 }
 
 fs::path get_current_app_path() {

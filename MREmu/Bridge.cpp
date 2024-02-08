@@ -1,6 +1,7 @@
 #include "Bridge.h"
 #include "Memory.h"
 #include "ARModule.h"
+#include "Cpu.h"
 #include <string>
 #include <iostream>
 #include <unicorn/unicorn.h>
@@ -231,6 +232,11 @@ namespace Bridge {
 		{"vm_file_delete", [](uc_engine* uc) {
 			write_ret(uc, vm_file_delete(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{"vm_file_rename", [](uc_engine* uc) {
+			write_ret(uc, vm_file_rename(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))));
 		}},
 		{"vm_file_mkdir",  [](uc_engine* uc) {
 			write_ret(uc, vm_file_mkdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
@@ -561,6 +567,13 @@ namespace Bridge {
 		{"vm_graphic_is_use_vector_font", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_is_use_vector_font());
 		}},
+		{"vm_graphic_get_char_num_in_width", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_char_num_in_width(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3)));
+		}},
 
 
 
@@ -641,8 +654,46 @@ namespace Bridge {
 					read_arg(uc, 0),
 					(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 					(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					(VMINT(*)(vm_soc_dns_result*))ADDRESS_FROM_EMU(read_arg(uc, 3))
+					(VMINT(*)(vm_soc_dns_result*))read_arg(uc, 3)
 				));
+		}},
+		{"vm_tcp_connect", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_tcp_connect(
+					(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					read_arg(uc, 2),
+					(void (*)(VMINT, VMINT))read_arg(uc, 3)
+				));
+		}},
+		{"vm_tcp_close", [](uc_engine* uc) {
+			vm_tcp_close(read_arg(uc, 0));
+		}},
+		{"vm_tcp_read", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_tcp_read(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2)
+				));
+		}},
+		{"vm_tcp_write", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_tcp_write(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2)
+				));
+		}},
+
+
+
+		// Some
+		{"srand", [](uc_engine* uc) {
+			srand(read_arg(uc, 0));
+		}},
+		{"rand", [](uc_engine* uc) {
+			write_ret(uc, rand());
 		}},
 
 

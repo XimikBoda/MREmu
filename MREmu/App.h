@@ -6,6 +6,7 @@
 #include "MREngine/Graphic.h"
 #include "MREngine/Timer.h"
 #include "MREngine/IO.h"
+#include "MREngine/Sock.h"
 #include <filesystem>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -40,6 +41,7 @@ public:
 	MREngine::AppGraphic graphic;
 	MREngine::Timer timer;
 	MREngine::AppIO io;
+	MREngine::AppSock sock;
 
 	bool preparation();
 	void start();
