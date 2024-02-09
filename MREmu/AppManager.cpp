@@ -213,6 +213,10 @@ MREngine::AppSock& get_current_app_sock() {
 	return get_cur_app()->sock;
 }
 
+MREngine::AppAudio& get_current_app_audio() {
+	return get_cur_app()->audio;
+}
+
 fs::path get_current_app_path() {
 	return get_cur_app()->path;
 }

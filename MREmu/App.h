@@ -7,6 +7,7 @@
 #include "MREngine/Timer.h"
 #include "MREngine/IO.h"
 #include "MREngine/Sock.h"
+#include "MREngine/Audio.h"
 #include <filesystem>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -42,6 +43,7 @@ public:
 	MREngine::Timer timer;
 	MREngine::AppIO io;
 	MREngine::AppSock sock;
+	MREngine::AppAudio audio;
 
 	bool preparation();
 	void start();
