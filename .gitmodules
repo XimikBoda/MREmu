@@ -7,3 +7,6 @@
 [submodule "capstone"]
 	path = capstone
 	url = https://github.com/capstone-engine/capstone.git
+[submodule "libADLMIDI"]
+	path = libADLMIDI
+	url = https://github.com/Wohlstand/libADLMIDI.git
