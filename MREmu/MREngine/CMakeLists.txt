@@ -9,6 +9,7 @@ add_library (MREngine
 						"IO.cpp" "IO.h"
 						"SIM.cpp" "SIM.h"
 						"Sock.cpp" "Sock.h"
+						"Audio.cpp" "Audio.h"
 						"CharSet.cpp"
 						"Textout.cpp" 
 						"STDLib.cpp" 
@@ -20,5 +21,6 @@ endif()
 
 target_link_libraries(MREngine sfml-graphics)
 target_link_libraries(MREngine imgui)
+target_link_libraries(MREngine ADLMIDI_static)
 
 target_include_directories(imgui PUBLIC "$ENV{MRE_SDK}/include")

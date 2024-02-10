@@ -18,9 +18,11 @@ endif()
 
 target_link_libraries(MREmu sfml-graphics)
 target_link_libraries(MREmu sfml-network)
+target_link_libraries(MREmu sfml-audio)
 target_link_libraries(MREmu imgui)
 target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu capstone)
+target_link_libraries(MREmu ADLMIDI_static)
 target_link_libraries(MREmu MREngine)
 
 target_include_directories(MREmu PUBLIC "../include")
