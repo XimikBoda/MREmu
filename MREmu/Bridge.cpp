@@ -682,8 +682,23 @@ namespace Bridge {
 					(void(*)(VMINT, VMINT))read_arg(uc, 5)
 				));
 		}},
+		{"vm_midi_pause", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_midi_pause(
+					read_arg(uc, 0)));
+		}},
+		{"vm_midi_get_time", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_midi_get_time(
+					read_arg(uc, 0),
+					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
+		}},
 		{"vm_midi_stop", [](uc_engine* uc) {
 			vm_midi_stop(read_arg(uc, 0));
+		}},
+		{"vm_midi_stop_all", [](uc_engine* uc) {
+			vm_midi_stop_all();
 		}},
 
 
