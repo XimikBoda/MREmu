@@ -11,16 +11,16 @@
 #error Unknown pointer size or missing size macros!
 #endif
 
-#ifdef X64MODE
+//#ifdef X64MODE
 uint32_t ADDRESS_TO_EMU(void* x);
 uint32_t ADDRESS_TO_EMU(size_t x);
 void* ADDRESS_FROM_EMU(uint32_t x);
 //#define ADDRESS_TO_EMU(x) ((uint32_t)(uint64_t(x)-shared_memory_offset))
 //#define ADDRESS_FROM_EMU(x) ((void*)((x)+shared_memory_offset))
-#else
-#define ADDRESS_TO_EMU(x) (x)
-#define ADDRESS_FROM_EMU(x) (x)
-#endif // X64MODE
+//#else
+//#define ADDRESS_TO_EMU(x) (x)
+//#define ADDRESS_FROM_EMU(x) (x)
+//#endif // X64MODE
 
 #define FUNC_TO_UINT32(x) (uint32_t)(((size_t)(x))&UINT32_MAX)
 

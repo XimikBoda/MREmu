@@ -143,6 +143,19 @@ namespace Bridge {
 		{"vm_switch_power_saving_mode", [](uc_engine* uc) {
 			write_ret(uc, vm_switch_power_saving_mode((power_saving_mode_enum)read_arg(uc, 0)));
 		}},
+		{"vm_appmgr_is_installed", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_appmgr_is_installed(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
+		{"vm_appmgr_get_installed_list", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_appmgr_get_installed_list(
+					read_arg(uc, 0),
+					(vm_install_id*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+		}},
 
 
 
@@ -276,6 +289,11 @@ namespace Bridge {
 		{"vm_find_close_ext",  [](uc_engine* uc) {
 			vm_find_close_ext(read_arg(uc, 0));
 		}},
+		{"vm_file_get_modify_time",  [](uc_engine* uc) {
+			write_ret(uc, vm_file_get_modify_time(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(vm_time_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
 		{"vm_get_removeable_driver", [](uc_engine* uc) {
 			write_ret(uc, vm_get_removable_driver());
 		}},
@@ -300,6 +318,18 @@ namespace Bridge {
 		}},
 		{"vm_sim_card_count", [](uc_engine* uc) {
 			write_ret(uc, vm_sim_card_count());
+		}},
+		{"vm_get_sim_card_status", [](uc_engine* uc) {
+			write_ret(uc, vm_get_sim_card_status(
+				read_arg(uc, 0)));
+		}},
+		{"vm_query_operator_code", [](uc_engine* uc) {
+			write_ret(uc, vm_query_operator_code(
+				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1)));
+		}},
+		{"vm_sim_get_active_sim_card", [](uc_engine* uc) {
+			write_ret(uc, vm_sim_get_active_sim_card());
 		}},
 
 

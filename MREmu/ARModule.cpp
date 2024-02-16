@@ -10,7 +10,7 @@ void ARModule::init(uint32_t m, uint32_t r, uint32_t f)
 {
 	mem_size = 512 * 1024;
 
-	mem_location = Memory::shared_malloc(mem_size, 0x100000);
+	mem_location = Memory::shared_malloc(mem_size, 0x10);
 	memset(mem_location, 0, mem_size);
 
 	offset_mem = ADDRESS_TO_EMU(mem_location);

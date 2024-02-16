@@ -12,7 +12,7 @@ void MREngine::SIM::init()
 }
 
 VMINT vm_has_sim_card(void) {
-	return TRUE;
+	return 1;
 }
 
 VMSTR vm_get_imei(void) {
@@ -22,3 +22,22 @@ VMSTR vm_get_imei(void) {
 VMINT vm_sim_card_count(void) {
 	return 1;
 }
+
+vm_sim_state_t vm_get_sim_card_status(VMINT card_id) {
+	if (card_id == 1)
+		return VM_SIM_STATE_WORKING;
+	else
+		return VM_SIM_STATE_VACANT;
+}
+
+VMINT vm_query_operator_code(VMCHAR* buffer, VMUINT buffer_size) {
+	if (buffer == 0 || buffer_size <= 3)
+		return -1;
+	strcpy(buffer, "+0");
+	return 0;
+}
+
+VMINT vm_sim_get_active_sim_card(void) {
+	return 1;
+}
+

@@ -102,3 +102,12 @@ VMUINT vm_get_sys_property(const VMINT key, VMCHAR* value, VMUINT len) { // TODO
 VMINT vm_switch_power_saving_mode(power_saving_mode_enum mode){
 	return 0;
 }
+
+VMBOOL vm_appmgr_is_installed(VMWSTR path, vm_install_id install_id) {
+	return 0;
+}
+
+VMINT vm_appmgr_get_installed_list(VMINT flag, vm_install_id* install_id_list, VMUINT* num) {
+	*num = 0;
+	return 0; // tmp
+}

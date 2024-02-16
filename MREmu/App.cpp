@@ -136,7 +136,7 @@ bool App::preparation()
 	}
 
 	{//temp
-		std::ofstream out("unpack.bin");
+		std::ofstream out("unpack.bin", std::ios::binary);
 		if (out.is_open()) {
 			out.write((char*)mem_location, segments_size);
 			out.close();

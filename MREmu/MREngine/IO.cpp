@@ -475,6 +475,27 @@ void vm_find_close_ext(VMINT handle) {
 	io.find_ext.remove(handle);
 }
 
+VMINT vm_file_get_modify_time(const VMWSTR filename, vm_time_t* modify_time) {
+	fs::path path = convert_path(filename);
+
+	if(!fs::exists(path))
+		return -1;
+
+	auto fileTime = fs::last_write_time(path);
+	auto systemTime = std::chrono::clock_cast<std::chrono::system_clock>(fileTime);
+	auto time = std::chrono::system_clock::to_time_t(systemTime);
+
+	std::tm* const pTInfo = std::localtime(&time);
+	modify_time->year = 1900 + pTInfo->tm_year;
+	modify_time->mon = pTInfo->tm_mon;
+	modify_time->day = pTInfo->tm_mday;
+	modify_time->hour = pTInfo->tm_hour;
+	modify_time->min = pTInfo->tm_min;
+	modify_time->sec = pTInfo->tm_sec;
+
+	return 0;
+}
+
 VMINT vm_get_removable_driver(void) {
 	return 'e';
 }

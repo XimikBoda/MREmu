@@ -15,7 +15,7 @@ project ("MREmu")
 add_subdirectory (imgui)
 
 set(BUILD_SHARED_LIBS FALSE) 
-set(UNICORN_ARCH "arm") 
+set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures") 
 add_subdirectory(SFML) 
 add_subdirectory(unicorn) 
 

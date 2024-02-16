@@ -18,7 +18,7 @@ uint64_t shared_memory_offset = NULL;
 size_t shared_memory_size = 0;
 size_t shared_memory_in_emu_start = 0;
 
-#ifdef X64MODE
+//#ifdef X64MODE
 uint32_t ADDRESS_TO_EMU(size_t x) {
 	if (x == 0)
 		return 0;
@@ -32,7 +32,7 @@ void* ADDRESS_FROM_EMU(uint32_t x) {
 		return 0;
 	return ((void*)((x)+shared_memory_offset));
 }
-#endif // X64MODE
+//endif // X64MODE
 
 namespace Memory {
 	MemoryManager shared_memory;
@@ -49,7 +49,7 @@ namespace Memory {
 #ifdef X64MODE
 		shared_memory_in_emu_start = 0x1000000;
 #else
-		shared_memory_in_emu_start = shared_memory_prt;
+		shared_memory_in_emu_start = (size_t)shared_memory_prt;
 #endif
 
 		shared_memory_offset = (uint64_t)shared_memory_prt - shared_memory_in_emu_start;

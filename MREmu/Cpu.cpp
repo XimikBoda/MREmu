@@ -12,7 +12,7 @@ Disassembler dism; //TODO
 
 namespace Cpu {
 	void* stack_p = 0;
-	size_t stack_size = 100 * 1024;
+	size_t stack_size = 128 * 1024;
 
 	uc_hook uc_hu;
 
@@ -122,6 +122,18 @@ namespace Cpu {
 		print_code(code, size);
 	}
 
+	static bool hook_read_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
+	{
+		printf(">>> Try to read block at 0x%08X, block size = 0x%08X                  ---- UNMAPPED\n", (int)address, size);
+		return 0;
+	}
+
+	static bool hook_write_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
+	{
+		printf(">>> Try to write block at 0x%08X, block size = 0x%08X, value = 0x%08X  ---- UNMAPPED\n", (int)address, size, (int)value);
+		return 0;
+	}
+
 	void init() {
 		uc_err uc_er = uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &uc);
 		if (uc_er) {
@@ -142,6 +154,11 @@ namespace Cpu {
 			abort;
 
 		write_reg(uc, UC_ARM_REG_SP, ADDRESS_TO_EMU(stack_p) + stack_size);
+
+		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ_UNMAPPED, hook_read_unmapped, 0, 1, 0);
+		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE_UNMAPPED, hook_write_unmapped, 0, 1, 0);
+
+		uc_mem_map(uc, 0, 0x1000, UC_PROT_ALL);
 
 		//uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE, hook_write, 0, 1, 0);
 		//uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ, hook_read, 0, 1, 0);
