@@ -1,4 +1,5 @@
 #include <SFML/Network.hpp>
+#include <cstring>
 #include "../Memory.h"
 #include "../Bridge.h"
 //#include "../Cpu.h"

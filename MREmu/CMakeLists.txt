@@ -16,6 +16,9 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREmu PROPERTY CXX_STANDARD 20)
 endif()
 
+set (CMAKE_CXX_STANDARD 11)
+set (SFML_STATIC_LIBRARIES TRUE)
+
 target_link_libraries(MREmu sfml-graphics)
 target_link_libraries(MREmu sfml-network)
 target_link_libraries(MREmu sfml-audio)

@@ -74,9 +74,10 @@ VMINT vm_get_tick_count(void) {
 }
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
-	extern fs::path vxp_path;
+	fs::path path = get_current_app_path();
+	filename[path.u16string().copy((char16_t*)filename, 260)]=0;
 
-	swprintf((wchar_t*)filename, 260, L"e:\\..\\..\\%s", vxp_path.wstring().c_str());
+	//swprintf((wchar_t*)filename, 260, L"e:\\..\\..\\%s", vxp_path.wstring().c_str());
 	return 0;
 }
 

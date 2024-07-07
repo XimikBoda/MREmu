@@ -289,11 +289,11 @@ namespace Bridge {
 		{"vm_find_close_ext",  [](uc_engine* uc) {
 			vm_find_close_ext(read_arg(uc, 0));
 		}},
-		{"vm_file_get_modify_time",  [](uc_engine* uc) {
+		/*{"vm_file_get_modify_time",  [](uc_engine* uc) {
 			write_ret(uc, vm_file_get_modify_time(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				(vm_time_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
+		}},*/
 		{"vm_get_removeable_driver", [](uc_engine* uc) {
 			write_ret(uc, vm_get_removable_driver());
 		}},

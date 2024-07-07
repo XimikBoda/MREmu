@@ -19,7 +19,15 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET MREngine PROPERTY CXX_STANDARD 20)
 endif()
 
+set (SFML_STATIC_LIBRARIES TRUE)
+
+#if (UNIX)
+#  find_package(Iconv REQUIRED)
+#  target_link_libraries(MREngine Iconv::Iconv)
+#endif()
 target_link_libraries(MREngine sfml-graphics)
+target_link_libraries(MREngine sfml-network)
+target_link_libraries(MREngine sfml-audio)
 target_link_libraries(MREngine imgui)
 target_link_libraries(MREngine ADLMIDI_static)
 

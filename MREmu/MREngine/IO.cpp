@@ -10,12 +10,13 @@
 #include <filesystem>
 #include <imgui.h>
 #include <imgui-SFML.h>
-#include <cstring>
+#include <iconv.h>
 
 namespace fs = std::filesystem;
 
 void MREngine::IO::init()
 {
+	
 	fs::create_directory("./fs");
 	fs::create_directory("./fs/e");
 	fs::create_directory("./fs/c");
@@ -69,26 +70,67 @@ void MREngine::IO::imgui_keyboard() {
 }
 
 fs::path convert_path(fs::path path) { // TODO rewrite this
+#if _WIN32 || _WIN64
 	fs::path res = ".\\fs\\";
+#else
+	fs::path res = "./fs/";
+#endif
 	//if (path.begin() != path.end() && (++path.begin()) != path.end() && path.begin()->string() == "." && (++path.begin())->string() == "fs")
 	//	return path;
 	auto litter = path.root_name().string();
 	if (litter.size()) {
 		litter.resize(2);
+#if _WIN32 || _WIN64
 		litter[1] = '\\';
+#else
+		litter[1] = '/';
+#endif
 		res += litter;
 	}
 	else {
+#if _WIN32 || _WIN64
 		res += "e\\";
+#else
+		res += "e/";
 	}
+#endif
 	res += path.relative_path();
 	res = res.make_preferred();
+
+#if !_WIN32 && !_WIN64
+	// Quick and dirty fix for *nix
+	std::string s = res.string();
+	s = std::regex_replace(s, std::regex("c:\\\\"), "");
+	s = std::regex_replace(s, std::regex("d:\\\\"), "");
+	s = std::regex_replace(s, std::regex("e:\\\\"), "");
+	s = std::regex_replace(s, std::regex("\\\\"), "/");
+	res = s;
+#endif
+
 	std::cout << "convert_path: " << path << " to " << res << '\n';
 	return res;
 }
 
 fs::path convert_path(const VMWSTR str) {
+//#if _WIN32 || _WIN64
 	fs::path path = std::u16string((char16_t*)str); //TODO: fix for linux
+/*#else
+	size_t in_len = sizeof(str); // UCS2 length
+	char *in_str = (char*)malloc(in_len);
+	strcpy(in_str, (char*)str);
+
+	size_t out_left = 0;
+	char *out_str = (char*)malloc(in_len/2); // UTF-8 size is half of UCS2's
+
+	std::cout << "in_len " << in_len << "\n" << std::endl;
+	std::cout << "out_left " << out_left << "\n" << std::endl;
+
+	iconv_t ic = iconv_open("UTF-8", "UTF-16");
+	iconv(ic, &in_str, &in_len, &out_str, &out_left);
+	iconv_close(ic);
+
+	fs::path path = out_str;
+#endif*/
 
 	return convert_path(path);
 }
@@ -105,7 +147,16 @@ static void replaceAll(std::string& str, const std::string& from, const std::str
 
 MREngine::find_el::find_el(fs::path path_f) {
 	path = convert_path(path_f);
+
+#if _WIN32 || _WIN64
 	lfolder = path_f.parent_path();
+#else
+	// Quick and dirty fix for *nix
+	std::string s = path_f.string();
+	s = std::regex_replace(s, std::regex("\\\\"), "/");
+	std::string s2 = fs::path(s).remove_filename().string();
+	lfolder = fs::path(std::regex_replace(s2, std::regex("/"), "\\"));
+#endif
 
 	find_recv = false;
 	std::string find_line = path.filename().string();
@@ -161,14 +212,9 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	if (mode & MODE_READ)
 		fmode |= std::ios_base::in;
 
-<<<<<<< HEAD
-	if (mode & MODE_WRITE)
-		fmode |= std::ios_base::out; // | std::ios_base::_Nocreate;
-=======
 	if (fmode | MODE_WRITE)
 		fmode |= std::ios_base::out;  // TODO: _Nocreate is not available on Linux, use an alternative
 		// fmode |= std::ios_base::out | std::ios_base::_Nocreate;
->>>>>>> Experimental Linux support
 
 	if (mode & MODE_CREATE_ALWAYS_WRITE)
 		fmode |= std::ios_base::out;
@@ -266,10 +312,6 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 	if (!f)
 		return -1;
 
-<<<<<<< HEAD
-=======
-
->>>>>>> Experimental Linux support
 	std::ios_base::seekdir sdir;
 
 	switch (base) {
@@ -287,7 +329,6 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		break;
 	}
 
-<<<<<<< HEAD
 	auto pos = f->tellg();
 	f->seekg(offset, sdir);
 
@@ -296,9 +337,6 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 		f->seekg(pos, std::ios_base::beg);
 		return -1;
 	}
-=======
-	f.seekg((std::streamoff)offset, sdir);
->>>>>>> Experimental Linux support
 
 	return 0;
 }
@@ -404,7 +442,7 @@ VMINT vm_file_get_attributes(const VMWSTR filename) {
 VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
 	if (info == 0 || pathname == 0)
 		return -1;
-	MREngine::find_el find((char16_t*)pathname);
+	MREngine::find_el find(std::u16string((char16_t*)pathname));
 
 	fs::path el = find.next();
 
@@ -446,7 +484,7 @@ VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
 	if (direntry == 0 || pathname == 0)
 		return -1;
 
-	MREngine::find_el find((char16_t*)pathname);
+	MREngine::find_el find(std::u16string((char16_t*)pathname));
 
 	fs::path el = find.next();
 
@@ -457,7 +495,9 @@ VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
 	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
 	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
 	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
-	direntry->filesize = fs::file_size(convert_path(el));
+
+	fs::path pth = convert_path(el);
+	if (!fs::is_directory(pth)) direntry->filesize = fs::file_size(pth);
 	//todo
 
 	MREngine::AppIO& io = get_current_app_io();
@@ -481,7 +521,9 @@ VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
 	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
 	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
-	direntry->filesize = fs::file_size(convert_path(el));
+	
+	fs::path pth = convert_path(el);
+	if (!fs::is_directory(pth)) direntry->filesize = fs::file_size(pth);
 
 	return 0;
 }
@@ -491,7 +533,7 @@ void vm_find_close_ext(VMINT handle) {
 	io.find_ext.remove(handle);
 }
 
-VMINT vm_file_get_modify_time(const VMWSTR filename, vm_time_t* modify_time) {
+/*VMINT vm_file_get_modify_time(const VMWSTR filename, vm_time_t* modify_time) {
 	fs::path path = convert_path(filename);
 
 	if(!fs::exists(path))
@@ -510,7 +552,7 @@ VMINT vm_file_get_modify_time(const VMWSTR filename, vm_time_t* modify_time) {
 	modify_time->sec = pTInfo->tm_sec;
 
 	return 0;
-}
+}*/
 
 VMINT vm_get_removable_driver(void) {
 	return 'e';
@@ -531,7 +573,7 @@ VMINT vm_is_support_keyborad(void) {
 
 VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
 	if (filename[0] == '@') {
-		fs::path vpath = (wchar_t*)filename;
+		fs::path vpath = std::u16string((char16_t*)filename);
 		uint32_t adr;
 		sscanf(vpath.stem().string().c_str(), "%d", &adr);
 		return vm_get_vm_tag_from_rom((VMUINT8*)ADDRESS_FROM_EMU(adr), tag_num, buf, buf_size);
