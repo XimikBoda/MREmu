@@ -11,16 +11,9 @@
 #error Unknown pointer size or missing size macros!
 #endif
 
-//#ifdef X64MODE
 uint32_t ADDRESS_TO_EMU(void* x);
 uint32_t ADDRESS_TO_EMU(size_t x);
 void* ADDRESS_FROM_EMU(uint32_t x);
-//#define ADDRESS_TO_EMU(x) ((uint32_t)(uint64_t(x)-shared_memory_offset))
-//#define ADDRESS_FROM_EMU(x) ((void*)((x)+shared_memory_offset))
-//#else
-//#define ADDRESS_TO_EMU(x) (x)
-//#define ADDRESS_FROM_EMU(x) (x)
-//#endif // X64MODE
 
 #define FUNC_TO_UINT32(x) (uint32_t)(((size_t)(x))&UINT32_MAX)
 
@@ -38,12 +31,12 @@ namespace Memory {
 		size_t start_adr = 0;
 		size_t mem_size = 0;
 		size_t free_memory_size = 0;
+		size_t protected_size = 0;
 		std::vector<memory_region_t> regions;
 	public:
-		void setup(size_t start_adr, size_t size);
+		void setup(size_t start_adr, size_t size, size_t protected_size = 0);
 
-		size_t malloc(size_t size, size_t align = 8); // align is 8 righd? //todo
-		size_t malloc_topmost(size_t size, size_t align);
+		size_t malloc(size_t size, bool allow_protected = false, size_t align = 8); // align is 8 right? //todo
 
 		size_t realloc(size_t addr, size_t size);
 
@@ -51,7 +44,7 @@ namespace Memory {
 	};
 
 	void init(size_t shared_memory_size);
-	void* shared_malloc(size_t size, size_t align = 8);
+	void* shared_malloc(size_t size, bool allow_protected = false, size_t align = 8);
 	void shared_free(void* addr);
 
 	void* app_malloc(int size);

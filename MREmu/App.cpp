@@ -34,7 +34,7 @@ bool App::preparation()
 	mem_size = tags.get_ram() * 1024;
 	mem_size = std::max<size_t>(512 * 1024 * 4, mem_size);
 
-	mem_location = Memory::shared_malloc(mem_size, 0x100000);
+	mem_location = Memory::shared_malloc(mem_size, true, 0x100000);
 	memset(mem_location, 0, mem_size);
 
 	offset_mem = ADDRESS_TO_EMU(mem_location);
