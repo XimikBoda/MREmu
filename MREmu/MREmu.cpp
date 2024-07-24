@@ -9,6 +9,7 @@
 
 #include "Memory.h"
 #include "Cpu.h"
+#include "GDB.h"
 #include "Bridge.h"
 #include "App.h"
 #include "AppManager.h"
@@ -31,6 +32,7 @@ void mre_main(AppManager* appManager_p) {
 	while (work) {
 		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
 
+		GDB::update();
 		appManager.update(delta_ms);
 
 		sf::sleep(sf::milliseconds(1000 / 60));
@@ -49,6 +51,8 @@ int main(int argc, char** argv) {
 
 	fs::current_path(fs::path(argv[0]).parent_path());
 
+	GDB::wait();
+
 	Memory::init(128 * 1024 * 1024);
 	Cpu::init();
 	Bridge::init();
@@ -59,6 +63,8 @@ int main(int argc, char** argv) {
 
 	AppManager appManager;
 	g_appManager = &appManager;
+	extern int cpu_state;
+	cpu_state = 0;
 
 	std::thread second_thread(mre_main, &appManager);
 
@@ -66,7 +72,7 @@ int main(int argc, char** argv) {
 	ImGui::SFML::Init(win);
 	win.setFramerateLimit(60);
 
-	if (app_path.size())
+	/*if (app_path.size())
 		if (fs::exists(app_path) || path_is_local)
 			appManager.add_app_for_launch(app_path, path_is_local);
 		else {
@@ -76,7 +82,7 @@ int main(int argc, char** argv) {
 	else {
 		printf("vxp file not specified\n");
 		exit(1);
-	}
+	}*/
 
 
 	sf::Clock deltaClock;

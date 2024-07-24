@@ -2,6 +2,7 @@
 #include "Memory.h"
 #include "ARModule.h"
 #include "Cpu.h"
+#include "GDB.h"
 #include <string>
 #include <iostream>
 #include <unicorn/unicorn.h>
@@ -23,6 +24,8 @@ const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
 
 extern uc_engine* uc;
 uc_hook trace;
+
+extern int cpu_state;
 
 namespace Bridge {
 	struct br_func {
@@ -894,12 +897,27 @@ namespace Bridge {
 		va_end(factor);
 		//write_reg(uc, UC_ARM_REG_LR, (uint64_t)stack_p);
 		write_reg(uc, UC_ARM_REG_LR, (uint64_t)idle_p);
-		uc_err err = uc_emu_start(uc, (adr), (uint64_t)idle_p & ~1, 0, 0);
-		if (err) {
-			printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+
+		write_reg(uc, UC_ARM_REG_PC, (uint64_t)adr&~1LL);
+		uint32_t cpsr = read_reg(uc, UC_ARM_REG_CPSR);
+		cpsr = cpsr & ~(1L << 5);
+		if (adr & 1)
+			cpsr |= (1L << 5);
+
+		while (read_reg(uc, UC_ARM_REG_PC) != (idle_p & ~1)) {
+			uc_err err = UC_ERR_OK;
+
+			if (cpu_state == 0)
+				GDB::update();
+			else if (cpu_state == 1)
+				err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC), (uint64_t)idle_p & ~1, 0, 1), cpu_state = 0;
+			else if(cpu_state == 2)
+				err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC), (uint64_t)idle_p & ~1, 0, 0);
+				
+			if (err) {
+				printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+			}
 		}
-		unsigned int r0 = 0;
-		uc_reg_read(uc, UC_ARM_REG_R0, &r0);
-		return r0;
+		return read_reg(uc, UC_ARM_REG_R0);
 	}
 }
