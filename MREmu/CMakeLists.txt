@@ -4,6 +4,7 @@ add_executable (MREmu
 						"MREmu.cpp" "MREmu.h" 
 						"Memory.cpp" "Memory.h" 
 						"Cpu.cpp" "Cpu.h" 
+						"GDB.cpp" "GDB.h" 
 						"Bridge.cpp" "Bridge.h" 
 						"App.cpp" "App.h" 
 						"MreTags.cpp" "MreTags.h" 
