@@ -103,9 +103,6 @@ namespace Memory {
 		size_t new_adr = start_adr + (allow_protected ? 0 : protected_size);
 
 		for (int i = 0; i < regions.size(); ++i) {
-			if (i > 0)
-				new_adr = regions[i - 1].adr + regions[i - 1].size;
-
 			if (new_adr % align != 0)
 				new_adr = ((new_adr / align) + 1) * align;
 
@@ -114,6 +111,8 @@ namespace Memory {
 				free_memory_size -= size;
 				return new_adr;
 			}
+
+			new_adr = regions[i].adr + regions[i].size;
 		}
 
 		if (new_adr + size < start_adr + mem_size) {

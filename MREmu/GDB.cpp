@@ -91,7 +91,7 @@ namespace GDB {
 		int uc_reg = UC_ARM_REG_INVALID, size = 4;
 	};
 
-	const cpu_reg cpu_reg_list[26] =
+	const cpu_reg cpu_reg_list[17] =//26
 	{
 		{UC_ARM_REG_R0},
 		{UC_ARM_REG_R1},
@@ -109,15 +109,15 @@ namespace GDB {
 		{UC_ARM_REG_SP},
 		{UC_ARM_REG_LR},
 		{UC_ARM_REG_PC},
-		{UC_ARM_REG_INVALID, 12}, //f0
-		{UC_ARM_REG_INVALID, 12}, //f1
-		{UC_ARM_REG_INVALID, 12}, //f2
-		{UC_ARM_REG_INVALID, 12}, //f3
-		{UC_ARM_REG_INVALID, 12}, //f4
-		{UC_ARM_REG_INVALID, 12}, //f5
-		{UC_ARM_REG_INVALID, 12}, //f6
-		{UC_ARM_REG_INVALID, 12}, //f7
-		{UC_ARM_REG_INVALID, 4}, //fps
+		//{UC_ARM_REG_INVALID, 12}, //f0
+		//{UC_ARM_REG_INVALID, 12}, //f1
+		//{UC_ARM_REG_INVALID, 12}, //f2
+		//{UC_ARM_REG_INVALID, 12}, //f3
+		//{UC_ARM_REG_INVALID, 12}, //f4
+		//{UC_ARM_REG_INVALID, 12}, //f5
+		//{UC_ARM_REG_INVALID, 12}, //f6
+		//{UC_ARM_REG_INVALID, 12}, //f7
+		//{UC_ARM_REG_INVALID, 4}, //fps
 		{UC_ARM_REG_CPSR}, //cprs
 	};
 
@@ -168,7 +168,7 @@ namespace GDB {
 	void process_g(std::string_view name) {
 		std::string regs_str;
 
-		for (int i = 0; i < 26; ++i)
+		for (int i = 0; i < 17; ++i)
 			regs_str.append(get_reg_hex(i));
 
 		make_answer(regs_str);
@@ -177,15 +177,76 @@ namespace GDB {
 	void process_p(std::string_view name) {
 		uint32_t id = 0;
 
-		sscanf(name.data() + 1, "%x", &id);
+		sscanf(name.data(), "p%x", &id);
 
 		std::string regs_str = get_reg_hex(id);
 
 		make_answer(regs_str);
 	}
 
+	void process_P(std::string_view name) {
+		uint32_t id = 0, val = 0;
+
+		sscanf(name.data(), "P%x=%x", &id, &val);
+
+		cpu_reg reg_info = cpu_reg_list[id];
+
+		if (reg_info.uc_reg == UC_ARM_REG_INVALID)
+			return make_answer("");
+
+		uint32_t rreg_value = byteswap(val);
+
+		uc_reg_write(uc, reg_info.uc_reg, &rreg_value);
+
+		make_answer("OK");
+	}
+
+	std::map<uint32_t, uc_hook> hooks;
+
+	void hook_bracepoint(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
+		uc_emu_stop(uc);
+
+		cpu_state = 0;
+
+		make_answer("S05");
+	}
+
+	void process_Z(std::string_view name) {
+		uint32_t type, addr, kind;
+
+		int c = sscanf(name.data(), "Z%x,%x,%x", &type, &addr, &kind);
+
+		if(c!=3)
+			return make_answer("");
+
+		uc_hook uc_hu;
+		uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, hook_bracepoint, 0, addr, addr+1);
+
+		hooks[addr] = uc_hu;
+
+		make_answer("OK");
+	}
+
+	void process_z(std::string_view name) {
+		uint32_t type, addr, kind;
+
+		int c = sscanf(name.data(), "z%x,%x,%x", &type, &addr, &kind);
+
+		if (c != 3)
+			return make_answer("");
+
+		if(!hooks.at(addr))
+			return make_answer("");
+
+		uc_hook_del(uc, hooks[addr]);
+
+		hooks.erase(addr);
+
+		make_answer("OK");
+	}
+
 	void process_qSupported(std::string_view parameters) {
-		make_answer("PacketSize=47ff;qXfer:auxv:read+;exec-events+;QDisableRandomization-;BreakpointCommands+;swbreak+;hwbreak+;qXfer:exec-file:read+;vContSupported+;no-resumed+");
+		make_answer("PacketSize=47ff;qXfer:auxv:read+;exec-events+;QDisableRandomization-;BreakpointCommands+;swbreak+;hwbreak+;qXfer:exec-file:read+;vContSupported+;no-resumed+;QNonStop+");
 	}
 
 	void process_qAttached(std::string_view parameters) {
@@ -296,6 +357,15 @@ namespace GDB {
 		make_answer("vCont;s;c;r;C");
 	}
 
+	void process_vCont(std::string_view parameters) {
+		if (parameters == "s"s) {
+			cpu_state = 1;
+			make_answer("S05");
+		} else if (parameters == "c"s) {
+			cpu_state = 2;
+		}
+	}
+
 	void process_vFile_open(std::string_view parameters) {
 		make_answer("F1");
 	}
@@ -365,6 +435,7 @@ namespace GDB {
 	{
 		{"vRun", process_vRun},
 		{"vCont?", process_vCont_request},
+		{"vCont", process_vCont},
 		{"vFile", process_vFile},
 	};
 
@@ -429,11 +500,23 @@ namespace GDB {
 		case 'p':
 			process_p(packet);
 			break;
+		case 'P':
+			process_P(packet);
+			break;
 		case 'm':
 			process_m(packet);
 			break;
 		case 'H':
 			make_answer("E01");
+			break;
+		case 'Z':
+			process_Z(packet);
+			break;
+		case 'z':
+			process_z(packet);
+			break;
+		case 'k':
+			//exit(0);//TODO
 			break;
 		case '!':
 			make_answer("OK");

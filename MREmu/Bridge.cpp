@@ -904,17 +904,23 @@ namespace Bridge {
 		if (adr & 1)
 			cpsr |= (1L << 5);
 
+		write_reg(uc, UC_ARM_REG_CPSR, cpsr);
+
 		while (read_reg(uc, UC_ARM_REG_PC) != (idle_p & ~1)) {
+			uint32_t cpsr = read_reg(uc, UC_ARM_REG_CPSR);
+			bool thumb = (cpsr & (1 << 5)) >> 5;
 			uc_err err = UC_ERR_OK;
 
 			if (cpu_state == 0)
 				GDB::update();
 			else if (cpu_state == 1)
-				err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC), (uint64_t)idle_p & ~1, 0, 1), cpu_state = 0;
+				err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC) | thumb, (uint64_t)idle_p & ~1, 0, 1), cpu_state = 0;
 			else if(cpu_state == 2)
-				err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC), (uint64_t)idle_p & ~1, 0, 0);
+				err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC) | thumb, (uint64_t)idle_p & ~1, 0, 0);
 				
 			if (err) {
+				cpu_state = 0;
+				GDB::make_answer("S05");
 				printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
 			}
 		}
