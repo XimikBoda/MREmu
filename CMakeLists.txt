@@ -18,6 +18,7 @@ set(BUILD_SHARED_LIBS FALSE)
 set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures") 
 add_subdirectory(SFML) 
 add_subdirectory(unicorn) 
+add_subdirectory(libiconv-cmake) 
 
 set(CAPSTONE_ARCHITECTURE_DEFAULT FALSE) 
 set(CAPSTONE_ARM_SUPPORT TRUE) 
