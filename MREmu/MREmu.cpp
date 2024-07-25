@@ -9,6 +9,7 @@
 
 #include "Memory.h"
 #include "Cpu.h"
+#include "GDB.h"
 #include "Bridge.h"
 #include "App.h"
 #include "AppManager.h"
@@ -31,6 +32,7 @@ void mre_main(AppManager* appManager_p) {
 	while (work) {
 		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
 
+		GDB::update();
 		appManager.update(delta_ms);
 
 		sf::sleep(sf::milliseconds(1000 / 60));
@@ -41,13 +43,21 @@ int main(int argc, char** argv) {
 	cli::Parser parser(argc, argv);
 	{
 		parser.set_optional<std::string>("", "", "", "Path to vxp");
-		parser.set_optional<bool>("-l", "-path_is_local", false, "Set to run from local filesystem");
+		parser.set_optional<bool>("l", "path_is_local", false, "Set to run from local filesystem");
+		parser.set_optional<bool>("g", "gdb", false, "Set to run gdb server");
+		parser.set_optional<int>("p", "gdb_port", 1234, "Port for gdb server");
 	}
 	parser.run_and_exit_if_error();
 	auto app_path = parser.get<std::string>("");
-	bool path_is_local = parser.get<bool>("-l");
+	bool path_is_local = parser.get<bool>("l");
+
+	GDB::gdb_mode = parser.get<bool>("g");
+	GDB::gdb_port = parser.get<int>("p");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
+
+	if(GDB::gdb_mode)
+		GDB::wait();
 
 	Memory::init(128 * 1024 * 1024);
 	Cpu::init();
@@ -59,6 +69,9 @@ int main(int argc, char** argv) {
 
 	AppManager appManager;
 	g_appManager = &appManager;
+
+	if (GDB::gdb_mode)
+		GDB::cpu_state = GDB::Stop;
 
 	std::thread second_thread(mre_main, &appManager);
 
@@ -73,10 +86,7 @@ int main(int argc, char** argv) {
 			printf("vxp file don't exists\n");
 			exit(1);
 		}
-	else {
-		printf("vxp file not specified\n");
-		exit(1);
-	}
+
 
 
 	sf::Clock deltaClock;

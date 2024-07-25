@@ -2,6 +2,7 @@
 #include "Memory.h"
 #include "ARModule.h"
 #include "Cpu.h"
+#include "GDB.h"
 #include <string>
 #include <iostream>
 #include <unicorn/unicorn.h>
@@ -894,12 +895,47 @@ namespace Bridge {
 		va_end(factor);
 		//write_reg(uc, UC_ARM_REG_LR, (uint64_t)stack_p);
 		write_reg(uc, UC_ARM_REG_LR, (uint64_t)idle_p);
-		uc_err err = uc_emu_start(uc, (adr), (uint64_t)idle_p & ~1, 0, 0);
-		if (err) {
-			printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+
+		if (!GDB::gdb_mode) {
+			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, 0);
+			if (err)
+				printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
 		}
-		unsigned int r0 = 0;
-		uc_reg_read(uc, UC_ARM_REG_R0, &r0);
-		return r0;
+		else
+		{
+			write_reg(uc, UC_ARM_REG_PC, (uint64_t)adr & ~1LL);
+			uint32_t cpsr = read_reg(uc, UC_ARM_REG_CPSR);
+			cpsr = cpsr & ~(1L << 5);
+			if (adr & 1)
+				cpsr |= (1L << 5);
+
+			write_reg(uc, UC_ARM_REG_CPSR, cpsr);
+
+			while (read_reg(uc, UC_ARM_REG_PC) != (idle_p & ~1)) {
+				uint32_t cpsr = read_reg(uc, UC_ARM_REG_CPSR);
+				bool thumb = (cpsr & (1 << 5)) >> 5;
+				uc_err err = UC_ERR_OK;
+
+				switch (GDB::cpu_state) {
+					case GDB::Stop:
+						GDB::update();
+						break;
+					case GDB::Step:
+						err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC) | thumb, (uint64_t)idle_p & ~1, 0, 1);
+						GDB::cpu_state = GDB::Stop;
+						break;
+					case GDB::Work:
+						err = uc_emu_start(uc, read_reg(uc, UC_ARM_REG_PC) | thumb, (uint64_t)idle_p & ~1, 0, 0);
+						break;
+				}
+
+				if (err) {
+					GDB::cpu_state = GDB::Stop;
+					GDB::make_answer("S05");
+					printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+				}
+			}
+		}
+		return read_reg(uc, UC_ARM_REG_R0);
 	}
 }
