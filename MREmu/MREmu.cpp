@@ -43,15 +43,21 @@ int main(int argc, char** argv) {
 	cli::Parser parser(argc, argv);
 	{
 		parser.set_optional<std::string>("", "", "", "Path to vxp");
-		parser.set_optional<bool>("-l", "-path_is_local", false, "Set to run from local filesystem");
+		parser.set_optional<bool>("l", "path_is_local", false, "Set to run from local filesystem");
+		parser.set_optional<bool>("g", "gdb", false, "Set to run gdb server");
+		parser.set_optional<int>("p", "gdb_port", 1234, "Port for gdb server");
 	}
 	parser.run_and_exit_if_error();
 	auto app_path = parser.get<std::string>("");
-	bool path_is_local = parser.get<bool>("-l");
+	bool path_is_local = parser.get<bool>("l");
+
+	GDB::gdb_mode = parser.get<bool>("g");
+	GDB::gdb_port = parser.get<int>("p");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
 
-	GDB::wait();
+	if(GDB::gdb_mode)
+		GDB::wait();
 
 	Memory::init(128 * 1024 * 1024);
 	Cpu::init();
@@ -63,8 +69,9 @@ int main(int argc, char** argv) {
 
 	AppManager appManager;
 	g_appManager = &appManager;
-	extern int cpu_state;
-	cpu_state = 0;
+
+	if (GDB::gdb_mode)
+		GDB::cpu_state = GDB::Stop;
 
 	std::thread second_thread(mre_main, &appManager);
 
@@ -72,17 +79,14 @@ int main(int argc, char** argv) {
 	ImGui::SFML::Init(win);
 	win.setFramerateLimit(60);
 
-	/*if (app_path.size())
+	if (app_path.size())
 		if (fs::exists(app_path) || path_is_local)
 			appManager.add_app_for_launch(app_path, path_is_local);
 		else {
 			printf("vxp file don't exists\n");
 			exit(1);
 		}
-	else {
-		printf("vxp file not specified\n");
-		exit(1);
-	}*/
+
 
 
 	sf::Clock deltaClock;

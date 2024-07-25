@@ -12,8 +12,6 @@ using namespace std::string_literals;
 extern uc_engine* uc;
 extern AppManager* g_appManager;
 
-int cpu_state = 2;
-
 namespace GDB {
 	sf::TcpListener tcpListner;
 	sf::TcpSocket sock;
@@ -27,11 +25,16 @@ namespace GDB {
 	uint8_t outbuf[outbuf_size];
 	uint32_t outbuf_pos = 0;
 
+	CpuState cpu_state = Work;
+	bool gdb_mode = false;
+	int gdb_port = 1234;
+
 	bool process_input();
 
 	void wait() {
-		tcpListner.listen(12342);
+		tcpListner.listen(gdb_port);
 		tcpListner.accept(sock);
+		tcpListner.close();
 		sock.setBlocking(false);
 	}
 
@@ -206,7 +209,7 @@ namespace GDB {
 	void hook_bracepoint(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 		uc_emu_stop(uc);
 
-		cpu_state = 0;
+		cpu_state = Stop;
 
 		make_answer("S05");
 	}
@@ -359,10 +362,10 @@ namespace GDB {
 
 	void process_vCont(std::string_view parameters) {
 		if (parameters == "s"s) {
-			cpu_state = 1;
+			cpu_state = Step;
 			make_answer("S05");
 		} else if (parameters == "c"s) {
-			cpu_state = 2;
+			cpu_state = Work;
 		}
 	}
 
