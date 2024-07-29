@@ -27,7 +27,7 @@ VMINT vm_gb2312_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	char* in_ptr = src;
 	char* out_ptr = (char*)dst;
 
-	size_t in_size = strlen(in_ptr); // WARNING
+	size_t in_size = strlen(in_ptr) + 1; // WARNING
 	size_t out_size = size;
 
 	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
@@ -57,7 +57,7 @@ VMINT vm_ascii_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	char* in_ptr = src;
 	char* out_ptr = (char*)dst;
 
-	size_t in_size = strlen(in_ptr); // WARNING
+	size_t in_size = strlen(in_ptr) + 1; // WARNING
 	size_t out_size = size;
 
 	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
