@@ -127,6 +127,11 @@ namespace Memory {
 		if (addr == 0)
 			return malloc(size);
 
+		if (size == 0) {
+			free(addr);
+			return addr;
+		}
+
 		int mem_ind = -1;
 		for (int i = 0; i < regions.size(); ++i) {
 			if (regions[i].adr == addr) {
@@ -134,6 +139,9 @@ namespace Memory {
 				break;
 			}
 		}
+
+		if(mem_ind == -1)
+			return malloc(size);
 
 		if (size <= regions[mem_ind].size) {
 			free_memory_size += regions[mem_ind].size - size;

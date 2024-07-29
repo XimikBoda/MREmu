@@ -58,6 +58,7 @@ void ARModule::init(uint32_t m, uint32_t r, uint32_t f)
 			}
 		}
 	}
+	app_memory.setup((size_t)mem_location, mem_size, 0);
 
 	uint32_t ar_adr = Bridge::run_cpu(entry_point, 3, m, r, f);
 
