@@ -223,7 +223,7 @@ namespace GDB {
 			return make_answer("");
 
 		uc_hook uc_hu;
-		uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, hook_bracepoint, 0, addr, addr+1);
+		uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_bracepoint, 0, addr, addr+1);
 
 		hooks[addr] = uc_hu;
 

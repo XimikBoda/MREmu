@@ -3,6 +3,7 @@
 #include <vmgraph.h>
 #include "unifont.h"
 #include <iostream>
+#include <cstring>
 
 extern MREngine::Graphic* graphic;
 

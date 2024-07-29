@@ -2,6 +2,8 @@
 #include <cstring>
 #include <vmres.h>
 
+#include <cstring>
+
 void MREngine::Resources::scan()
 {
 	size_t pos = offset;

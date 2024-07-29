@@ -4,12 +4,12 @@
 #include <locale>
 #include <codecvt>
 
-#include <iconv.h>
+#include "iconv.h"
 
 VMINT vm_ucs2_to_gb2312(VMSTR dst, VMINT size, VMWSTR src) {
 	iconv_t ch = iconv_open("GB2312//TRANSLIT", "UCS-2LE");
 
-	char* in_ptr = (char*)src;
+	const char* in_ptr = (char*)src;
 	char* out_ptr = dst;
 
 	size_t in_size = CONVERT_CHSET_MAX_LEN; // WARNING
@@ -24,7 +24,7 @@ VMINT vm_ucs2_to_gb2312(VMSTR dst, VMINT size, VMWSTR src) {
 VMINT vm_gb2312_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	iconv_t ch = iconv_open("UCS-2LE//TRANSLIT", "GB2312");
 
-	char* in_ptr = src;
+	const char* in_ptr = src;
 	char* out_ptr = (char*)dst;
 
 	size_t in_size = strlen(in_ptr) + 1; // WARNING
@@ -39,7 +39,7 @@ VMINT vm_gb2312_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 VMINT vm_ucs2_to_ascii(VMSTR dst, VMINT size, VMWSTR src) {
 	iconv_t ch = iconv_open("ASCII//TRANSLIT", "UCS-2LE");
 
-	char* in_ptr = (char*)src;
+	const char* in_ptr = (char*)src;
 	char* out_ptr = dst;
 
 	size_t in_size = CONVERT_CHSET_MAX_LEN; // WARNING
@@ -54,7 +54,7 @@ VMINT vm_ucs2_to_ascii(VMSTR dst, VMINT size, VMWSTR src) {
 VMINT vm_ascii_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	iconv_t ch = iconv_open("UCS-2LE//TRANSLIT", "ASCII");
 
-	char* in_ptr = src;
+	const char* in_ptr = src;
 	char* out_ptr = (char*)dst;
 
 	size_t in_size = strlen(in_ptr) + 1; // WARNING
@@ -122,7 +122,7 @@ VMINT vm_chset_convert(vm_chset_enum src_type, vm_chset_enum dest_type, VMCHAR* 
 	if (ch == (iconv_t)-1)
 		return VM_CHSET_CONVERT_ERR_PARAM;
 
-	char* in_ptr = src;
+	const char* in_ptr = src;
 	char* out_ptr = dest;
 
 	size_t in_size = CONVERT_CHSET_MAX_LEN; // WARNING

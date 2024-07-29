@@ -20,6 +20,7 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
 endif()
 
 target_link_libraries(MREngine sfml-graphics)
+target_link_libraries(MREngine sfml-audio)
 target_link_libraries(MREngine imgui)
 target_link_libraries(MREngine ADLMIDI_static)
 target_link_libraries(MREngine libiconv)

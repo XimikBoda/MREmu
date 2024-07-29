@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <SFML/System/Clock.hpp>
 
+#include <cstring>
+
 namespace fs = std::filesystem;
 
 //MRE API

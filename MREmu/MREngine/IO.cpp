@@ -15,10 +15,10 @@ namespace fs = std::filesystem;
 
 void MREngine::IO::init()
 {
-	fs::create_directory(".\\fs");
-	fs::create_directory(".\\fs\\e");
-	fs::create_directory(".\\fs\\c");
-	fs::create_directory(".\\fs\\d");
+	fs::create_directory("./fs");
+	fs::create_directory("./fs/e");
+	fs::create_directory("./fs/c");
+	fs::create_directory("./fs/d");
 }
 
 static void click_buttom(int key, int ev) {
@@ -482,7 +482,14 @@ VMINT vm_file_get_modify_time(const VMWSTR filename, vm_time_t* modify_time) {
 		return -1;
 
 	auto fileTime = fs::last_write_time(path);
-	auto systemTime = std::chrono::clock_cast<std::chrono::system_clock>(fileTime);
+
+	std::chrono::time_point<std::chrono::system_clock> systemTime;
+#ifdef  __GNUC__
+	systemTime = std::chrono::file_clock::to_sys(fileTime);
+#else // MSVC, CLANG
+	systemTime = std::chrono::utc_clock::to_sys(std::chrono::file_clock::to_utc(fileTime));
+#endif
+
 	auto time = std::chrono::system_clock::to_time_t(systemTime);
 
 	std::tm* const pTInfo = std::localtime(&time);

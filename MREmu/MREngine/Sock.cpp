@@ -1,6 +1,7 @@
 #include <SFML/Network.hpp>
 #include "../Memory.h"
 #include "../Bridge.h"
+#include <cstring>
 //#include "../Cpu.h"
 #include "Sock.h"
 //#include <vmsock.h>
