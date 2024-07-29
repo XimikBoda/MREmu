@@ -25,6 +25,7 @@ target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu capstone)
 target_link_libraries(MREmu ADLMIDI_static)
 target_link_libraries(MREmu MREngine)
+target_link_libraries(MREmu libiconv)
 
 target_include_directories(MREmu PUBLIC "../include")
 

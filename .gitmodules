@@ -10,3 +10,6 @@
 [submodule "libADLMIDI"]
 	path = libADLMIDI
 	url = https://github.com/Wohlstand/libADLMIDI.git
+[submodule "libiconv-cmake"]
+	path = libiconv-cmake
+	url = https://github.com/XimikBoda/libiconv-cmake

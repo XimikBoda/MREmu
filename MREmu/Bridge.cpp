@@ -648,12 +648,12 @@ namespace Bridge {
 
 
 		// CharSet
-		{"vm_ascii_to_ucs2", [](uc_engine* uc) {
+		{"vm_ucs2_to_gb2312", [](uc_engine* uc) {
 			write_ret(uc,
-				vm_ascii_to_ucs2(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				vm_ucs2_to_ascii(
+					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					read_arg(uc, 1),
-					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
 				));
 		}},
 		{"vm_gb2312_to_ucs2", [](uc_engine* uc) {
@@ -670,6 +670,24 @@ namespace Bridge {
 					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					read_arg(uc, 1),
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
+		}},
+		{"vm_ascii_to_ucs2", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_ascii_to_ucs2(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
+		}},
+		{"vm_chset_convert", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_chset_convert(
+					(vm_chset_enum)read_arg(uc, 0),
+					(vm_chset_enum)read_arg(uc, 1),
+					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+					read_arg(uc, 4)
 				));
 		}},
 		{"vm_get_language", [](uc_engine* uc) {

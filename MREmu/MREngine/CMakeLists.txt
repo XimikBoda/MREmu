@@ -22,5 +22,6 @@ endif()
 target_link_libraries(MREngine sfml-graphics)
 target_link_libraries(MREngine imgui)
 target_link_libraries(MREngine ADLMIDI_static)
+target_link_libraries(MREngine libiconv)
 
 target_include_directories(imgui PUBLIC "$ENV{MRE_SDK}/include")
