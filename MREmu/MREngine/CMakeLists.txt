@@ -10,7 +10,7 @@ add_library (MREngine
 						"SIM.cpp" "SIM.h"
 						"Sock.cpp" "Sock.h"
 						"Audio.cpp" "Audio.h"
-						"CharSet.cpp"
+						"CharSet.cpp" "CharSet.h"
 						"Textout.cpp" 
 						"STDLib.cpp" 
 						"ItemsMng.h")
