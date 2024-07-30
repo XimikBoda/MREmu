@@ -1,8 +1,11 @@
 #include <vmchset.h>
+#include <vmstdlib.h>
 #include <string>
 #include <cstring>
 #include <locale>
 #include <codecvt>
+#include <vector>
+#include "CharSet.h"
 
 #include "iconv.h"
 
@@ -12,7 +15,7 @@ VMINT vm_ucs2_to_gb2312(VMSTR dst, VMINT size, VMWSTR src) {
 	const char* in_ptr = (char*)src;
 	char* out_ptr = dst;
 
-	size_t in_size = CONVERT_CHSET_MAX_LEN; // WARNING
+	size_t in_size = vm_wstrlen(src) * 2 + 2;
 	size_t out_size = size;
 
 	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
@@ -27,7 +30,7 @@ VMINT vm_gb2312_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	const char* in_ptr = src;
 	char* out_ptr = (char*)dst;
 
-	size_t in_size = strlen(in_ptr) + 1; // WARNING
+	size_t in_size = strlen(in_ptr) + 1;
 	size_t out_size = size;
 
 	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
@@ -42,7 +45,7 @@ VMINT vm_ucs2_to_ascii(VMSTR dst, VMINT size, VMWSTR src) {
 	const char* in_ptr = (char*)src;
 	char* out_ptr = dst;
 
-	size_t in_size = CONVERT_CHSET_MAX_LEN; // WARNING
+	size_t in_size = vm_wstrlen(src) * 2 + 2;
 	size_t out_size = size;
 
 	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
@@ -57,7 +60,7 @@ VMINT vm_ascii_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	const char* in_ptr = src;
 	char* out_ptr = (char*)dst;
 
-	size_t in_size = strlen(in_ptr) + 1; // WARNING
+	size_t in_size = strlen(in_ptr) + 1;
 	size_t out_size = size;
 
 	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
@@ -139,4 +142,36 @@ VMINT32 vm_get_language_ssc(VMINT8* ssc) {
 		return -1;
 	sprintf(ssc, "*#0044#");
 	return 0;
+}
+
+
+std::u8string ucs2_to_utf8(VMWSTR src) {
+	iconv_t ch = iconv_open("UTF-8//IGNORE", "UCS-2LE");
+
+	char* in_ptr = (char*)src;
+	size_t in_size = vm_wstrlen(src) * 2 + 2;
+
+	std::vector<uint8_t> buf(in_size * 2, 0);
+	char* out_ptr = (char*)buf.data();
+	size_t out_size = buf.size();
+
+	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+
+	iconv_close(ch);
+
+	return std::u8string((char8_t*)buf.data());
+}
+
+void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size) {
+	iconv_t ch = iconv_open("UCS-2LE//IGNORE", "UTF-8");
+
+	char* in_ptr = (char*)src.data();
+	size_t in_size = src.size() + 1;
+
+	char* out_ptr = (char*)dest;
+	size_t out_size = size * 2;
+
+	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+
+	iconv_close(ch);
 }
