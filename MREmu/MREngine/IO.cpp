@@ -81,8 +81,6 @@ fs::path UCS2_to_path(const VMWSTR wstr){
 #ifndef WIN32
 	std::replace(u8str.begin(), u8str.end(), '\\', '/');
 #endif
-	std::cout<<(char*)u8str.c_str()<<'\n';
-	/*<<(wchar_t*)wstr<<' '*/
 	return u8str;
 }
 
@@ -170,7 +168,7 @@ fs::path MREngine::find_el::next() {
 	std::wstring_convert<std::codecvt_utf8<char16_t>, char16_t> converter;
 
 	while (find_recv && di != end_itr && 
-		!std::regex_match(converter.to_bytes(di->path().filename().u16string()), find_reg))
+		!std::regex_match(di->path().filename().string(), find_reg))
 		di++;
 	if (di == end_itr)
 		return "";
@@ -419,6 +417,11 @@ VMINT vm_file_get_attributes(const VMWSTR filename) {
 		return -1;
 }
 
+void find_packer(fs::path& el, struct vm_fileinfo_t* info) {
+	utf8_to_ucs2(el.filename().u8string(), info->filename, MAX_APP_NAME_LEN);
+	info->size = fs::file_size(path_from_emu(el)); // TODO: Add check for folders
+}
+
 VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
 	if (info == 0 || pathname == 0)
 		return -1;
@@ -429,13 +432,13 @@ VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
 	if (el.empty())
 		return -1;
 
-	info->filename[el.filename().u16string().copy((char16_t*)info->filename, 260)] = 0;
-	info->size = fs::file_size(path_from_emu(el));
+	find_packer(el, info);
 
 	MREngine::AppIO& io = get_current_app_io();
 
 	return io.find.push(find);
 }
+
 VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 	MREngine::AppIO& io = get_current_app_io();
 
@@ -448,9 +451,7 @@ VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 	if (el.empty())
 		return -1;
 
-
-	info->filename[el.filename().u16string().copy((char16_t*)info->filename, 260)] = 0;
-	info->size = fs::file_size(path_from_emu(el));
+	find_packer(el, info);
 
 	return 0;
 }
@@ -458,6 +459,28 @@ void vm_find_close(VMINT handle) {
 	MREngine::AppIO& io = get_current_app_io();
 
 	io.find.remove(handle);
+}
+
+void find_ext_packer(fs::path& el, vm_fileinfo_ext* direntry) {
+	utf8_to_ucs2(el.filename().u8string(), direntry->filefullname, MAX_APP_NAME_LEN);
+
+	{//8.1 format, weird realization
+		VMCHAR filename[9], extension[4];
+		el.stem().string().copy(filename, 9);
+		el.extension().string().copy(extension, 4);
+		memcpy(direntry->filename, filename, 8);
+		memcpy(direntry->extension, extension, 3);
+	}
+
+	VMWCHAR fullpath[MAX_APP_NAME_LEN * 2];
+	utf8_to_ucs2(el.u8string(), fullpath, MAX_APP_NAME_LEN * 2);
+
+	direntry->attributes = vm_file_get_attributes(fullpath);
+	if (direntry->attributes & VM_FS_ATTR_DIR)
+		direntry->filesize = 0;
+	else
+		direntry->filesize = fs::file_size(path_from_emu(el));
+	//todo
 }
 
 VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
@@ -471,15 +494,7 @@ VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
 	if (el.empty())
 		return -1;
 
-	direntry->filefullname[el.filename().u16string().copy((char16_t*)direntry->filefullname, 260)]=0;
-	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
-	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
-	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
-	if(direntry->attributes&VM_FS_ATTR_DIR)
-		direntry->filesize = 0;
-	else
-		direntry->filesize = fs::file_size(path_from_emu(el));
-	//todo
+	find_ext_packer(el, direntry);
 
 	MREngine::AppIO& io = get_current_app_io();
 
@@ -498,14 +513,11 @@ VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 	if (el.empty())
 		return -1;
 
-	direntry->filefullname[el.filename().u16string().copy((char16_t*)direntry->filefullname, 260)] = 0;
-	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
-	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
-	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
-	direntry->filesize = fs::file_size(path_from_emu(el));
+	find_ext_packer(el, direntry);
 
 	return 0;
 }
+
 void vm_find_close_ext(VMINT handle) {
 	MREngine::AppIO& io = get_current_app_io();
 	

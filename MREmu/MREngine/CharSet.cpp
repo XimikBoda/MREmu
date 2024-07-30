@@ -165,7 +165,7 @@ std::u8string ucs2_to_utf8(VMWSTR src) {
 void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size) {
 	iconv_t ch = iconv_open("UCS-2LE//IGNORE", "UTF-8");
 
-	const char* in_ptr = (char*)src.data();
+	const char* in_ptr = (char*)src.c_str();
 	size_t in_size = src.size() + 1;
 
 	char* out_ptr = (char*)dest;
