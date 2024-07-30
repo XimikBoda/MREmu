@@ -1,5 +1,6 @@
 #include "System.h"
 #include "IO.h"
+#include "CharSet.h"
 #include "../Memory.h"
 #include <vmsys.h>
 #include <string>
@@ -76,7 +77,7 @@ VMINT vm_get_tick_count(void) {
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
 	fs::path path = get_current_app_path();
-	filename[path.u16string().copy((char16_t*)filename, 260)]=0;
+	utf8_to_ucs2(path.filename().u8string(), filename, 260);
 	return 0;
 }
 
