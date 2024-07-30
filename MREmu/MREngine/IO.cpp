@@ -1,4 +1,5 @@
 #include "IO.h"
+#include "CharSet.h"
 #include "../Memory.h"
 #include "../MreTags.h"
 #include <vmio.h>
@@ -11,14 +12,16 @@
 #include <imgui.h>
 #include <imgui-SFML.h>
 
+using namespace std::string_literals;
+
 namespace fs = std::filesystem;
 
 void MREngine::IO::init()
 {
-	fs::create_directory("./fs");
-	fs::create_directory("./fs/e");
-	fs::create_directory("./fs/c");
-	fs::create_directory("./fs/d");
+	fs::create_directory(fs::path("./fs").make_preferred());
+	fs::create_directory(fs::path("./fs/e").make_preferred());
+	fs::create_directory(fs::path("./fs/c").make_preferred());
+	fs::create_directory(fs::path("./fs/d").make_preferred());
 }
 
 static void click_buttom(int key, int ev) {
@@ -67,28 +70,59 @@ void MREngine::IO::imgui_keyboard() {
 	ImGui::End();
 }
 
-fs::path convert_path(fs::path path) { // TODO rewrite this
-	fs::path res = ".\\fs\\";
-	//if (path.begin() != path.end() && (++path.begin()) != path.end() && path.begin()->string() == "." && (++path.begin())->string() == "fs")
-	//	return path;
-	auto litter = path.root_name().string();
-	if (litter.size()) {
-		litter.resize(2);
-		litter[1] = '\\';
-		res += litter;
+bool validate_path(fs::path path){
+	std::regex pr("^[a-сA-С]:[\\\\\\/](?:[^\\\\\\/:*?\"<>|\\r\\n]+[\\\\\\/]*)*[^\\\\\\/:*?\"<>|\\r\\n]*$"s); // I hope it`s correct
+
+	return std::regex_match(path.string(), pr);
+}
+
+fs::path UCS2_to_path(const VMWSTR wstr){
+	auto u8str = ucs2_to_utf8(wstr);
+#ifndef WIN32
+	std::replace(u8str.begin(), u8str.end(), '\\', '/');
+#endif
+	std::cout<<(char*)u8str.c_str()<<'\n';
+	/*<<(wchar_t*)wstr<<' '*/
+	return u8str;
+}
+
+fs::path path_from_emu(fs::path path) { // TODO rewrite this
+	fs::path res = "./fs";
+
+	std::string root_n;
+	fs::path path_relative = "";
+#ifdef WIN32
+	root_n = path.root_name().string();
+	path_relative = path.relative_path();
+#else
+	auto it = path.begin();
+	if (it == path.end())
+		return "";
+	root_n = *it;
+	it++;
+	while (it != path.end()) {
+		path_relative /= *it;
+		it++;
 	}
-	else {
-		res += "e\\";
+#endif
+
+	if (root_n.size()) {
+		root_n.resize(1);
+		if (root_n[0] >= 'A' && root_n[0] <= 'C')
+			root_n[0] -= 'A' - 'a';
+		res /= fs::path(root_n);
 	}
-	res += path.relative_path();
-	std::cout << "convert_path: " << path << " to " << res << '\n';
+	else
+		return "";
+
+	res /= path_relative;
+	res = res.make_preferred(); //works only on windows(
+	std::cout << "path_from_emu: " << path << " to " << res << '\n';
 	return res;
 }
 
-fs::path convert_path(const VMWSTR str) {
-	fs::path path = std::u16string((char16_t*)str); //TODO: fix for linux
-
-	return convert_path(path);
+fs::path path_from_emu(const VMWSTR str) {
+	return path_from_emu(UCS2_to_path(str));
 }
 
 static void replaceAll(std::string& str, const std::string& from, const std::string& to) {
@@ -102,7 +136,7 @@ static void replaceAll(std::string& str, const std::string& from, const std::str
 }
 
 MREngine::find_el::find_el(fs::path path_f) {
-	path = convert_path(path_f);
+	path = path_from_emu(path_f);
 	lfolder = path_f.parent_path();
 
 	find_recv = false;
@@ -152,7 +186,7 @@ void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	fs::path path = convert_path(filename);
+	fs::path path = path_from_emu(filename);
 
 	std::ios_base::openmode fmode = std::ios_base::binary;
 
@@ -337,7 +371,7 @@ VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 }
 
 VMINT vm_file_delete(const VMWSTR filename) {
-	fs::path path = convert_path(filename);
+	fs::path path = path_from_emu(filename);
 
 	if (fs::remove(path))
 		return 0;
@@ -346,8 +380,8 @@ VMINT vm_file_delete(const VMWSTR filename) {
 }
 
 VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
-	fs::path old_path = convert_path(filename);
-	fs::path new_path = convert_path(newname);
+	fs::path old_path = path_from_emu(filename);
+	fs::path new_path = path_from_emu(newname);
 
 	if (!fs::exists(old_path))
 		return -1;
@@ -357,7 +391,7 @@ VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
 }
 
 VMINT vm_file_mkdir(const VMWSTR dirname) {
-	fs::path path = convert_path(dirname);
+	fs::path path = path_from_emu(dirname);
 	bool res = fs::create_directory(path);
 	if (res)
 		return 0;
@@ -366,12 +400,12 @@ VMINT vm_file_mkdir(const VMWSTR dirname) {
 }
 
 VMINT vm_file_set_attributes(const VMWSTR filename, VMBYTE attributes) {
-	fs::path path = convert_path(filename);
+	fs::path path = path_from_emu(filename);
 	return 0; //todo
 }
 
 VMINT vm_file_get_attributes(const VMWSTR filename) {
-	fs::path path = convert_path(filename);
+	fs::path path = path_from_emu(filename);
 	int res = 0;
 
 	if (std::filesystem::exists(path)) {
@@ -388,7 +422,7 @@ VMINT vm_file_get_attributes(const VMWSTR filename) {
 VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
 	if (info == 0 || pathname == 0)
 		return -1;
-	MREngine::find_el find((char16_t*)pathname);
+	MREngine::find_el find(UCS2_to_path(pathname));
 
 	fs::path el = find.next();
 
@@ -396,7 +430,7 @@ VMINT vm_find_first(VMWSTR pathname, struct vm_fileinfo_t* info) {
 		return -1;
 
 	info->filename[el.filename().u16string().copy((char16_t*)info->filename, 260)] = 0;
-	info->size = fs::file_size(convert_path(el));
+	info->size = fs::file_size(path_from_emu(el));
 
 	MREngine::AppIO& io = get_current_app_io();
 
@@ -416,7 +450,7 @@ VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 
 
 	info->filename[el.filename().u16string().copy((char16_t*)info->filename, 260)] = 0;
-	info->size = fs::file_size(convert_path(el));
+	info->size = fs::file_size(path_from_emu(el));
 
 	return 0;
 }
@@ -430,7 +464,7 @@ VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
 	if (direntry == 0 || pathname == 0)
 		return -1;
 
-	MREngine::find_el find((char16_t*)pathname);
+	MREngine::find_el find(UCS2_to_path(pathname));
 
 	fs::path el = find.next();
 
@@ -441,7 +475,10 @@ VMINT vm_find_first_ext(VMWSTR pathname, vm_fileinfo_ext* direntry) {
 	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
 	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
 	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
-	direntry->filesize = fs::file_size(convert_path(el));
+	if(direntry->attributes&VM_FS_ATTR_DIR)
+		direntry->filesize = 0;
+	else
+		direntry->filesize = fs::file_size(path_from_emu(el));
 	//todo
 
 	MREngine::AppIO& io = get_current_app_io();
@@ -465,7 +502,7 @@ VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 	el.stem().u16string().copy((char16_t*)direntry->filename, 8);
 	el.extension().u16string().copy((char16_t*)direntry->extension, 3);
 	direntry->attributes = vm_file_get_attributes((VMWSTR)el.u16string().c_str());
-	direntry->filesize = fs::file_size(convert_path(el));
+	direntry->filesize = fs::file_size(path_from_emu(el));
 
 	return 0;
 }
@@ -476,7 +513,7 @@ void vm_find_close_ext(VMINT handle) {
 }
 
 VMINT vm_file_get_modify_time(const VMWSTR filename, vm_time_t* modify_time) {
-	fs::path path = convert_path(filename);
+	fs::path path = path_from_emu(filename);
 
 	if(!fs::exists(path))
 		return -1;
@@ -522,13 +559,13 @@ VMINT vm_is_support_keyborad(void) {
 
 VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
 	if (filename[0] == '@') {
-		fs::path vpath = (wchar_t*)filename;
+		fs::path vpath = UCS2_to_path((VMWSTR)filename);
 		uint32_t adr;
 		sscanf(vpath.stem().string().c_str(), "%d", &adr);
 		return vm_get_vm_tag_from_rom((VMUINT8*)ADDRESS_FROM_EMU(adr), tag_num, buf, buf_size);
 	}
 
-	fs::path path = convert_path(filename);
+	fs::path path = path_from_emu(filename);
 
 	std::fstream f(path, std::ios::in | std::ios::binary | std::ios::ate);
 

@@ -148,7 +148,7 @@ VMINT32 vm_get_language_ssc(VMINT8* ssc) {
 std::u8string ucs2_to_utf8(VMWSTR src) {
 	iconv_t ch = iconv_open("UTF-8//IGNORE", "UCS-2LE");
 
-	char* in_ptr = (char*)src;
+	const char* in_ptr = (char*)src;
 	size_t in_size = vm_wstrlen(src) * 2 + 2;
 
 	std::vector<uint8_t> buf(in_size * 2, 0);
@@ -165,7 +165,7 @@ std::u8string ucs2_to_utf8(VMWSTR src) {
 void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size) {
 	iconv_t ch = iconv_open("UCS-2LE//IGNORE", "UTF-8");
 
-	char* in_ptr = (char*)src.data();
+	const char* in_ptr = (char*)src.data();
 	size_t in_size = src.size() + 1;
 
 	char* out_ptr = (char*)dest;
