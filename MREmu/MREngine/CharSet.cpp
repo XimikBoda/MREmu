@@ -175,3 +175,20 @@ void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size) {
 
 	iconv_close(ch);
 }
+
+std::string utf8_to_ascii(std::u8string src) {
+	iconv_t ch = iconv_open("ASCII//TRANSLIT", "UTF-8");
+
+	const char* in_ptr = (char*)src.c_str();
+	size_t in_size = src.size() + 1;
+
+	std::vector<uint8_t> buf(in_size * 2, 0);
+	char* out_ptr = (char*)buf.data();
+	size_t out_size = buf.size();
+
+	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+
+	iconv_close(ch);
+
+	return std::string((char*)buf.data());
+}

@@ -115,7 +115,7 @@ fs::path path_from_emu(fs::path path) { // TODO rewrite this
 
 	res /= path_relative;
 	res = res.make_preferred(); //works only on windows(
-	std::cout << "path_from_emu: " << path << " to " << res << '\n';
+	//std::wcout << "path_from_emu: " << path << " to " << res << '\n';
 	return res;
 }
 
@@ -165,10 +165,8 @@ fs::path MREngine::find_el::next() {
 	else
 		di++;
 
-	std::wstring_convert<std::codecvt_utf8<char16_t>, char16_t> converter;
-
 	while (find_recv && di != end_itr && 
-		!std::regex_match(di->path().filename().string(), find_reg))
+		!std::regex_match(utf8_to_ascii(di->path().filename().u8string()), find_reg))
 		di++;
 	if (di == end_itr)
 		return "";
@@ -466,8 +464,8 @@ void find_ext_packer(fs::path& el, vm_fileinfo_ext* direntry) {
 
 	{//8.1 format, weird realization
 		VMCHAR filename[9], extension[4];
-		el.stem().string().copy(filename, 9);
-		el.extension().string().copy(extension, 4);
+		utf8_to_ascii(el.stem().u8string()).copy(filename, 9);
+		utf8_to_ascii(el.extension().u8string()).copy(extension, 4);
 		memcpy(direntry->filename, filename, 8);
 		memcpy(direntry->extension, extension, 3);
 	}

@@ -707,6 +707,12 @@ namespace Bridge {
 			write_ret(uc,vm_wstrlen(
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{"vm_wstrcpy", [](uc_engine* uc) {
+			write_ret(uc,vm_wstrcpy(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
+		}},
 
 
 
