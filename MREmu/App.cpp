@@ -167,7 +167,7 @@ bool App::load_from_file(fs::path path, bool local)
 	path_is_local = local;
 
 	if (path_is_local) {
-		real_path = convert_path(path);
+		real_path = path_from_emu(path);
 		this->path = path;
 	}
 	else

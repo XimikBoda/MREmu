@@ -155,21 +155,17 @@ namespace Cpu {
 
 		write_reg(uc, UC_ARM_REG_SP, ADDRESS_TO_EMU(stack_p) + stack_size);
 
-		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ_UNMAPPED, hook_read_unmapped, 0, 1, 0);
-		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE_UNMAPPED, hook_write_unmapped, 0, 1, 0);
+		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ_UNMAPPED, (void*)hook_read_unmapped, 0, 1, 0);
+		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE_UNMAPPED, (void*)hook_write_unmapped, 0, 1, 0);
 
 		uc_mem_map(uc, 0, 0x1000, UC_PROT_ALL);
-
-		//uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE, hook_write, 0, 1, 0);
-		//uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ, hook_read, 0, 1, 0);
-		//uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, hook_code, 0, 0, 0x100000000);
 	}
 	void trace_on() {
 		static bool active = false;
 		if (!active) {
-			uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE, hook_write, 0, 1, 0);
-			uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ, hook_read, 0, 1, 0);
-			uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, hook_code, 0, 0, 0x100000000);
+			uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE, (void*)hook_write, 0, 1, 0);
+			uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ, (void*)hook_read, 0, 1, 0);
+			uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_code, 0, 0, 0x100000000);
 			active = true;
 		}
 	}
