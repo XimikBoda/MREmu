@@ -23,6 +23,10 @@ VMINT vm_sim_card_count(void) {
 	return 1;
 }
 
+VMINT vm_set_active_sim_card(VMINT card_id) {
+	return card_id == 1;
+}
+
 vm_sim_state_t vm_get_sim_card_status(VMINT card_id) {
 	if (card_id == 1)
 		return VM_SIM_STATE_WORKING;
@@ -41,3 +45,10 @@ VMINT vm_sim_get_active_sim_card(void) {
 	return 1;
 }
 
+VMINT vm_sim_max_card_count(void) {
+	return 1;
+}
+
+VMINT vm_sim_get_prefer_sim_card(void) {
+	return 1;
+}

@@ -27,6 +27,8 @@ VMINT vm_get_time(vm_time_t* time) {
 }
 
 VMINT vm_get_curr_utc(VMUINT* utc) {
+	if (utc == 0)
+		return -1;
 	*utc = std::time(nullptr);
 	return 0;
 }

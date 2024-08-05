@@ -8,6 +8,8 @@ void MREngine::Resources::scan()
 {
 	size_t pos = offset;
 
+	bool global = false;
+
 	while (1) {
 		if (pos > offset + size)
 			abort();
@@ -24,8 +26,8 @@ void MREngine::Resources::scan()
 		uint32_t res_size = *(uint32_t*)(file_context->data() + pos);
 		pos += 4;
 
-		if (res_offset < offset)
-			res_offset += offset;
+		if (res_offset < offset || global)
+			res_offset += offset, global = true;
 
 		if (res_offset < offset || res_offset + res_size > offset + size)
 			abort();
@@ -51,6 +53,8 @@ unsigned char* MREngine::Resources::get_file_context()
 
 VMUINT8* vm_load_resource(char* res_name, VMINT* res_size) {
 	MREngine::Resources& resources = get_current_app_resources();
+
+	printf("vm_load_resource(%s)\n", res_name);
 
 	MREngine::res_el* res = resources.find_py_name(res_name);
 
@@ -80,4 +84,8 @@ VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
 	memcpy(data, resources.file_context->data() + offset, size);
 	return 0;
 	
+}
+
+VMINT vm_get_res_header() {
+	return 8;
 }

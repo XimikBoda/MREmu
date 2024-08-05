@@ -19,6 +19,12 @@
 
 #include "MREngine/Sock.h"
 
+VMINT vm_get_res_header();//tmp
+
+namespace Cpu {
+	void printREG(uc_engine* uc);
+}
+
 const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
 
@@ -320,6 +326,10 @@ namespace Bridge {
 		{"vm_sim_card_count", [](uc_engine* uc) {
 			write_ret(uc, vm_sim_card_count());
 		}},
+		{"vm_set_active_sim_card", [](uc_engine* uc) {
+			write_ret(uc, vm_set_active_sim_card(
+				read_arg(uc, 0)));
+		}},
 		{"vm_get_sim_card_status", [](uc_engine* uc) {
 			write_ret(uc, vm_get_sim_card_status(
 				read_arg(uc, 0)));
@@ -331,6 +341,12 @@ namespace Bridge {
 		}},
 		{"vm_sim_get_active_sim_card", [](uc_engine* uc) {
 			write_ret(uc, vm_sim_get_active_sim_card());
+		}},
+		{"vm_sim_max_card_count", [](uc_engine* uc) {
+			write_ret(uc, vm_sim_max_card_count());
+		}},
+		{"vm_sim_get_prefer_sim_card", [](uc_engine* uc) {
+			write_ret(uc, vm_sim_max_card_count());
 		}},
 
 
@@ -644,6 +660,10 @@ namespace Bridge {
 					read_arg(uc, 2)
 				)));
 		}},
+		{"vm_get_res_header", [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_res_header());
+		}},
 
 
 
@@ -853,9 +873,9 @@ namespace Bridge {
 
 		if (ind > func_map.size())
 			abort();
-		//if(ind)
-		//	printf("--%s-- called\n", func_map[ind].name.c_str());
+		//if(ind) printf("--%s-- called -> ", func_map[ind].name.c_str());
 		func_map[ind].f(uc);
+		//if (ind) printf("%08x\n", read_arg(uc, 0));
 	}
 
 	void init() {
@@ -922,8 +942,13 @@ namespace Bridge {
 
 		if (!GDB::gdb_mode) {
 			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, 0);
-			if (err)
+			if (err) {
 				printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+				Cpu::printREG(uc);
+				while (1) {
+					Sleep(1000);
+				}
+			}
 		}
 		else
 		{
