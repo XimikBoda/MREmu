@@ -323,6 +323,9 @@ namespace Bridge {
 		{"vm_get_imei", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_get_imei()));
 		}},
+		{"vm_get_imsi", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_get_imsi()));
+		}},
 		{"vm_sim_card_count", [](uc_engine* uc) {
 			write_ret(uc, vm_sim_card_count());
 		}},
@@ -370,11 +373,19 @@ namespace Bridge {
 		{"vm_graphic_delete_layer", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_delete_layer(read_arg(uc, 0)));
 		}},
+		{"vm_graphic_active_layer", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_active_layer(read_arg(uc, 0)));
+		}},
 		{"vm_graphic_get_layer_buffer", [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
 		}},
 		{"vm_graphic_flush_layer", [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_flush_layer(
+				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1)));
+		}},
+		{"vm_graphic_flatten_layer", [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_flatten_layer(
 				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				read_arg(uc, 1)));
 		}},
@@ -498,6 +509,12 @@ namespace Bridge {
 				read_arg(uc, 2),
 				read_arg(uc, 3));
 		}},
+		{"vm_graphic_set_pixel_ex", [](uc_engine* uc) {
+			vm_graphic_set_pixel_ex(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2));
+		}},
 		{"vm_graphic_line", [](uc_engine* uc) {
 			vm_graphic_line(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -519,6 +536,23 @@ namespace Bridge {
 		}},
 		{"vm_graphic_fill_rect_ex", [](uc_engine* uc) {
 			vm_graphic_fill_rect_ex(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4));
+		}},
+		{"vm_graphic_rect", [](uc_engine* uc) {
+			vm_graphic_rect(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5));
+		}},
+		{"vm_graphic_rect_ex", [](uc_engine* uc) {
+			vm_graphic_rect_ex(
 				read_arg(uc, 0),
 				read_arg(uc, 1),
 				read_arg(uc, 2),

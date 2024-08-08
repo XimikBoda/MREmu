@@ -4,11 +4,14 @@
 #include <cstring>
 
 static void* imei_ptr = 0;
+static void* imsi_ptr = 0;
 
 void MREngine::SIM::init()
 {
 	imei_ptr = Memory::shared_malloc(20);
 	memcpy(imei_ptr, "1234567890123456", 17);
+	imsi_ptr = Memory::shared_malloc(20);
+	memcpy(imsi_ptr, "123456789012345", 16);
 }
 
 VMINT vm_has_sim_card(void) {
@@ -17,6 +20,10 @@ VMINT vm_has_sim_card(void) {
 
 VMSTR vm_get_imei(void) {
 	return (VMSTR)imei_ptr;
+}
+
+VMSTR vm_get_imsi(void) {
+	return (VMSTR)imsi_ptr;
 }
 
 VMINT vm_sim_card_count(void) {

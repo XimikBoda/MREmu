@@ -32,6 +32,8 @@ namespace MREngine {
 	class AppAudio {
 	public:
 		ItemsMng<std::shared_ptr<Midi>> midis;
+
+		~AppAudio();
 	};
 }
 

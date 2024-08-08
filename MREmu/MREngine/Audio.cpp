@@ -55,6 +55,15 @@ Midi::~Midi() {
 	adl_close(midi_player);
 }
 
+MREngine::AppAudio::~AppAudio() {
+	for (int i = 0; i < midis.size(); ++i)
+		if (midis.is_active(i)) {
+			midis[i]->stop();
+			midis[i].reset();
+			midis.remove(i);
+		}
+}
+
 VMINT vm_midi_play_by_bytes(VMUINT8* midibuf, VMINT len, VMINT repeat, void (*f)(VMINT handle, VMINT event)) {
 	return vm_midi_play_by_bytes_ex(midibuf, len, 0, repeat, 0, f);
 }
@@ -119,5 +128,10 @@ void vm_midi_stop(VMINT handle) {
 void vm_midi_stop_all(void) {
 	MREngine::AppAudio& audio = get_current_app_audio();
 
-	audio.midis = ItemsMng<std::shared_ptr<Midi>>();
+	for(int i = 0; i < audio.midis.size(); ++i)
+		if(audio.midis.is_active(i)) {
+			audio.midis[i]->stop();
+			audio.midis[i].reset();
+			audio.midis.remove(i);
+		}
 }

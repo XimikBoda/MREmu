@@ -136,6 +136,7 @@ int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_col
 			return -1;
 
 		layers.push_back({ graphic->base_buf1, x, y, w, h, trans_color });
+		active_layer = 0;
 		return 0;
 	}
 	else if (layers.size() == 1) {
@@ -269,6 +270,14 @@ VMINT vm_graphic_delete_layer(VMINT handle) {
 	return get_current_app_graphic().delete_layer(handle);
 }
 
+VMINT vm_graphic_active_layer(VMINT handle) {
+	auto& gr = get_current_app_graphic();
+	if (handle < 0 || handle >= gr.layers.size())
+		return VM_GDI_FAILED;
+	gr.active_layer = handle;
+	return VM_GDI_SUCCEED;
+}
+
 VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
 	return (VMUINT8*)get_current_app_graphic().get_layer_buf(handle);
 }
@@ -302,7 +311,53 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 				break;
 			}
 
-	//memcpy(graphic->screen.data(), graphic->base_buf1, graphic->screen.size() * 2);//temp
+	return VM_GDI_SUCCEED;
+}
+
+VM_GDI_RESULT vm_graphic_flatten_layer(VMINT* hhandle, VMINT count) {
+	if (hhandle == 0)
+		return -1;
+
+	MREngine::AppGraphic& gr = get_current_app_graphic();
+
+	for (int i = 0; i < count; ++i)
+		if (hhandle[i] < 0 || hhandle[i] >= gr.layers.size())
+			return -1;
+
+	for (int sy = 0; sy < graphic->height; ++sy)
+		for (int sx = 0; sx < graphic->width; ++sx) {
+			auto& act_layer = gr.layers[gr.active_layer];
+			int act_lx = sx - act_layer.x;
+			int act_ly = sy - act_layer.y;
+			uint16_t* act_buf = (uint16_t*)act_layer.buf;
+
+			if (act_lx < 0 || act_lx >= act_layer.w || act_ly < 0 || act_ly >= act_layer.h)
+				continue;
+
+			for (int lid = count - 1; lid >= 0; --lid) {
+				if (hhandle[lid] == gr.active_layer)
+					continue;
+				auto& layer = gr.layers[hhandle[lid]];
+				int lx = sx - layer.x;
+				int ly = sy - layer.y;
+				uint16_t* buf = (uint16_t*)layer.buf;
+
+				if (lx < 0 || lx >= layer.w || ly < 0 || ly >= layer.h)
+					continue;
+
+				uint16_t color = buf[ly * layer.w + lx];
+				if (int(color) == layer.trans_color)
+					continue;
+
+				act_buf[act_ly * act_layer.w + act_lx] = color;
+				break;
+			}
+		}
+
+	for (int i = 0; i < count; ++i)
+		if (hhandle[count - 1 - i] != gr.active_layer)
+			gr.delete_layer(hhandle[count - 1 - i]);
+
 	return VM_GDI_SUCCEED;
 }
 
@@ -700,6 +755,19 @@ void vm_graphic_set_pixel(VMUINT8* buf, VMINT x, VMINT y, VMUINT16 color) {
 	buf16_dst[y * cfp_dst->width + x] = color;
 }
 
+void vm_graphic_set_pixel_ex(VMINT handle, VMINT x1, VMINT y1) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+
+	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+
+	vm_graphic_set_pixel((VMUINT8*)layer.buf, x1, y1, c);
+}
+
 void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUINT16 color) {
 	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
 	if (!cs_dst)
@@ -758,6 +826,61 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 			buf16_dst[y * cfp_dst->width + x] = color;
 		}
 	}
+}
+
+void vm_graphic_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMUINT16 color) {
+	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
+	if (!cs_dst)
+		return;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+
+	int st_x = std::max(0, x);
+	int st_y = std::max(0, y);
+
+	int end_x = std::min<int>(cfp_dst->width, x + width);
+	int end_y = std::min<int>(cfp_dst->height, y + height);
+
+	auto& clip = get_current_app_graphic().clip;
+	if (clip.flag) {
+		if (st_x < clip.left)
+			st_x = clip.left;
+		if (st_y < clip.top)
+			st_y = clip.top;
+		if (end_x > clip.right)
+			end_x = clip.right;
+		if (end_y > clip.bottom)
+			end_y = clip.bottom;
+	}
+
+	if (st_x <= x && x < end_x)
+		for (int sy = st_y; sy < end_y; ++sy)
+			buf16_dst[sy * cfp_dst->width + x] = color;
+
+	if (st_x <= x + width - 1 && x + width - 1 < end_x)
+		for (int sy = st_y; sy < end_y; ++sy)
+			buf16_dst[sy * cfp_dst->width + x + width - 1] = color;
+
+	if (st_y <= y && y < end_y)
+		for (int sx = st_x; sx < end_x; ++sx)
+			buf16_dst[y * cfp_dst->width + sx] = color;
+
+	if (st_y <= y + height - 1 && y + height - 1 < end_y)
+		for (int sx = st_x; sx < end_x; ++sx)
+			buf16_dst[(y + height - 1) * cfp_dst->width + sx] = color;
+}
+
+void vm_graphic_rect_ex(VMINT handle, VMINT x, VMINT y, VMINT width, VMINT height) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+
+	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+
+	vm_graphic_rect((VMUINT8*)layer.buf, x, y, width, height, c);
 }
 
 void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMUINT16 line_color, VMUINT16 back_color) {

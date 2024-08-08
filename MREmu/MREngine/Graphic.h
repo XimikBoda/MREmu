@@ -59,6 +59,7 @@ namespace MREngine {
 	class AppGraphic {
 	public:
 		std::vector<layer> layers;
+		int active_layer = 0;
 
 		std::vector<std::pair<void*, sf::Texture>> canvases_list;
 		mutex_wrapper canvases_list_mutex;
