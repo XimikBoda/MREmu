@@ -11,7 +11,7 @@ class Midi : public sf::SoundStream
 {
 public:
 	struct ADL_MIDIPlayer* midi_player = NULL;
-	short buffer[4096];
+	short buffer[4410];
 	bool error = false;
 	mutex_wrapper access_mutex;
 	int repeat = 0;

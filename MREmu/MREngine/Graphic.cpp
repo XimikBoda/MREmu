@@ -536,10 +536,10 @@ void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* sr
 			st_x = clip.left;
 		if (st_y < clip.top)
 			st_y = clip.top;
-		if (end_x > clip.right)
-			end_x = clip.right;
-		if (end_y > clip.bottom)
-			end_y = clip.bottom;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
 	}
 
 	bool flag = cfp_src->flag;
@@ -586,10 +586,10 @@ void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE*
 			st_x = clip.left;
 		if (st_y < clip.top)
 			st_y = clip.top;
-		if (end_x > clip.right)
-			end_x = clip.right;
-		if (end_y > clip.bottom)
-			end_y = clip.bottom;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
 	}
 
 	bool flag = cfp_src->flag;
@@ -639,10 +639,10 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 			st_x = clip.left;
 		if (st_y < clip.top)
 			st_y = clip.top;
-		if (end_x > clip.right)
-			end_x = clip.right;
-		if (end_y > clip.bottom)
-			end_y = clip.bottom;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
 	}
 
 	bool flag = cfp_src->flag;
@@ -700,10 +700,10 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 			st_x = clip.left;
 		if (st_y < clip.top)
 			st_y = clip.top;
-		if (end_x > clip.right)
-			end_x = clip.right;
-		if (end_y > clip.bottom)
-			end_y = clip.bottom;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
 	}
 
 	bool flag = cfp_src->flag;
@@ -743,10 +743,10 @@ void vm_graphic_set_pixel(VMUINT8* buf, VMINT x, VMINT y, VMUINT16 color) {
 			left = clip.left;
 		if (top < clip.top)
 			top = clip.top;
-		if (right > clip.right)
-			right = clip.right;
-		if (bottom > clip.bottom)
-			bottom = clip.bottom;
+		if (right > clip.right + 1)
+			right = clip.right + 1;
+		if (bottom > clip.bottom + 1)
+			bottom = clip.bottom + 1;
 	}
 
 	if (x < left || x >= right || y < top || y >= bottom)
@@ -789,10 +789,10 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 			left = clip.left;
 		if (top < clip.top)
 			top = clip.top;
-		if (right > clip.right)
-			right = clip.right;
-		if (bottom > clip.bottom)
-			bottom = clip.bottom;
+		if (right > clip.right + 1)
+			right = clip.right + 1;
+		if (bottom > clip.bottom + 1)
+			bottom = clip.bottom + 1;
 	}
 	if (abs(x1 - x0) >= abs(y1 - y0)) {
 		if (x0 > x1) {
@@ -828,6 +828,19 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 	}
 }
 
+void vm_graphic_line_ex(VMINT handle, VMINT x0, VMINT y0, VMINT x1, VMINT y1) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+
+	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+
+	vm_graphic_line((VMUINT8*)layer.buf, x0, y0, x1, y1, c);
+}
+
 void vm_graphic_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMUINT16 color) {
 	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
 	if (!cs_dst)
@@ -847,10 +860,10 @@ void vm_graphic_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, 
 			st_x = clip.left;
 		if (st_y < clip.top)
 			st_y = clip.top;
-		if (end_x > clip.right)
-			end_x = clip.right;
-		if (end_y > clip.bottom)
-			end_y = clip.bottom;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
 	}
 
 	if (st_x <= x && x < end_x)
@@ -902,10 +915,10 @@ void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 			st_x = clip.left;
 		if (st_y < clip.top)
 			st_y = clip.top;
-		if (end_x > clip.right)
-			end_x = clip.right;
-		if (end_y > clip.bottom)
-			end_y = clip.bottom;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
 	}
 
 	for (int sy = st_y; sy < end_y; ++sy)
@@ -928,6 +941,127 @@ void vm_graphic_fill_rect_ex(VMINT handle, VMINT  x, VMINT  y, VMINT  width, VMI
 
 	vm_graphic_fill_rect((VMUINT8*)layer.buf, x, y, width, height, c, c);
 }
+
+inline bool on_round(int dx, int dy, int r) {
+	if (dx < 0 || dy < 0)
+		return false;
+	if (dx > r && dy == 0 || dy > r && dx == 0)
+		return false;
+	int cx = r - dx, cy = r - dy;
+	return cx * cx + cy * cy == r * r;
+}
+
+void vm_graphic_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMINT corner_width, VMUINT16 color) {
+	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
+	if (!cs_dst)
+		return;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+
+	int st_x = std::max(0, x);
+	int st_y = std::max(0, y);
+
+	int end_x = std::min<int>(cfp_dst->width, x + width);
+	int end_y = std::min<int>(cfp_dst->height, y + height);
+
+	auto& clip = get_current_app_graphic().clip;
+	if (clip.flag) {
+		if (st_x < clip.left)
+			st_x = clip.left;
+		if (st_y < clip.top)
+			st_y = clip.top;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
+	}
+
+	for (int sy = st_y; sy < end_y; ++sy)
+		for (int sx = st_x; sx < end_x; ++sx) {
+			int dx1 = sx - x, dx2 = x + width - 1 - sx;
+			int dy1 = sy - y, dy2 = y + height - 1 - sy;
+			if (on_round(dx1, dy1, corner_width)
+				&& on_round(dx2, dy1, corner_width)
+				&& on_round(dx1, dy2, corner_width)
+				&& on_round(dx2, dy2, corner_width)
+				)
+				buf16_dst[sy * cfp_dst->width + sx] = color;
+		}
+}
+
+void vm_graphic_roundrect_ex(VMINT handle, VMINT x, VMINT y, VMINT width, VMINT height, VMINT frame_width) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+
+	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+
+	vm_graphic_roundrect((VMUINT8*)layer.buf, x, y, width, height, frame_width, c);
+}
+
+inline bool in_round(int dx, int dy, int r) {
+	if (dx < 0 || dy < 0)
+		return false;
+	if (dx > r || dy > r)
+		return false;
+	int cx = r - dx, cy = r - dy;
+	return cx * cx + cy * cy <= r * r;
+}
+
+void vm_graphic_fill_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMINT corner_width, VMUINT16 color) {
+	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
+	if (!cs_dst)
+		return;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+
+	int st_x = std::max(0, x);
+	int st_y = std::max(0, y);
+
+	int end_x = std::min<int>(cfp_dst->width, x + width);
+	int end_y = std::min<int>(cfp_dst->height, y + height);
+
+	auto& clip = get_current_app_graphic().clip;
+	if (clip.flag) {
+		if (st_x < clip.left)
+			st_x = clip.left;
+		if (st_y < clip.top)
+			st_y = clip.top;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
+	}
+
+	for (int sy = st_y; sy < end_y; ++sy)
+		for (int sx = st_x; sx < end_x; ++sx) {
+			int dx1 = sx - x, dx2 = x + width - 1 - sx;
+			int dy1 = sy - y, dy2 = y + height - 1 - sy;
+			if (in_round(dx1, dy1, corner_width)
+				&& in_round(dx2, dy1, corner_width)
+				&& in_round(dx1, dy2, corner_width)
+				&& in_round(dx2, dy2, corner_width)
+				)
+				buf16_dst[sy * cfp_dst->width + sx] = color;
+		}
+}
+
+void vm_graphic_fill_roundrect_ex(VMINT handle, VMINT x, VMINT y, VMINT width, VMINT height, VMINT frame_width) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+
+	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+
+	vm_graphic_fill_roundrect((VMUINT8*)layer.buf, x, y, width, height, frame_width, c);
+}
+
 
 bool is_point_in_path(int x, int y, vm_graphic_point* point, VMINT npoints) {
 	int j = npoints - 1;
@@ -989,10 +1123,10 @@ void vm_graphic_fill_polygon(VMINT handle, vm_graphic_point* point, VMINT npoint
 			st_x = clip.left;
 		if (st_y < clip.top)
 			st_y = clip.top;
-		if (end_x > clip.right)
-			end_x = clip.right;
-		if (end_y > clip.bottom)
-			end_y = clip.bottom;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
 	}
 
 	unsigned short color = get_current_app_graphic().global_color.vm_color_565;

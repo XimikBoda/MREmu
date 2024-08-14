@@ -310,6 +310,13 @@ namespace Bridge {
 		{"vm_get_disk_free_space", [](uc_engine* uc) {
 			write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{"vm_get_disk_info", [](uc_engine* uc) {
+			write_ret(uc, vm_get_disk_info(
+				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(vm_fs_disk_info*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				(vm_fs_di_enum)read_arg(uc, 2)
+			));
+		}},
 		{"vm_is_support_keyborad", [](uc_engine* uc) {
 			write_ret(uc, vm_is_support_keyborad());
 		}},
@@ -524,6 +531,14 @@ namespace Bridge {
 				read_arg(uc, 4),
 				read_arg(uc, 5));
 		}},
+		{"vm_graphic_line_ex", [](uc_engine* uc) {
+			vm_graphic_line_ex(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4));
+		}},
 		{"vm_graphic_fill_rect", [](uc_engine* uc) {
 			vm_graphic_fill_rect(
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -541,6 +556,44 @@ namespace Bridge {
 				read_arg(uc, 2),
 				read_arg(uc, 3),
 				read_arg(uc, 4));
+		}},
+		{"vm_graphic_roundrect", [](uc_engine* uc) {
+			vm_graphic_roundrect(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5),
+				read_arg(uc, 6));
+		}},
+		{"vm_graphic_roundrect_ex", [](uc_engine* uc) {
+			vm_graphic_roundrect_ex(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5));
+		}},
+		{"vm_graphic_fill_roundrect", [](uc_engine* uc) {
+			vm_graphic_fill_roundrect(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5),
+				read_arg(uc, 6));
+		}},
+		{"vm_graphic_fill_roundrect_ex", [](uc_engine* uc) {
+			vm_graphic_fill_roundrect_ex(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				read_arg(uc, 5));
 		}},
 		{"vm_graphic_rect", [](uc_engine* uc) {
 			vm_graphic_rect(
@@ -771,6 +824,9 @@ namespace Bridge {
 
 
 		// Audio
+		{"vm_set_volume", [](uc_engine* uc) {
+			vm_set_volume(read_arg(uc, 0));
+		}},
 		{"vm_midi_play_by_bytes", [](uc_engine* uc) {
 			write_ret(uc,
 				vm_midi_play_by_bytes(

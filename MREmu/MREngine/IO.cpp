@@ -562,6 +562,10 @@ VMUINT vm_get_disk_free_space(VMWSTR drv_name) {
 	return 256 * 1024 * 1024;
 }
 
+VMINT vm_get_disk_info(const VMCHAR* drv_name, vm_fs_disk_info* fs_disk, vm_fs_di_enum e_di) {
+	return -1;
+}
+
 VMINT vm_is_support_keyborad(void) {
 	return 1;
 }

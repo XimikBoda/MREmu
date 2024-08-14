@@ -32,17 +32,22 @@ Midi::Midi(void* buf, size_t len) {
 
 bool Midi::onGetData(Chunk& data) {
 	std::lock_guard lock(access_mutex);
-	int samples_count = adl_play(midi_player, 4096, buffer);
+	int samples_count = adl_play(midi_player, 4410, buffer);
 	data.samples = buffer;
 	data.sampleCount = samples_count;
-	if(samples_count == 0)
+	if (samples_count == 0) {
 		if (repeat) {
 			repeat--;
-			return true;
+			setLoop(true);
 		}
-		else
-			return done = false;
-	return true;
+		else {
+			setLoop(false);
+			done = true;
+		}
+		return false;
+	}
+	else
+		return true;
 }
 
 void Midi::onSeek(sf::Time timeOffset) {
@@ -64,12 +69,20 @@ MREngine::AppAudio::~AppAudio() {
 		}
 }
 
+void vm_set_volume(VMINT volume) {
+	if (volume < 0)
+		volume = 0;
+	if (volume > 6)
+		volume = 6;
+	sf::Listener::setGlobalVolume(volume * 100 / 6);
+}
+
 VMINT vm_midi_play_by_bytes(VMUINT8* midibuf, VMINT len, VMINT repeat, void (*f)(VMINT handle, VMINT event)) {
 	return vm_midi_play_by_bytes_ex(midibuf, len, 0, repeat, 0, f);
 }
 
-VMINT vm_midi_play_by_bytes_ex(VMUINT8* midibuf, VMINT len, VMUINT start_time, 
-	VMINT repeat, VMUINT path, void (*f)(VMINT handle, VMINT event)) 
+VMINT vm_midi_play_by_bytes_ex(VMUINT8* midibuf, VMINT len, VMUINT start_time,
+	VMINT repeat, VMUINT path, void (*f)(VMINT handle, VMINT event))
 {
 	auto& audio = get_current_app_audio();
 
@@ -77,8 +90,15 @@ VMINT vm_midi_play_by_bytes_ex(VMUINT8* midibuf, VMINT len, VMUINT start_time,
 	if (midi->error)
 		return -1;
 
+	for (int i = 0; i < audio.midis.size(); ++i)
+		if (audio.midis.is_active(i))
+			audio.midis[i]->pause();
+
+	if (repeat == 0)
+		repeat = 999; //TODO
+
 	midi->source = midibuf;
-	midi->repeat = repeat;
+	midi->repeat = repeat - 1;
 	midi->setPlayingOffset(sf::milliseconds(start_time));
 	midi->play();
 
@@ -108,9 +128,9 @@ VMINT vm_midi_pause(VMINT handle) {
 VMINT vm_midi_get_time(VMINT handle, VMUINT* current_time) {
 	MREngine::AppAudio& audio = get_current_app_audio();
 
-	if (audio.midis.is_active(handle)) {
+	if (audio.midis.is_active(handle) && !audio.midis[handle]->done) {
 		*current_time = audio.midis[handle]->getPlayingOffset().
-			asMilliseconds();;
+			asMilliseconds();
 		return 0;
 	}
 	return -1;
@@ -128,8 +148,8 @@ void vm_midi_stop(VMINT handle) {
 void vm_midi_stop_all(void) {
 	MREngine::AppAudio& audio = get_current_app_audio();
 
-	for(int i = 0; i < audio.midis.size(); ++i)
-		if(audio.midis.is_active(i)) {
+	for (int i = 0; i < audio.midis.size(); ++i)
+		if (audio.midis.is_active(i)) {
 			audio.midis[i]->stop();
 			audio.midis[i].reset();
 			audio.midis.remove(i);
