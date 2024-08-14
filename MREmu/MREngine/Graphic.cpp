@@ -945,10 +945,11 @@ void vm_graphic_fill_rect_ex(VMINT handle, VMINT  x, VMINT  y, VMINT  width, VMI
 inline bool on_round(int dx, int dy, int r) {
 	if (dx < 0 || dy < 0)
 		return false;
-	if (dx > r && dy == 0 || dy > r && dx == 0)
+	if (dx >= r || dy >= r)
 		return false;
 	int cx = r - dx, cy = r - dy;
-	return cx * cx + cy * cy == r * r;
+	int cr = cx * cx + cy * cy;
+	return cr < (r) * (r) && cr > (r-1) * (r-1);
 }
 
 void vm_graphic_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMINT corner_width, VMUINT16 color) {
@@ -963,6 +964,8 @@ void vm_graphic_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 
 	int end_x = std::min<int>(cfp_dst->width, x + width);
 	int end_y = std::min<int>(cfp_dst->height, y + height);
+
+	corner_width = std::min(corner_width, std::min(width / 2, height / 2));
 
 	auto& clip = get_current_app_graphic().clip;
 	if (clip.flag) {
@@ -981,9 +984,11 @@ void vm_graphic_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 			int dx1 = sx - x, dx2 = x + width - 1 - sx;
 			int dy1 = sy - y, dy2 = y + height - 1 - sy;
 			if (on_round(dx1, dy1, corner_width)
-				&& on_round(dx2, dy1, corner_width)
-				&& on_round(dx1, dy2, corner_width)
-				&& on_round(dx2, dy2, corner_width)
+				|| on_round(dx2, dy1, corner_width)
+				|| on_round(dx1, dy2, corner_width)
+				|| on_round(dx2, dy2, corner_width)
+				|| dx1 >= corner_width && dx2 >= corner_width && (dy1 == 0 || dy2 == 0)
+				|| dy1 >= corner_width && dy2 >= corner_width && (dx1 == 0 || dx2 == 0)
 				)
 				buf16_dst[sy * cfp_dst->width + sx] = color;
 		}
@@ -1005,10 +1010,10 @@ void vm_graphic_roundrect_ex(VMINT handle, VMINT x, VMINT y, VMINT width, VMINT 
 inline bool in_round(int dx, int dy, int r) {
 	if (dx < 0 || dy < 0)
 		return false;
-	if (dx > r || dy > r)
-		return false;
+	if (dx >= r || dy >= r)
+		return true;
 	int cx = r - dx, cy = r - dy;
-	return cx * cx + cy * cy <= r * r;
+	return cx * cx + cy * cy < r * r;
 }
 
 void vm_graphic_fill_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, VMINT corner_width, VMUINT16 color) {
@@ -1023,6 +1028,8 @@ void vm_graphic_fill_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMIN
 
 	int end_x = std::min<int>(cfp_dst->width, x + width);
 	int end_y = std::min<int>(cfp_dst->height, y + height);
+
+	corner_width = std::min(corner_width, std::min(width / 2, height / 2));
 
 	auto& clip = get_current_app_graphic().clip;
 	if (clip.flag) {
@@ -1043,7 +1050,7 @@ void vm_graphic_fill_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMIN
 			if (in_round(dx1, dy1, corner_width)
 				&& in_round(dx2, dy1, corner_width)
 				&& in_round(dx1, dy2, corner_width)
-				&& in_round(dx2, dy2, corner_width)
+				&& in_round(dx2, dy2, corner_width) 
 				)
 				buf16_dst[sy * cfp_dst->width + sx] = color;
 		}
