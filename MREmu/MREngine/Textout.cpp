@@ -97,10 +97,10 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 			left = clip.left;
 		if (top < clip.top)
 			top = clip.top;
-		if (right > clip.right)
-			right = clip.right;
-		if (bottom > clip.bottom)
-			bottom = clip.bottom;
+		if (right > clip.right + 1)
+			right = clip.right + 1;
+		if (bottom > clip.bottom + 1)
+			bottom = clip.bottom + 1;
 	}
 
 	int st_y = std::max(top, y);

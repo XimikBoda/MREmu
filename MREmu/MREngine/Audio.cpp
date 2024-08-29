@@ -131,6 +131,10 @@ VMINT vm_midi_get_time(VMINT handle, VMUINT* current_time) {
 	if (audio.midis.is_active(handle) && !audio.midis[handle]->done) {
 		*current_time = audio.midis[handle]->getPlayingOffset().
 			asMilliseconds();
+
+		if (!*current_time) // some games don`t like when it is rezo
+			*current_time += 1;
+
 		return 0;
 	}
 	return -1;
