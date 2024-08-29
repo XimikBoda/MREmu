@@ -10,7 +10,6 @@ namespace fs = std::filesystem;
 namespace MREngine {
 	namespace IO {
 		void init();
-		void imgui_keyboard();
 	};
 
 	struct find_el{

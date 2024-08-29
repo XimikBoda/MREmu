@@ -13,6 +13,7 @@
 #include "Bridge.h"
 #include "App.h"
 #include "AppManager.h"
+#include "Keyboard.h"
 
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
@@ -75,9 +76,12 @@ int main(int argc, char** argv) {
 
 	std::thread second_thread(mre_main, &appManager);
 
-	sf::RenderWindow win(sf::VideoMode::getDesktopMode(), "MREmu");
-	ImGui::SFML::Init(win);
-	win.setFramerateLimit(60);
+	sf::RenderWindow win_debug(sf::VideoMode::getDesktopMode(), "MREmu Debug");
+	ImGui::SFML::Init(win_debug);
+	win_debug.setFramerateLimit(60);
+	//win_debug.setVerticalSyncEnabled(true);
+
+	Keyboard keyboard;
 
 	if (app_path.size())
 		if (fs::exists(app_path) || path_is_local)
@@ -87,24 +91,43 @@ int main(int argc, char** argv) {
 			exit(1);
 		}
 
+	keyboard.update_pos_and_size(0, 320, 240, 208);
 
+	sf::Clock fps;
 
 	sf::Clock deltaClock;
 	sf::Event event;
-	while (win.isOpen()) {
-		while (win.pollEvent(event)) {
+	while (win_debug.isOpen()) {
+		while (win_debug.pollEvent(event)) {
+			sf::IntRect kb_rect(keyboard.x, keyboard.y, keyboard.w, keyboard.h);;
 			ImGui::SFML::ProcessEvent(event);
+			keyboard.keyboard_event(event);
 			switch (event.type) {
 			case sf::Event::Closed:
-				win.close();
+				win_debug.close();
 				break;
 			case sf::Event::Resized:
-				win.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+				win_debug.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+				break;
+			case sf::Event::MouseButtonPressed:
+				if (event.mouseButton.button == sf::Mouse::Button::Left) {
+					if (event.mouseButton.x >= kb_rect.left &&
+						event.mouseButton.x < kb_rect.left + kb_rect.width &&
+						event.mouseButton.y >= kb_rect.top &&
+						event.mouseButton.y < kb_rect.top + kb_rect.height)
+						keyboard.kc.press_key(keyboard.find_key_by_pos(event.mouseButton.x - kb_rect.left,
+							event.mouseButton.y - kb_rect.top), keyboard.kc.Mouse);
+				}
+				break;
+			case sf::Event::MouseButtonReleased:
+				if (event.mouseButton.button == sf::Mouse::Button::Left)
+					keyboard.kc.unpress_by_source(keyboard.kc.Mouse);
 				break;
 			}
 		}
-		ImGui::SFML::Update(win, deltaClock.restart());
+		ImGui::SFML::Update(win_debug, deltaClock.restart());
 
+		graphic.update_screen();
 		graphic.imgui_screen();
 		App* active_app = appManager.get_active_app();
 		if (active_app) {
@@ -112,13 +135,24 @@ int main(int argc, char** argv) {
 			active_app->graphic.imgui_canvases();
 		}
 
+		ImGui::Begin("Fps");
+		ImGui::Text("%1.3f", 1.f/fps.restart().asSeconds());
+		ImGui::End();
+
+		{
+			sf::Sprite screen(graphic.screen_tex);
+			//screen.setScale(2, 2);
+			win_debug.draw(screen);
+		}
+
 		Cpu::imgui_REG();
 
-		MREngine::IO::imgui_keyboard();
+		keyboard.imgui_keyboard();
+		keyboard.draw(&win_debug);
 
-		ImGui::SFML::Render(win);
-		win.display();
-		win.clear();
+		ImGui::SFML::Render(win_debug);
+		win_debug.display();
+		win_debug.clear();
 	}
 
 	work = false;

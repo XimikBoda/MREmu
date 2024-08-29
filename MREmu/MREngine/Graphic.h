@@ -21,6 +21,7 @@ namespace MREngine {
 		Graphic();
 
 		void activate();
+		void update_screen();
 
 		void imgui_screen();
 

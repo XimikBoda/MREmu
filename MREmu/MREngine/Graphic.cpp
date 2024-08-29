@@ -112,9 +112,12 @@ void MREngine::Graphic::activate()
 	graphic = this;
 }
 
+void MREngine::Graphic::update_screen() {
+	buf_to_texture(screen.data(), width, height, screen_tex);
+}
+
 void MREngine::Graphic::imgui_screen() {
 	if (ImGui::Begin("Screen")) {
-		buf_to_texture(screen.data(), width, height, screen_tex);
 		ImGui::Image(screen_tex);
 	}
 	ImGui::End();
