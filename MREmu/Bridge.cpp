@@ -1,6 +1,7 @@
 #include "Bridge.h"
 #include "Memory.h"
 #include "ARModule.h"
+#include "MREngine/Graphic.h"
 #include "Cpu.h"
 #include "GDB.h"
 #include <string>
@@ -85,6 +86,7 @@ namespace Bridge {
 	}
 
 #define FUNCN(name) #name, (void*)name
+#define FUNCN_FIX(name) #name, (void*)name##_FIX
 
 	std::vector<br_func> func_map =
 	{
@@ -411,27 +413,29 @@ namespace Bridge {
 		{FUNCN(vm_graphic_get_bits_per_pixel), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_get_bits_per_pixel());
 		}},
-		{FUNCN(vm_graphic_create_canvas), [](uc_engine* uc) {
+		{FUNCN_FIX(vm_graphic_create_canvas), [](uc_engine* uc) {
 			write_ret(uc,
-				vm_graphic_create_canvas(
-					read_arg(uc, 0),
-					read_arg(uc, 1)));
+				ADDRESS_TO_EMU(
+					vm_graphic_create_canvas_FIX(
+						read_arg(uc, 0),
+						read_arg(uc, 1))));
 		}},
-		{FUNCN(vm_graphic_create_canvas_cf), [](uc_engine* uc) {
+		{FUNCN_FIX(vm_graphic_create_canvas_cf), [](uc_engine* uc) {
 			write_ret(uc,
-				vm_graphic_create_canvas_cf(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					read_arg(uc, 2)));
+				ADDRESS_TO_EMU(
+					vm_graphic_create_canvas_cf_FIX(
+						read_arg(uc, 0),
+						read_arg(uc, 1),
+						read_arg(uc, 2))));
 		}},
-		{FUNCN(vm_graphic_release_canvas), [](uc_engine* uc) {
-			vm_graphic_release_canvas(
-				read_arg(uc, 0));
+		{FUNCN_FIX(vm_graphic_release_canvas), [](uc_engine* uc) {
+			vm_graphic_release_canvas_FIX(
+				ADDRESS_FROM_EMU(read_arg(uc, 0)));
 		}},
-		{FUNCN(vm_graphic_get_canvas_buffer), [](uc_engine* uc) {
+		{FUNCN_FIX(vm_graphic_get_canvas_buffer), [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(
-				vm_graphic_get_canvas_buffer(
-					read_arg(uc, 0))));
+				vm_graphic_get_canvas_buffer_FIX(
+					ADDRESS_FROM_EMU(read_arg(uc, 0)))));
 		}},
 		{FUNCN(vm_graphic_create_layer_ex), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_create_layer_ex(
@@ -455,16 +459,17 @@ namespace Bridge {
 				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 7)),
 				read_arg(uc, 8)));
 		}},
-		{FUNCN(vm_graphic_load_image), [](uc_engine* uc) {
+		{FUNCN_FIX(vm_graphic_load_image), [](uc_engine* uc) {
 			write_ret(uc,
-				vm_graphic_load_image(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1)));
+				ADDRESS_TO_EMU(
+					vm_graphic_load_image_FIX(
+						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+						read_arg(uc, 1))));
 		}},
-		{FUNCN(vm_graphic_get_img_property), [](uc_engine* uc) {
+		{FUNCN_FIX(vm_graphic_get_img_property), [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(
-				vm_graphic_get_img_property(
-					read_arg(uc, 0),
+				vm_graphic_get_img_property_FIX(
+					ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					read_arg(uc, 1))));
 		}},
 		{FUNCN(vm_graphic_blt), [](uc_engine* uc) {
@@ -643,9 +648,9 @@ namespace Bridge {
 			write_ret(uc, vm_graphic_setcolor(
 				(vm_graphic_color*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
-		{FUNCN(vm_graphic_canvas_set_trans_color), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_canvas_set_trans_color(
-				read_arg(uc, 0),
+		{FUNCN_FIX(vm_graphic_canvas_set_trans_color), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_canvas_set_trans_color_FIX(
+				ADDRESS_FROM_EMU(read_arg(uc, 0)),
 				read_arg(uc, 1)));
 		}},
 
