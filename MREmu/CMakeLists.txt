@@ -7,6 +7,7 @@ add_executable (MREmu
 						"GDB.cpp" "GDB.h" 
 						"Bridge.cpp" "Bridge.h" 
 						"App.cpp" "App.h" 
+						"ArmApp.cpp" "ArmApp.h" 
 						"MreTags.cpp" "MreTags.h" 
 						"Disassembler.cpp" "Disassembler.h"
 						"ARModule.cpp" "ARModule.h"

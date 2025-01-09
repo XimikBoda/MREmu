@@ -31,9 +31,6 @@ public:
 
 	uint32_t entry_point;
 
-	bool is_ads;
-	bool is_zipped;
-
 	MreTags tags;
 
 	Memory::MemoryManager app_memory;
@@ -45,7 +42,7 @@ public:
 	MREngine::AppSock sock;
 	MREngine::AppAudio audio;
 
-	bool preparation();
-	void start();
-	bool load_from_file(fs::path path, bool local);//tmp
+	virtual bool preparation() { return false; };
+	virtual void start() {};
+	virtual bool load_from_file(fs::path path, bool local) { return false; };//tmp
 };

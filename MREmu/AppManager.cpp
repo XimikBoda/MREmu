@@ -1,5 +1,6 @@
 #include "AppManager.h"
 #include "Bridge.h"
+#include "ArmApp.h"
 
 void AppManager::add_app_for_launch(fs::path path, bool local)
 {
@@ -19,13 +20,13 @@ void AppManager::launch_apps()
 		launch_queue.pop();
 	}
 
-	App app; 
+	std::shared_ptr<App> app = std::make_shared<ArmApp>();
 
-	if (!app.load_from_file(launch_data.path, launch_data.local))
+	if (!app->load_from_file(launch_data.path, launch_data.local))
 		return;
 
 
-	if (!app.preparation())
+	if (!app->preparation())
 		return;
 
 	apps.push_back(app);
@@ -33,14 +34,14 @@ void AppManager::launch_apps()
 	active_app_id = apps.size() - 1;
 	current_work_app_id = apps.size() - 1;
 
-	apps[current_work_app_id].resources.file_context = &(apps[current_work_app_id].file_context); //todo
+	apps[current_work_app_id]->resources.file_context = &(apps[current_work_app_id]->file_context); //todo
 
 	static int ph_app_id = 0;
 	ph_app_id++;
 
-	apps[current_work_app_id].system_callbacks.ph_app_id = ph_app_id;
+	apps[current_work_app_id]->system_callbacks.ph_app_id = ph_app_id;
 
-	apps[current_work_app_id].start();
+	apps[current_work_app_id]->start();
 
 	add_system_event(ph_app_id, VM_MSG_CREATE, 0);
 	add_system_event(ph_app_id, VM_MSG_PAINT, 0);
@@ -67,7 +68,7 @@ void AppManager::process_keyboard_events()
 		if (current_work_app_id < 0 || current_work_app_id >= apps.size())
 			return;
 
-		App& cur_app = apps[current_work_app_id];
+		App& cur_app = *apps[current_work_app_id];
 		if (cur_app.io.key_handler)
 			Bridge::run_cpu(cur_app.io.key_handler, 2, ke.event, ke.keycode);
 	}
@@ -93,7 +94,7 @@ void AppManager::process_message_events()
 		int app_id = -1;
 
 		for (int i = 0; i < apps.size(); ++i)
-			if (apps[i].system_callbacks.ph_app_id == me.phandle) {
+			if (apps[i]->system_callbacks.ph_app_id == me.phandle) {
 				app_id = i;
 				break;
 			}
@@ -103,7 +104,7 @@ void AppManager::process_message_events()
 
 		current_work_app_id = app_id;
 
-		App& cur_app = apps[current_work_app_id];
+		App& cur_app = *apps[current_work_app_id];
 		if (cur_app.system_callbacks.msg_proc)
 			Bridge::run_cpu(cur_app.system_callbacks.msg_proc, 4,
 				me.phandle_sender, me.msg_id, me.wparam, me.lparam);
@@ -129,7 +130,7 @@ void AppManager::process_system_events()
 		int app_id = -1;
 
 		for (int i = 0; i < apps.size(); ++i)
-			if (apps[i].system_callbacks.ph_app_id == se.phandle) {
+			if (apps[i]->system_callbacks.ph_app_id == se.phandle) {
 				app_id = i;
 				break;
 			}
@@ -139,7 +140,7 @@ void AppManager::process_system_events()
 
 		current_work_app_id = app_id;
 
-		App& cur_app = apps[current_work_app_id];
+		App& cur_app = *apps[current_work_app_id];
 		if (cur_app.system_callbacks.sysevt)
 			Bridge::run_cpu(cur_app.system_callbacks.sysevt, 2, se.message, se.param);
 	}
@@ -154,8 +155,8 @@ void AppManager::update(size_t delta_ms) {
 		current_work_app_id = i;
 		bool active = active_app_id == current_work_app_id;
 
-		apps[i].timer.update(delta_ms);//active
-		apps[i].sock.update();
+		apps[i]->timer.update(delta_ms);//active
+		apps[i]->sock.update();
 	}
 }
 
@@ -164,7 +165,7 @@ App* AppManager::get_active_app()
 	if (active_app_id < 0 || active_app_id >= apps.size())
 		return 0;
 	else
-		return &apps[active_app_id];
+		return &*apps[active_app_id];
 }
 
 App* AppManager::get_current_work_app_id()
@@ -172,7 +173,7 @@ App* AppManager::get_current_work_app_id()
 	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
 		return 0;
 	else
-		return &apps[current_work_app_id];
+		return &*apps[current_work_app_id];
 }
 
 extern AppManager* g_appManager;
@@ -227,8 +228,8 @@ MreTags* get_tags_by_mem_adr(size_t offset_mem) {
 
 	auto &apps = g_appManager->apps;
 	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i].offset_mem == offset_mem)
-			return &apps[i].tags;
+		if (apps[i]->offset_mem == offset_mem)
+			return &apps[i]->tags;
 
 	return 0;
 }
