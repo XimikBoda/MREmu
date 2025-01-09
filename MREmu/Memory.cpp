@@ -51,7 +51,7 @@ namespace Memory {
 
 		shared_memory_offset = (uint64_t)shared_memory_prt - shared_memory_in_emu_start;
 
-		shared_memory.setup((uint64_t)shared_memory_prt, shared_memory_size, 10 * 1024 * 1024);
+		shared_memory.setup((uint64_t)shared_memory_prt, shared_memory_size, 4 * 1024 * 1024);
 	}
 
 
@@ -67,7 +67,7 @@ namespace Memory {
 
 	void* app_malloc(int size) {
 		MemoryManager& mm = get_current_app_memory();
-		return (void*)mm.malloc(size);
+		return (void*)mm.malloc(size, 4);
 	}
 
 	void* app_realloc(void* p, int size) {
@@ -114,6 +114,9 @@ namespace Memory {
 
 			new_adr = regions[i].adr + regions[i].size;
 		}
+
+		if (new_adr % align != 0)
+			new_adr = ((new_adr / align) + 1) * align;
 
 		if (new_adr + size < start_adr + mem_size) {
 			regions.push_back({ new_adr, size });

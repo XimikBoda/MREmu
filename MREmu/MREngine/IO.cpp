@@ -140,19 +140,19 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 
 	fs::path path = path_from_emu(filename);
 
-	std::ios_base::openmode fmode = std::ios_base::binary;
+	std::ios::openmode fmode = std::ios::binary;
 
 	if (mode & MODE_READ)
-		fmode |= std::ios_base::in;
+		fmode |= std::ios::in;
 
 	if (mode & MODE_WRITE)
-		fmode |= std::ios_base::out; // | std::ios_base::_Nocreate;
+		fmode |= std::ios::out; // | std::ios::_Nocreate;
 
 	if (mode & MODE_CREATE_ALWAYS_WRITE)
-		fmode |= std::ios_base::out;
+		fmode |= std::ios::out | std::ios::trunc;
 
 	if (mode & MODE_APPEND)
-		fmode |= std::ios_base::out | std::ios_base::app;
+		fmode |= std::ios::out | std::ios::app;
 
 	std::fstream* f = new std::fstream;
 

@@ -14,6 +14,10 @@ void MREngine::SIM::init()
 	memcpy(imsi_ptr, "123456789012345", 16);
 }
 
+operator_t vm_get_operator(void) {
+	return UNKOWN_OPERATOR;
+}
+
 VMINT vm_has_sim_card(void) {
 	return 1;
 }

@@ -41,6 +41,9 @@ namespace Memory {
 		size_t realloc(size_t addr, size_t size);
 
 		void free(size_t addr);
+
+		size_t get_memory_size() { return mem_size; }
+		size_t get_free_memory_size() { return free_memory_size; }
 	};
 
 	void init(size_t shared_memory_size);

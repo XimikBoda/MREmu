@@ -20,6 +20,7 @@
 #include "MREngine/Sock.h"
 
 VMINT vm_get_res_header();//tmp
+VMWSTR vm_ucs2_string(VMSTR s);
 
 namespace Cpu {
 	void printREG(uc_engine* uc);
@@ -324,6 +325,9 @@ namespace Bridge {
 
 
 		// SIM
+		{"vm_get_operator", [](uc_engine* uc) {
+			write_ret(uc, vm_get_operator());
+		}},
 		{"vm_has_sim_card", [](uc_engine* uc) {
 			write_ret(uc, vm_has_sim_card());
 		}},
@@ -806,6 +810,11 @@ namespace Bridge {
 				vm_get_language_ssc(
 					(VMINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{"vm_ucs2_string", [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(
+				vm_ucs2_string(
+					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)))));
+		}},
 
 
 
@@ -816,6 +825,12 @@ namespace Bridge {
 		}},
 		{"vm_wstrcpy", [](uc_engine* uc) {
 			write_ret(uc,vm_wstrcpy(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
+		}},
+		{"vm_wstrcmp", [](uc_engine* uc) {
+			write_ret(uc,vm_wstrcmp(
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
 				));

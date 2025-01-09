@@ -26,6 +26,9 @@ bool MreTags::load(std::vector<unsigned char>& file)
 		if (pos + tag_size >= file_size)
 			return false;
 
+		//if (id >= raw_tags.size())
+		//	raw_tags.resize(id + 1);
+
 		raw_tags[id].resize(tag_size);
 		if (tag_size)
 			memcpy(raw_tags[id].data(), &file[pos], tag_size);

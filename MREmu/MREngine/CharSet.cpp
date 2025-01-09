@@ -6,8 +6,15 @@
 #include <codecvt>
 #include <vector>
 #include "CharSet.h"
+#include "../Memory.h"
 
 #include "iconv.h"
+
+VMWSTR ucs2_buf = 0;
+
+void MREngine::CharSet::init() {
+	ucs2_buf = (VMWSTR)Memory::shared_malloc(256);
+}
 
 VMINT vm_ucs2_to_gb2312(VMSTR dst, VMINT size, VMWSTR src) {
 	iconv_t ch = iconv_open("GB2312//TRANSLIT", "UCS-2LE");
@@ -144,6 +151,11 @@ VMINT32 vm_get_language_ssc(VMINT8* ssc) {
 	return 0;
 }
 
+VMWSTR vm_ucs2_string(VMSTR s) {
+	if (s != 0)
+		vm_gb2312_to_ucs2(ucs2_buf, 256, s);
+	return ucs2_buf;
+}
 
 std::u8string ucs2_to_utf8(VMWSTR src) {
 	iconv_t ch = iconv_open("UTF-8//IGNORE", "UCS-2LE");
@@ -159,7 +171,7 @@ std::u8string ucs2_to_utf8(VMWSTR src) {
 
 	iconv_close(ch);
 
-	return std::u8string((char8_t*)buf.data());
+	return std::u8string((char8_t*)buf.data(), buf.size());
 }
 
 void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size) {

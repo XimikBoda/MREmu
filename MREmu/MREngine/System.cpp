@@ -79,7 +79,7 @@ VMINT vm_get_tick_count(void) {
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
 	fs::path path = get_current_app_path();
-	utf8_to_ucs2(path.filename().u8string(), filename, 260);
+	utf8_to_ucs2(path.u8string(), filename, 260);
 	return 0;
 }
 
