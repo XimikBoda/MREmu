@@ -1,6 +1,7 @@
 #include "AppManager.h"
 #include "Bridge.h"
 #include "ArmApp.h"
+#include "DLLApp.h"
 
 void AppManager::add_app_for_launch(fs::path path, bool local)
 {
@@ -20,7 +21,7 @@ void AppManager::launch_apps()
 		launch_queue.pop();
 	}
 
-	std::shared_ptr<App> app = std::make_shared<ArmApp>();
+	std::shared_ptr<App> app = std::make_shared<DLLApp>();
 
 	if (!app->load_from_file(launch_data.path, launch_data.local))
 		return;
