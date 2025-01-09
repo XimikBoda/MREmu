@@ -11,6 +11,8 @@ endif()
 
 project ("MREmu")
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
 # Include sub-projects.
 add_subdirectory (imgui)
 
