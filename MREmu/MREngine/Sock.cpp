@@ -5,15 +5,16 @@
 //#include "../Cpu.h"
 #include "Sock.h"
 //#include <vmsock.h>
+#include "../App.h"
 
-void MREngine::AppSock::update(){ 
+void MREngine::AppSock::update(App* app){ 
     for (int i = 0; i < tcps.size(); ++i)
         if (tcps.is_active(i)) {
             auto& tcp = tcps[i];
 
             if (!tcp.is_connected && tcp.soc->getRemotePort()) {
                 tcp.is_connected = true;
-                Bridge::run_cpu(tcp.callback, 2, i, VM_TCP_EVT_CONNECTED);
+                app->run(tcp.callback, i, VM_TCP_EVT_CONNECTED);
             }
 
             if (tcp.is_connected) {
@@ -26,7 +27,7 @@ void MREngine::AppSock::update(){
                     tcp.receive_tmp_buf_pos += recived;
 
                     if(recived)
-                        Bridge::run_cpu(tcp.callback, 2, i, VM_TCP_EVT_CAN_READ);
+                        app->run(tcp.callback, i, VM_TCP_EVT_CAN_READ);
                 }
             }
 
@@ -87,8 +88,7 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
 VMINT vm_tcp_connect(const char* host, const VMINT port, const VMINT apn,
     void (*callback)(VMINT handle, VMINT event)) {
 
-    MREngine::tcp_el tcp = { std::make_shared<sf::TcpSocket>(),
-        FUNC_TO_UINT32(callback) };
+    MREngine::tcp_el tcp = { std::make_shared<sf::TcpSocket>(), callback };
 
     tcp.soc->setBlocking(true);
     auto res = tcp.soc->connect(host, port);

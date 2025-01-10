@@ -169,7 +169,7 @@ void AppManager::update(size_t delta_ms) {
 		App* cur_app = &*apps[current_work_app_id];
 
 		apps[i]->timer.update(delta_ms, cur_app);//active
-		apps[i]->sock.update();
+		apps[i]->sock.update(cur_app);
 	}
 }
 
