@@ -16,6 +16,21 @@ bool DLLApp::preparation()
 
 	resources.file_context = &file_context;
 
+	{
+		if (tags.tags_offset < 4)
+			return 0;
+
+		uint32_t resources_end = tags.tags_offset - 4;
+		uint32_t resources_start = *(uint32_t*)&file_context[resources_end] + 8;
+
+		if (resources_end < resources_start)
+			return 0;
+
+		
+		resources.offset = resources_start;
+		resources.size = resources_end - resources_start;
+	}
+
 	dll = LoadLibraryW(real_path.wstring().c_str());
 
 	if(!dll)
