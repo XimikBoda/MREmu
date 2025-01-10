@@ -17,6 +17,7 @@
 #include <vmsim.h>
 #include <vmstdlib.h>
 #include <vmmm.h>
+#include <vmbitstream.h>
 
 #include "MREngine/Sock.h"
 
@@ -885,6 +886,73 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_midi_stop_all), [](uc_engine* uc) {
 			vm_midi_stop_all();
+		}},
+
+
+		// Bitstream
+		{FUNCN(vm_bitstream_audio_open), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_open(
+					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(vm_bitstream_audio_cfg_struct*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					(vm_bitstream_audio_result_callback)read_arg(uc, 2)
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_open_pcm), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_open_pcm(
+					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(vm_bitstream_pcm_audio_cfg_struct*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					(vm_bitstream_audio_result_callback)read_arg(uc, 2)
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_finished), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_finished(
+					read_arg(uc, 0)
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_close), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_close(
+					read_arg(uc, 0)
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_get_buffer_status), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_get_buffer_status(
+					read_arg(uc, 0),
+					(vm_bitstream_audio_buffer_status*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_put_data), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_put_data(
+					read_arg(uc, 0),
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2),
+					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_start), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_start(
+					read_arg(uc, 0),
+					(vm_bitstream_audio_start_param*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_stop), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_stop(
+					read_arg(uc, 0)
+				));
+		}},
+		{FUNCN(vm_bitstream_audio_get_play_time), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_bitstream_audio_get_play_time(
+					read_arg(uc, 0),
+					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
 		}},
 
 
