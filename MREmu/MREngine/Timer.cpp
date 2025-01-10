@@ -3,24 +3,19 @@
 #include "../Memory.h"
 #include <vmtimer.h>
 
-bool get_current_app_is_arm();
+#include "../App.h"
 
-void MREngine::timer_el::run(int tid) {
-	if (is_arm)
-		Bridge::run_cpu(FUNC_TO_UINT32(adr), 1, tid);
-	else
-		adr(tid);
-}
-
-void MREngine::Timer::update(size_t delta_ms)
+void MREngine::Timer::update(size_t delta_ms, App* cur_app)
 {
+	if (!delta_ms)
+		delta_ms = 1;
 	for (int i = 0; i < gui_timers.size(); ++i)
 		if (gui_timers.is_active(i)) {
 			auto& el = gui_timers[i];
 			el.cur_val += delta_ms;
 			if (el.cur_val >= el.time) {
 				el.cur_val = 0;
-				el.run(i);
+				cur_app->run(el.adr, i);
 			}
 		}
 	for (int i = 0; i < timers.size(); ++i)
@@ -29,15 +24,15 @@ void MREngine::Timer::update(size_t delta_ms)
 			el.cur_val += delta_ms;
 			if (el.cur_val >= el.time) {
 				el.cur_val = 0;
-				el.run(i);
+				cur_app->run(el.adr, i);
 			}
 		}
 }
 
-int MREngine::Timer::create(size_t time, VM_TIMERPROC_T adr, bool is_arm, bool gui)
+int MREngine::Timer::create(size_t time, VM_TIMERPROC_T adr, bool gui)
 {
 	auto& tim = gui ? gui_timers : timers;
-	int i = tim.push({ time, 0, adr, is_arm });
+	int i = tim.push({ time, 0, adr });
 	return i;
 }
 
@@ -54,8 +49,7 @@ int MREngine::Timer::destroy(int id, bool gui)
 
 
 VMINT vm_create_timer(VMUINT32 millisec, VM_TIMERPROC_T timerproc) {
-	bool is_arm = get_current_app_is_arm();
-	return get_current_app_timer().create(millisec, timerproc, is_arm, true);
+	return get_current_app_timer().create(millisec, timerproc, true);
 }
 
 
@@ -65,8 +59,7 @@ VMINT vm_delete_timer(VMINT timerid) {
 
 
 VMINT vm_create_timer_ex(VMUINT32 millisec, VM_TIMERPROC_T timerproc) {
-	bool is_arm = get_current_app_is_arm();
-	return get_current_app_timer().create(millisec, timerproc, is_arm, false);
+	return get_current_app_timer().create(millisec, timerproc, false);
 }
 
 

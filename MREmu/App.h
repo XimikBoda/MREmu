@@ -10,12 +10,11 @@
 #include "MREngine/Audio.h"
 #include <filesystem>
 #include <vector>
-#include <elfio/elfio.hpp>
-#include <elfio/elf_types.hpp>
+#include "Bridge.h"
 
 namespace fs = std::filesystem;
 
-class App 
+class App
 {
 public:
 	std::vector<unsigned char> file_context;
@@ -23,8 +22,6 @@ public:
 	fs::path path;
 	fs::path real_path;
 	bool path_is_local = false;
-
-	bool is_arm;
 
 	void* mem_location = 0;
 	size_t offset_mem;
@@ -45,4 +42,17 @@ public:
 	virtual bool preparation() { return false; };
 	virtual void start() {};
 	virtual bool load_from_file(fs::path path, bool local) { return false; };//tmp
+
+	virtual bool is_native() { return true; }
+
+	template <typename Func, typename... Args>
+	auto run(Func func, Args... args) {
+		if (is_native())
+			return func(std::forward<Args>(args)...);
+		else {
+			int n = sizeof...(args);
+
+			return (decltype(func(std::forward<Args>(args)...)))Bridge::run_cpu(FUNC_TO_UINT32(func), n, args...);
+		}
+	}
 };

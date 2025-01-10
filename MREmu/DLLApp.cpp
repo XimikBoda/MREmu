@@ -14,8 +14,6 @@ bool DLLApp::preparation()
 	if (!tags.load(file_context))
 		return false;
 
-	is_arm = false;
-
 	resources.file_context = &file_context;
 
 	{
@@ -65,7 +63,7 @@ bool DLLApp::preparation()
 
 void DLLApp::start()
 {
-	entry_point((void*)Bridge::vm_get_sym_entry_native);
+	run(entry_point, (void*)Bridge::vm_get_sym_entry_native);
 }
 
 bool DLLApp::load_from_file(fs::path path, bool local)

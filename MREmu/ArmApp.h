@@ -13,6 +13,7 @@
 #include <vector>
 #include <elfio/elfio.hpp>
 #include <elfio/elf_types.hpp>
+#include "Bridge.h"
 
 namespace fs = std::filesystem;
 
@@ -27,4 +28,6 @@ public:
 	bool preparation() override;
 	void start() override;
 	bool load_from_file(fs::path path, bool local) override;//tmp
+
+	bool is_native() { return false; }
 };

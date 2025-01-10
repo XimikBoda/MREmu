@@ -26,8 +26,6 @@ bool ArmApp::preparation()
 	if (!tags.load(file_context))
 		return false;
 
-	is_arm = true;
-
 	resources.file_context = &file_context;
 
 	is_ads = tags.is_ads();
