@@ -32,7 +32,7 @@ Midi::Midi(void* buf, size_t len) {
 
 bool Midi::onGetData(Chunk& data) {
 	std::lock_guard lock(access_mutex);
-	int samples_count = adl_play(midi_player, 4410, buffer);
+	int samples_count = adl_play(midi_player, play_buf, buffer);
 	data.samples = buffer;
 	data.sampleCount = samples_count;
 	if (samples_count == 0) {
@@ -66,6 +66,13 @@ MREngine::AppAudio::~AppAudio() {
 			midis[i]->stop();
 			midis[i].reset();
 			midis.remove(i);
+		}
+
+	for (int i = 0; i < bitstreams.size(); ++i)
+		if (bitstreams.is_active(i)) {
+			bitstreams[i]->stop();
+			bitstreams[i].reset();
+			bitstreams.remove(i);
 		}
 }
 
