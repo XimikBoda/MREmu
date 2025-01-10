@@ -6,10 +6,12 @@
 
 #define SOCK_TMP_BUF_SIZE 1024
 
+class App;
+
 namespace MREngine {
     struct tcp_el {
         std::shared_ptr<sf::TcpSocket> soc;
-        uint32_t callback;
+        void (*callback)(VMINT handle, VMINT event);
         bool is_connected = false;
         bool is_disconnected = false;
         uint8_t receive_tmp_buf[SOCK_TMP_BUF_SIZE];
@@ -19,7 +21,7 @@ namespace MREngine {
     class AppSock {
     public:
         ItemsMng<tcp_el> tcps;
-        void update();
+        void update(App* app);
     };
 }
 

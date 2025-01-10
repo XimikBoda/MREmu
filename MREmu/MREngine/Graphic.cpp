@@ -42,6 +42,9 @@ void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
 
 	int w = cfp->width, h = cfp->height;
 
+	if (!(w * h))
+		return;
+
 	if (pix_data.size() < w * h * 4)
 		pix_data.resize(w * h * 4);
 
@@ -59,7 +62,7 @@ void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
 		pix_data[i * 4 + 2] = VM_COLOR_GET_BLUE(buf16[i]);
 	}
 	sf::Image im;
-	im.create(w, h, &pix_data[0]);
+	im.create(w, h, pix_data.data());
 
 	p.second.loadFromImage(im);
 }
@@ -390,7 +393,7 @@ MREngine::canvas_signature* find_canvas_signature(VMUINT8* buf) {
 	return 0;
 }
 
-VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
+VMINT_CANVAS vm_graphic_create_canvas_FIX(VMINT width, VMINT height) {
 	int image_size = width * height * 2;
 	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
 
@@ -413,18 +416,18 @@ VMINT vm_graphic_create_canvas(VMINT width, VMINT height) {
 	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 
-	return (VMINT)ADDRESS_TO_EMU(canvas_buf);
+	return (VMINT_CANVAS)canvas_buf;
 }
 
-VMINT vm_graphic_create_canvas_cf(vm_graphic_color_famat cf, VMINT width, VMINT height) {
+VMINT_CANVAS vm_graphic_create_canvas_cf_FIX(vm_graphic_color_famat cf, VMINT width, VMINT height) {
 	if (cf != VM_GRAPHIC_COLOR_FORMAT_16)
-		return -1;
+		return (VMINT_CANVAS)0;
 
-	return vm_graphic_create_canvas(width, height);
+	return vm_graphic_create_canvas_FIX(width, height);
 }
 
-void vm_graphic_release_canvas(VMINT hcanvas) {
-	void* hcanvas_adr = ADDRESS_FROM_EMU(hcanvas);
+void vm_graphic_release_canvas_FIX(VMINT_CANVAS hcanvas) {
+	void* hcanvas_adr = hcanvas;
 	auto& canvases_list = get_current_app_graphic().canvases_list;
 
 	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
@@ -438,11 +441,11 @@ void vm_graphic_release_canvas(VMINT hcanvas) {
 	vm_free(hcanvas_adr);
 }
 
-VMUINT8* vm_graphic_get_canvas_buffer(VMINT hcanvas) {
-	return (VMUINT8*)ADDRESS_FROM_EMU(hcanvas);
+VMUINT8* vm_graphic_get_canvas_buffer_FIX(VMINT_CANVAS hcanvas) {
+	return (VMUINT8*)hcanvas;
 }
 
-VMINT vm_graphic_load_image(VMUINT8* img, VMINT img_len) {
+VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {
 	sf::Image im;
 	if (!im.loadFromMemory(img, img_len))
 		return 0;
@@ -479,16 +482,16 @@ VMINT vm_graphic_load_image(VMUINT8* img, VMINT img_len) {
 	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 
-	return (VMINT)ADDRESS_TO_EMU(canvas_buf);
+	return (VMINT_CANVAS)canvas_buf;
 }
 
-struct frame_prop* vm_graphic_get_img_property(VMINT hcanvas, VMUINT8 frame_index) {
+struct frame_prop* vm_graphic_get_img_property_FIX(VMINT_CANVAS hcanvas, VMUINT8 frame_index) {
 	if (hcanvas == 0)
 		return 0;
 
 	static struct frame_prop* info = (frame_prop*)Memory::shared_malloc(sizeof(frame_prop));
 
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(ADDRESS_FROM_EMU(hcanvas));
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
 	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
 		return 0;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
@@ -1182,8 +1185,8 @@ VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {
 	return VM_GDI_SUCCEED;
 }
 
-VM_GDI_RESULT vm_graphic_canvas_set_trans_color(VMINT hcanvas, VMINT trans_color) {
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(ADDRESS_FROM_EMU(hcanvas));
+VM_GDI_RESULT vm_graphic_canvas_set_trans_color_FIX(VMINT_CANVAS hcanvas, VMINT trans_color) {
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
 	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
 		return VM_GDI_FAILED;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);

@@ -10,12 +10,11 @@
 #include "MREngine/Audio.h"
 #include <filesystem>
 #include <vector>
-#include <elfio/elfio.hpp>
-#include <elfio/elf_types.hpp>
+#include "Bridge.h"
 
 namespace fs = std::filesystem;
 
-class App 
+class App
 {
 public:
 	std::vector<unsigned char> file_context;
@@ -29,11 +28,6 @@ public:
 	size_t mem_size;
 	size_t segments_size;
 
-	uint32_t entry_point;
-
-	bool is_ads;
-	bool is_zipped;
-
 	MreTags tags;
 
 	Memory::MemoryManager app_memory;
@@ -45,7 +39,20 @@ public:
 	MREngine::AppSock sock;
 	MREngine::AppAudio audio;
 
-	bool preparation();
-	void start();
+	virtual bool preparation() { return false; };
+	virtual void start() {};
 	bool load_from_file(fs::path path, bool local);//tmp
+
+	virtual bool is_native() { return true; }
+
+	template <typename Func, typename... Args>
+	auto run(Func func, Args... args) {
+		if (is_native())
+			return func(std::forward<Args>(args)...);
+		else {
+			int n = sizeof...(args);
+
+			return (decltype(func(std::forward<Args>(args)...)))Bridge::run_cpu(FUNC_TO_UINT32(func), n, args...);
+		}
+	}
 };
