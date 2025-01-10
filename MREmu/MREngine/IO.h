@@ -5,6 +5,8 @@
 #include <regex>
 #include <filesystem>
 
+#include <vmio.h>
+
 namespace fs = std::filesystem;
 
 namespace MREngine {
@@ -34,7 +36,7 @@ namespace MREngine {
 		ItemsMng<find_el> find;
 		ItemsMng<find_el> find_ext;
 
-		uint32_t key_handler = 0;
+		vm_key_handler_t key_handler = 0;
 	};
 };
 

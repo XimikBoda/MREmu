@@ -14,6 +14,8 @@ bool DLLApp::preparation()
 	if (!tags.load(file_context))
 		return false;
 
+	is_arm = false;
+
 	resources.file_context = &file_context;
 
 	{
@@ -38,11 +40,13 @@ bool DLLApp::preparation()
 
 	entry_point = (dll_vm_entry)GetProcAddress(dll, "vm_entry");
 
-	if (!entry_point)
+	if (!entry_point) {
+		FreeLibrary(dll);
 		return false;
+	}
 
 	mem_size = tags.get_ram() * 1024;
-	mem_size = std::max<size_t>(512 * 1024 * 4, mem_size);
+	mem_size = std::max<size_t>(512 * 1024, mem_size);
 
 	mem_location = Memory::shared_malloc(mem_size, true, 0x100000);
 	memset(mem_location, 0, mem_size);

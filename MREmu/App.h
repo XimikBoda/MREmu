@@ -24,12 +24,12 @@ public:
 	fs::path real_path;
 	bool path_is_local = false;
 
+	bool is_arm;
+
 	void* mem_location = 0;
 	size_t offset_mem;
 	size_t mem_size;
 	size_t segments_size;
-
-	uint32_t entry_point;
 
 	MreTags tags;
 

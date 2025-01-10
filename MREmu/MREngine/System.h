@@ -1,14 +1,14 @@
 #pragma once
 #include <cstdint>
-
+#include <vmpromng.h>
 
 namespace MREngine {
 	class SystemCallbacks {
 	public:
-		uint32_t sysevt = 0;
+		void (*sysevt)(VMINT message, VMINT param) = 0;
 
 		int ph_app_id;
-		uint32_t msg_proc = 0;
+		VM_MESSAGE_PROC msg_proc = 0;
 	};
 }
 

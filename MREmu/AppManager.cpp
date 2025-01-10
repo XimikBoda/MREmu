@@ -71,7 +71,10 @@ void AppManager::process_keyboard_events()
 
 		App& cur_app = *apps[current_work_app_id];
 		if (cur_app.io.key_handler)
-			Bridge::run_cpu(cur_app.io.key_handler, 2, ke.event, ke.keycode);
+			if (cur_app.is_arm)
+				Bridge::run_cpu(FUNC_TO_UINT32(cur_app.io.key_handler), 2, ke.event, ke.keycode);
+			else
+				cur_app.io.key_handler(ke.event, ke.keycode);
 	}
 }
 
@@ -107,8 +110,12 @@ void AppManager::process_message_events()
 
 		App& cur_app = *apps[current_work_app_id];
 		if (cur_app.system_callbacks.msg_proc)
-			Bridge::run_cpu(cur_app.system_callbacks.msg_proc, 4,
-				me.phandle_sender, me.msg_id, me.wparam, me.lparam);
+			if (cur_app.is_arm)
+				Bridge::run_cpu(FUNC_TO_UINT32(cur_app.system_callbacks.msg_proc), 4,
+					me.phandle_sender, me.msg_id, me.wparam, me.lparam);
+			else
+				cur_app.system_callbacks.msg_proc(me.phandle_sender, me.msg_id, me.wparam, me.lparam);
+
 	}
 }
 
@@ -143,7 +150,10 @@ void AppManager::process_system_events()
 
 		App& cur_app = *apps[current_work_app_id];
 		if (cur_app.system_callbacks.sysevt)
-			Bridge::run_cpu(cur_app.system_callbacks.sysevt, 2, se.message, se.param);
+			if (cur_app.is_arm)
+				Bridge::run_cpu(FUNC_TO_UINT32(cur_app.system_callbacks.sysevt), 2, se.message, se.param);
+			else
+				cur_app.system_callbacks.sysevt(se.message, se.param);
 	}
 }
 
@@ -185,6 +195,10 @@ App* get_cur_app() {
 		return curr_app;
 	else
 		abort();
+}
+
+bool get_current_app_is_arm() {
+	return get_cur_app()->is_arm;
 }
 
 Memory::MemoryManager& get_current_app_memory() { 

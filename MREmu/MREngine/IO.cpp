@@ -132,7 +132,7 @@ fs::path MREngine::find_el::next() {
 void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	io.key_handler = FUNC_TO_UINT32(handler);
+	io.key_handler = handler;
 }
 
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
