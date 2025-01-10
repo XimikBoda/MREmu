@@ -8,6 +8,25 @@
 
 using namespace std::string_literals;
 
+#ifdef  WIN32
+
+bool DLLApp::check_format(fs::path path) {
+	unsigned char buf[4];
+	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
+	if (!in.is_open())
+		return false;
+	size_t file_size = (size_t)in.tellg();
+	if (file_size < 4)
+		return false;
+	in.seekg(0, std::ios::beg);
+	in.read((char*)buf, 4);
+	in.close();
+
+	if (!memcmp(buf, "MZ", 2))
+		return true;
+
+	return false;
+}
 
 bool DLLApp::preparation()
 {
@@ -26,14 +45,14 @@ bool DLLApp::preparation()
 		if (resources_end < resources_start)
 			return 0;
 
-		
+
 		resources.offset = resources_start;
 		resources.size = resources_end - resources_start;
 	}
 
 	dll = LoadLibraryW(real_path.wstring().c_str());
 
-	if(!dll)
+	if (!dll)
 		return false;
 
 	entry_point = (dll_vm_entry)GetProcAddress(dll, "vm_entry");
@@ -56,7 +75,7 @@ bool DLLApp::preparation()
 
 	app_memory.setup((size_t)mem_location, mem_size);
 
-	if(resources.size)
+	if (resources.size)
 		resources.scan();
 	return true;
 }
@@ -66,24 +85,4 @@ void DLLApp::start()
 	run(entry_point, (void*)Bridge::vm_get_sym_entry_native);
 }
 
-bool DLLApp::load_from_file(fs::path path, bool local)
-{
-	path_is_local = local;
-
-	if (path_is_local) {
-		real_path = path_from_emu(path);
-		this->path = path;
-	}
-	else
-		real_path = path;
-
-	std::ifstream in(real_path, std::ios::in | std::ios::binary | std::ios::ate);
-	if (!in.is_open())
-		return false;
-	size_t file_size = (size_t)in.tellg();
-	in.seekg(0, std::ios::beg);
-	file_context.resize(file_size);
-	in.read((char*)file_context.data(), file_size);
-	in.close();
-	return true;
-}
+#endif //  WIN32

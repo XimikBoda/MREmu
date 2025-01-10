@@ -41,7 +41,7 @@ public:
 
 	virtual bool preparation() { return false; };
 	virtual void start() {};
-	virtual bool load_from_file(fs::path path, bool local) { return false; };//tmp
+	bool load_from_file(fs::path path, bool local);//tmp
 
 	virtual bool is_native() { return true; }
 

@@ -25,9 +25,10 @@ public:
 	bool is_ads;
 	bool is_zipped;
 
+	static bool check_format(fs::path path);
+
 	bool preparation() override;
 	void start() override;
-	bool load_from_file(fs::path path, bool local) override;//tmp
 
 	bool is_native() { return false; }
 };

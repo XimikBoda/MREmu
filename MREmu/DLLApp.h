@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <vector>
 
+#ifdef  WIN32
+
 #include <windows.h>
 
 namespace fs = std::filesystem;
@@ -25,7 +27,10 @@ public:
 
 	HMODULE dll = 0;
 
+	static bool check_format(fs::path path);
+
 	bool preparation() override;
 	void start() override;
-	bool load_from_file(fs::path path, bool local) override;//tmp
 };
+
+#endif //  WIN32

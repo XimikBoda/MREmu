@@ -21,6 +21,33 @@ typedef struct
 	uint32_t res_size;
 } compress_ads_elf_info;
 
+bool ArmApp::check_format(fs::path path) {
+	unsigned char buf[4];
+	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
+	if (!in.is_open())
+		return false;
+	size_t file_size = (size_t)in.tellg();
+	if (file_size < 4)
+		return false;
+	in.seekg(0, std::ios::beg);
+	in.read((char*)buf, 4);
+	in.close();
+
+	if (!memcmp(buf, "ELF", 3))
+		return true;
+
+	if (buf[0] == 0x78) // Zlib 
+		switch (buf[1]) {
+		case 0x01:
+		case 0x5E:
+		case 0x9C:
+		case 0xDA:
+			return true;
+		}
+
+	return false;
+}
+
 bool ArmApp::preparation()
 {
 	if (!tags.load(file_context))
@@ -108,14 +135,14 @@ bool ArmApp::preparation()
 			compress_ads_elf_info* info = (compress_ads_elf_info*)(file_context.data() + tags.tags_offset - 4 - elf_info_size);
 
 			uLongf dL = info->org_ro_size;
-			if(uncompress((unsigned char*)mem_location, 
+			if (uncompress((unsigned char*)mem_location,
 				&dL, file_context.data() + info->ro_offset, info->ro_size)) {
 				printf("uncompress error\n");
 				return false;
 			}
 
 			dL = info->org_rw_size;
-			if (uncompress((unsigned char*)mem_location + info->org_ro_size, 
+			if (uncompress((unsigned char*)mem_location + info->org_ro_size,
 				&dL, file_context.data() + info->rw_offset, info->rw_size)) {
 				printf("uncompress error\n");
 				return false;
@@ -146,7 +173,7 @@ bool ArmApp::preparation()
 	app_memory.setup((size_t)mem_location, mem_size);
 	app_memory.malloc(segments_size); // for "protect" code
 
-	if(resources.size)
+	if (resources.size)
 		resources.scan();
 	return true;
 }
@@ -155,31 +182,9 @@ void ArmApp::start()
 {
 	uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
 	if (is_ads) {
-		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + mem_size+ 0x100);
+		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + mem_size + 0x100);
 	}
 	else {
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);
 	}
-}
-
-bool ArmApp::load_from_file(fs::path path, bool local)
-{
-	path_is_local = local;
-
-	if (path_is_local) {
-		real_path = path_from_emu(path);
-		this->path = path;
-	}
-	else
-		real_path = path;
-
-	std::ifstream in(real_path, std::ios::in | std::ios::binary | std::ios::ate);
-	if (!in.is_open())
-		return false;
-	size_t file_size = (size_t)in.tellg();
-	in.seekg(0, std::ios::beg);
-	file_context.resize(file_size);
-	in.read((char*)file_context.data(), file_size);
-	in.close();
-	return true;
 }

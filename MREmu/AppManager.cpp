@@ -21,12 +21,19 @@ void AppManager::launch_apps()
 		launch_queue.pop();
 	}
 
-	std::shared_ptr<App> app = std::make_shared<ArmApp>();
+	std::shared_ptr<App> app;
+
+	if (ArmApp::check_format(launch_data.path))
+		app = std::make_shared<ArmApp>();
+
+#ifdef WIN32
+	if (DLLApp::check_format(launch_data.path))
+		app = std::make_shared<DLLApp>();
+#endif // WIN32
 
 	if (!app->load_from_file(launch_data.path, launch_data.local))
 		return;
-
-
+	
 	if (!app->preparation())
 		return;
 
