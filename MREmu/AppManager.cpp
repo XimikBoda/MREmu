@@ -151,10 +151,6 @@ void AppManager::process_system_events()
 		App& cur_app = *apps[current_work_app_id];
 		if (cur_app.system_callbacks.sysevt)
 			cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
-			/*if (cur_app.is_arm)
-				Bridge::run_cpu(FUNC_TO_UINT32(cur_app.system_callbacks.sysevt), 2, se.message, se.param);
-			else
-				cur_app.system_callbacks.sysevt(se.message, se.param);*/
 	}
 }
 
