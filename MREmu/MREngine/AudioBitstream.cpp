@@ -20,19 +20,19 @@ public:
 
 	vm_bitstream_codec_type_enum get_vm_codec_type() {
 		if (is_native) return p->vm_codec_type;
-		else return (vm_bitstream_codec_type_enum)(uint8_t)(*((uint8_t*)p + 0));
+		else return (vm_bitstream_codec_type_enum)(*(uint8_t*)((uint8_t*)p + 0));
 	}
 	VMBOOL get_isStereo() {
 		if (is_native) return p->isStereo;
-		else return (VMBOOL)(*((uint8_t*)p + 4));
+		else return (VMBOOL)(*(uint32_t*)((uint8_t*)p + 4));
 	}
 	VMUINT8 get_bitPerSample() {
 		if (is_native) return p->bitPerSample;
-		else return (VMUINT8)(*((uint8_t*)p + 8));
+		else return (VMUINT8)(*(uint8_t*)((uint8_t*)p + 8));
 	}
 	vm_bitstream_sample_freq_enum get_sampleFreq() {
 		if (is_native) return p->sampleFreq;
-		else return (vm_bitstream_sample_freq_enum)(uint8_t)(*((uint8_t*)p + 9));
+		else return (vm_bitstream_sample_freq_enum)(*(uint8_t*)((uint8_t*)p + 9));
 	}
 };
 
