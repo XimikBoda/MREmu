@@ -68,3 +68,4 @@ namespace MREngine {
 }
 
 MREngine::AppAudio& get_current_app_audio();
+bool cur_app_is_native();

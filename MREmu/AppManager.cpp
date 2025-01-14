@@ -198,6 +198,10 @@ App* get_cur_app() {
 		abort();
 }
 
+bool cur_app_is_native() {
+	return get_cur_app()->is_native();
+}
+
 Memory::MemoryManager& get_current_app_memory() { 
 	return get_cur_app()->app_memory;
 }
