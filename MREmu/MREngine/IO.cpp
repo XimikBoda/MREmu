@@ -62,7 +62,7 @@ fs::path path_from_emu(fs::path path) { // TODO rewrite this
 
 	if (root_n.size()) {
 		root_n.resize(1);
-		if (root_n[0] >= 'A' && root_n[0] <= 'C')
+		if (root_n[0] >= 'A' && root_n[0] <= 'Z')
 			root_n[0] -= 'A' - 'a';
 		res /= fs::path(root_n);
 	}

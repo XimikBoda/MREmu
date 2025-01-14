@@ -31,6 +31,9 @@ void AppManager::launch_apps()
 		app = std::make_shared<DLLApp>();
 #endif // WIN32
 
+	if (!app)
+		return;
+
 	if (!app->load_from_file(launch_data.path, launch_data.local))
 		return;
 	

@@ -1058,6 +1058,14 @@ namespace Bridge {
 				break;
 			}
 
+		if (ret == 0)
+			if (str == "vm_vsprintf")
+				ret = vsprintf;
+			else if (str == "vm_sprintf")
+				ret = sprintf;
+			else if(str == "vm_sscanf")
+				ret = sscanf;
+
 		printf("vm_get_sym_entry_native(%s) -> %08x\n", symbol, ret);
 
 		return ret;

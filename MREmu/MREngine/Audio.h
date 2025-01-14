@@ -7,7 +7,7 @@
 #include <adlmidi.h>
 #include <vmbitstream.h>
 
-const int bitstream_buf_size = 10 * 1024;
+const int bitstream_buf_size = 10 * 1024*4;
 const int play_buf = 4410;
 
 class Midi : public sf::SoundStream

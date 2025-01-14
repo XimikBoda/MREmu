@@ -51,7 +51,7 @@ namespace Memory {
 
 		shared_memory_offset = (uint64_t)shared_memory_prt - shared_memory_in_emu_start;
 
-		shared_memory.setup((uint64_t)shared_memory_prt, shared_memory_size, 4 * 1024 * 1024);
+		shared_memory.setup((uint64_t)shared_memory_prt, shared_memory_size, 10 * 1024 * 1024);
 	}
 
 
