@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
 
 	std::thread second_thread(mre_main, &appManager);
 
-	sf::RenderWindow win_debug(sf::VideoMode::getDesktopMode(), "MREmu Debug");
+	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
 	ImGui::SFML::Init(win_debug);
 	win_debug.setFramerateLimit(60);
 	//win_debug.setVerticalSyncEnabled(true);

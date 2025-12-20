@@ -15,7 +15,7 @@ public:
 		for (size_t i = 0; i < vec.size(); ++i)
 			if (!vec[i].active) {
 				vec[i].el = el;
-				vec[i].active = false;
+				vec[i].active = true;
 				return i;
 			}
 		vec.push_back({ el, true });

@@ -7,7 +7,7 @@
 #include <adlmidi.h>
 #include <vmbitstream.h>
 
-const int bitstream_buf_size = 10 * 1024*4;
+const int bitstream_buf_size = 10 * 1024;
 const int play_buf = 4410;
 
 class Midi : public sf::SoundStream
@@ -40,10 +40,15 @@ public:
 
 	uint32_t play_pos = 0; // in samples (16 bits)
 	uint32_t data_size = 0; // in samples (16 bits)
+	std::condition_variable cv;
+	mutex_wrapper data_mutex;
 
 	bool stereo = false;
 	int sample_rate = 44100;
 	bool data_finished = false;
+
+	sf::Time last_time;
+	uint32_t last_sampleCount_sum = 0;
 
 	vm_bitstream_audio_result_callback callback = 0;
 
@@ -51,7 +56,8 @@ public:
 
 	bool onGetData(Chunk& data);
 	void onSeek(sf::Time timeOffset);
-
+	
+	uint32_t getBetterFreeSpace();
 	void putData(void* buf, uint32_t size, uint32_t &writen);
 };
 

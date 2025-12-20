@@ -46,24 +46,50 @@ Bitstream::Bitstream(bool stereo, int sample_rate, vm_bitstream_audio_result_cal
 }
 
 bool Bitstream::onGetData(Chunk& data) {
-	std::lock_guard lock(access_mutex);
-	data.samples = buffer + play_pos;
+	while(1){
+		while (!data_size) {
+			std::unique_lock<std::mutex> lck(data_mutex);
+			cv.wait(lck);
+		}
 
-	uint32_t available_size_16 = std::min(data_size, bitstream_buf_size - play_pos);
-	data.sampleCount = std::min<uint32_t>(available_size_16, play_buf);
+		std::lock_guard lock(access_mutex);
 
-	play_pos += data.sampleCount;
-	if (play_pos == bitstream_buf_size)
-		play_pos = 0;
+		data.samples = buffer + play_pos;
 
-	data_size -= data.sampleCount;
+		uint32_t available_size_16 = std::min(data_size, bitstream_buf_size - play_pos);
+		data.sampleCount = std::min<uint32_t>(available_size_16, play_buf);
 
-	return data.sampleCount != 0;
+		play_pos += data.sampleCount;
+		if (play_pos == bitstream_buf_size)
+			play_pos = 0;
+
+		data_size -= data.sampleCount;
+
+
+		last_time = getPlayingOffset();
+		last_sampleCount_sum += data.sampleCount;
+
+		//if (data.sampleCount == 0)
+		//	data.samples = 0;
+		if (data.sampleCount != 0)
+			return true;
+	}
 }
 
 void Bitstream::onSeek(sf::Time timeOffset) {
 	std::lock_guard lock(access_mutex);
 	//TODO
+}
+
+uint32_t Bitstream::getBetterFreeSpace() {
+	sf::Time cur_time = getPlayingOffset();
+	sf::Time d_time = cur_time - last_time;
+
+	int played_samples = (float)(sample_rate) * d_time.asSeconds();
+	if (played_samples > last_sampleCount_sum)
+		played_samples = last_sampleCount_sum;
+
+	return bitstream_buf_size - data_size;// -(last_sampleCount_sum - played_samples);
 }
 
 void Bitstream::putData(void* buf, uint32_t size, uint32_t& writen)
@@ -93,6 +119,8 @@ void Bitstream::putData(void* buf, uint32_t size, uint32_t& writen)
 		size16 -= size_to_write;
 		data_size += size_to_write;
 	}
+	last_sampleCount_sum = 0;
+	cv.notify_all();
 }
 
 VMINT vm_bitstream_audio_open(
@@ -166,7 +194,7 @@ VMINT vm_bitstream_audio_get_buffer_status(
 
 	if (audio.bitstreams.is_active(handle)) {
 		status->total_buf_size = bitstream_buf_size;
-		status->free_buf_size = status->total_buf_size - audio.bitstreams[handle]->data_size;
+		status->free_buf_size = audio.bitstreams[handle]->getBetterFreeSpace();
 		return VM_BITSTREAM_SUCCEED;
 	}
 	return VM_BITSTREAM_FAILED;
