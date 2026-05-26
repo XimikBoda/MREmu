@@ -106,6 +106,24 @@ namespace Cpu {
 		print_code(code, size);
 	}
 
+	static void hook_stack(uc_engine* uc, uint64_t address, uint32_t size, void* user_data)
+	{
+		static int max_stack = 0;
+
+		uint32_t sp;
+		uc_reg_read(uc, UC_ARM_REG_SP, &sp);
+
+		uint32_t pc;
+		uc_reg_read(uc, UC_ARM_REG_PC, &pc);
+
+		uint32_t used_stack = ADDRESS_TO_EMU(stack_p) + stack_size - sp;
+		if (used_stack > max_stack) {
+			printf("%1.1f kb, %d, 0x%08x\n", used_stack/1000.f, used_stack, pc);
+			max_stack = used_stack;
+		}
+		
+	}
+
 	static void hook_read(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
 		unsigned char code[8];
@@ -159,6 +177,9 @@ namespace Cpu {
 
 		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ_UNMAPPED, (void*)hook_read_unmapped, 0, 1, 0);
 		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE_UNMAPPED, (void*)hook_write_unmapped, 0, 1, 0);
+
+
+		uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_stack, 0, 0, 0x100000000);
 
 		//uc_mem_map(uc, 0, 0x1000, UC_PROT_ALL);
 

@@ -21,3 +21,7 @@ VMINT vm_post_msg(VM_P_HANDLE phandle, VMUINT msg_id, VMINT wparam, VMINT lparam
 	add_message_event(phandle, msg_id, wparam, lparam, vm_pmng_get_current_handle());
 	return 1; //TODO
 }
+
+void vm_start_app_with_para(const VMWCHAR* filepath, VMINT parent_app_handle, VMINT is_parent_exit, void* parameter, VMINT parameter_size) {
+	
+}

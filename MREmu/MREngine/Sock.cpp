@@ -92,6 +92,7 @@ VMINT vm_tcp_connect(const char* host, const VMINT port, const VMINT apn,
 
     tcp.soc->setBlocking(true);
     auto res = tcp.soc->connect(host, port);
+    tcp.soc->setBlocking(false);
 
     switch (res){
     case sf::Socket::Disconnected:
@@ -149,9 +150,9 @@ VMINT vm_tcp_write(VMINT handle, void* buf, VMINT len) {
     auto& tcp = app_sock.tcps[handle];
 
     size_t writed = 0;
-    tcp.soc->setBlocking(true);
+   // tcp.soc->setBlocking(true);
     auto res = tcp.soc->send(buf, len, writed);
-    tcp.soc->setBlocking(false);
+    //tcp.soc->setBlocking(false);
 
     return writed;
 }
