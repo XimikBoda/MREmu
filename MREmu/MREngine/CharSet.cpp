@@ -161,17 +161,19 @@ std::u8string ucs2_to_utf8(VMWSTR src) {
 	iconv_t ch = iconv_open("UTF-8//IGNORE", "UCS-2LE");
 
 	const char* in_ptr = (char*)src;
-	size_t in_size = vm_wstrlen(src) * 2 + 2;
+	size_t len = vm_wstrlen(src);
+	size_t in_size = len * 2;
 
-	std::vector<uint8_t> buf(in_size * 2, 0);
+	size_t buf_size = len * 3;
+	std::vector<uint8_t> buf(buf_size, 0);
 	char* out_ptr = (char*)buf.data();
-	size_t out_size = buf.size();
+	size_t out_size = buf_size;
 
 	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
 
 	iconv_close(ch);
 
-	return std::u8string((char8_t*)buf.data(), buf.size());
+	return std::u8string((char8_t*)buf.data(), buf_size - out_size);
 }
 
 void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size) {

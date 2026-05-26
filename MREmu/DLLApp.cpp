@@ -49,11 +49,18 @@ bool DLLApp::preparation()
 		resources.offset = resources_start;
 		resources.size = resources_end - resources_start;
 	}
+	memmove(file_context.data(), file_context.data() + resources.offset, resources.size);
+	file_context.resize(resources.size);
+	file_context = std::vector<unsigned char>(file_context);
+	resources.offset = 0;
 
 	dll = LoadLibraryW(real_path.wstring().c_str());
 
-	if (!dll)
+	if (!dll) {
+		DWORD errorCode = GetLastError();
+		printf("Can`t load DLL, error code: %d\n", errorCode);
 		return false;
+	}
 
 	entry_point = (dll_vm_entry)GetProcAddress(dll, "vm_entry");
 

@@ -33,7 +33,7 @@ bool ArmApp::check_format(fs::path path) {
 	in.read((char*)buf, 4);
 	in.close();
 
-	if (!memcmp(buf, "ELF", 3))
+	if (!memcmp(buf + 1, "ELF", 3))
 		return true;
 
 	if (buf[0] == 0x78) // Zlib 
