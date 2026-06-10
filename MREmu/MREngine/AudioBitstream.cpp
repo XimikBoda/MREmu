@@ -46,34 +46,26 @@ Bitstream::Bitstream(bool stereo, int sample_rate, vm_bitstream_audio_result_cal
 }
 
 bool Bitstream::onGetData(Chunk& data) {
-	while(1){
-		while (!data_size) {
-			std::unique_lock<std::mutex> lck(data_mutex);
-			cv.wait(lck);
-		}
+	std::unique_lock<std::mutex> lock(data_mutex);
 
-		std::lock_guard lock(access_mutex);
+	cv.wait(lock, [this] { return data_size > 0 || data_finished; });
 
-		data.samples = buffer + play_pos;
-
-		uint32_t available_size_16 = std::min(data_size, bitstream_buf_size - play_pos);
-		data.sampleCount = std::min<uint32_t>(available_size_16, play_buf);
-
-		play_pos += data.sampleCount;
-		if (play_pos == bitstream_buf_size)
-			play_pos = 0;
-
-		data_size -= data.sampleCount;
-
-
-		last_time = getPlayingOffset();
-		last_sampleCount_sum += data.sampleCount;
-
-		//if (data.sampleCount == 0)
-		//	data.samples = 0;
-		if (data.sampleCount != 0)
-			return true;
+	if (data_finished && data_size == 0) {
+		return false;
 	}
+
+	data.samples = buffer + play_pos;
+
+	uint32_t available_size_16 = std::min(data_size, bitstream_buf_size - play_pos);
+	data.sampleCount = std::min<uint32_t>(available_size_16, play_buf);
+
+	play_pos += data.sampleCount;
+	if (play_pos == bitstream_buf_size)
+		play_pos = 0;
+
+	data_size -= data.sampleCount;
+
+	return true;
 }
 
 void Bitstream::onSeek(sf::Time timeOffset) {
@@ -81,21 +73,10 @@ void Bitstream::onSeek(sf::Time timeOffset) {
 	//TODO
 }
 
-uint32_t Bitstream::getBetterFreeSpace() {
-	sf::Time cur_time = getPlayingOffset();
-	sf::Time d_time = cur_time - last_time;
-
-	int played_samples = (float)(sample_rate) * d_time.asSeconds();
-	if (played_samples > last_sampleCount_sum)
-		played_samples = last_sampleCount_sum;
-
-	return bitstream_buf_size - data_size;// -(last_sampleCount_sum - played_samples);
-}
-
-void Bitstream::putData(void* buf, uint32_t size, uint32_t& writen)
-{
-	std::lock_guard lock(access_mutex);
+void Bitstream::putData(void* buf, uint32_t size, uint32_t& writen) {
+	std::lock_guard lock(data_mutex);
 	uint32_t size16 = size / 2;
+	int16_t *buf16 = (int16_t*)buf;
 
 	writen = 0;
 
@@ -103,10 +84,11 @@ void Bitstream::putData(void* buf, uint32_t size, uint32_t& writen)
 		uint32_t can_write_16 = bitstream_buf_size - data_size - play_pos;
 		uint32_t size_to_write = std::min(size16, can_write_16);
 
-		memcpy(buffer + play_pos + data_size, buf, size_to_write * 2);
+		memcpy(buffer + play_pos + data_size, buf16, size_to_write * 2);
 		writen += size_to_write * 2;
 		size16 -= size_to_write;
 		data_size += size_to_write;
+		buf16 += size_to_write;
 	}
 
 	if (size16 && play_pos + data_size >= bitstream_buf_size && data_size < bitstream_buf_size)
@@ -114,13 +96,24 @@ void Bitstream::putData(void* buf, uint32_t size, uint32_t& writen)
 		uint32_t can_write_16 = bitstream_buf_size - data_size;
 		uint32_t size_to_write = std::min(size16, can_write_16);
 
-		memcpy(buffer + play_pos + data_size - bitstream_buf_size, buf, size_to_write * 2);
+		memcpy(buffer + play_pos + data_size - bitstream_buf_size, buf16, size_to_write * 2);
 		writen += size_to_write * 2;
 		size16 -= size_to_write;
 		data_size += size_to_write;
+		buf16 += size_to_write;
 	}
-	last_sampleCount_sum = 0;
 	cv.notify_all();
+}
+
+void Bitstream::dataFinished() {
+	std::lock_guard lock(data_mutex);
+	data_finished = true;
+	cv.notify_all();
+}
+
+Bitstream::~Bitstream() {
+	dataFinished();
+	stop();
 }
 
 VMINT vm_bitstream_audio_open(
@@ -177,6 +170,7 @@ VMINT vm_bitstream_audio_close(VMINT handle) {
 	MREngine::AppAudio& audio = get_current_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
+		audio.bitstreams[handle]->dataFinished();
 		audio.bitstreams[handle]->stop();
 		audio.bitstreams[handle].reset();
 		audio.bitstreams.remove(handle);
@@ -194,7 +188,7 @@ VMINT vm_bitstream_audio_get_buffer_status(
 
 	if (audio.bitstreams.is_active(handle)) {
 		status->total_buf_size = bitstream_buf_size;
-		status->free_buf_size = audio.bitstreams[handle]->getBetterFreeSpace();
+		status->free_buf_size = status->total_buf_size - audio.bitstreams[handle]->data_size;
 		return VM_BITSTREAM_SUCCEED;
 	}
 	return VM_BITSTREAM_FAILED;
@@ -212,8 +206,8 @@ VMINT vm_bitstream_audio_put_data(
 	if (audio.bitstreams.is_active(handle)) {
 		auto& bs = *audio.bitstreams[handle];
 		bs.putData(buffer, buffer_size, *written);
-		if (bs.getStatus() != sf::SoundSource::Status::Playing && !bs.data_finished)
-			bs.play();
+		//if (bs.getStatus() != sf::SoundSource::Status::Playing && !bs.data_finished)
+		//	bs.play();
 
 		return VM_BITSTREAM_SUCCEED;
 	}
@@ -242,7 +236,7 @@ VMINT vm_bitstream_audio_stop(VMINT handle) {
 	MREngine::AppAudio& audio = get_current_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
-		audio.bitstreams[handle]->data_finished = true;
+		audio.bitstreams[handle]->dataFinished();
 		audio.bitstreams[handle]->play_pos = 0;
 		audio.bitstreams[handle]->data_size = 0;
 		audio.bitstreams[handle]->stop();

@@ -179,7 +179,7 @@ namespace Cpu {
 		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE_UNMAPPED, (void*)hook_write_unmapped, 0, 1, 0);
 
 
-		uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_stack, 0, 0, 0x100000000);
+		//uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_stack, 0, 0, 0x100000000);
 
 		//uc_mem_map(uc, 0, 0x1000, UC_PROT_ALL);
 

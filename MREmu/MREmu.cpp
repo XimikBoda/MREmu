@@ -37,7 +37,7 @@ void mre_main(AppManager* appManager_p) {
 		GDB::update();
 		appManager.update(delta_ms);
 
-		sf::sleep(sf::milliseconds(1000 / 60));
+		sf::sleep(sf::milliseconds(1000 / 120));
 	}
 }
 

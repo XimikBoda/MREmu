@@ -47,9 +47,6 @@ public:
 	int sample_rate = 44100;
 	bool data_finished = false;
 
-	sf::Time last_time;
-	uint32_t last_sampleCount_sum = 0;
-
 	vm_bitstream_audio_result_callback callback = 0;
 
 	Bitstream(bool stereo, int sample_rate, vm_bitstream_audio_result_callback callback);
@@ -57,8 +54,10 @@ public:
 	bool onGetData(Chunk& data);
 	void onSeek(sf::Time timeOffset);
 	
-	uint32_t getBetterFreeSpace();
 	void putData(void* buf, uint32_t size, uint32_t &writen);
+	void dataFinished();
+
+	~Bitstream();
 };
 
 namespace MREngine {
