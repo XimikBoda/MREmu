@@ -20,6 +20,7 @@
 #include <vmbitstream.h>
 
 #include "MREngine/Sock.h"
+#include "MREngine/Audio.h"
 
 VMINT vm_get_res_header();//tmp
 VMWSTR vm_ucs2_string(VMSTR s);
@@ -953,6 +954,42 @@ namespace Bridge {
 					read_arg(uc, 0),
 					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
 				));
+		}},
+
+		// Bitstream Record
+		{FUNCN(mremu_media_setbufer), [](uc_engine* uc) {
+			mremu_media_setbufer(
+				(VMUINT16*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1)
+			);
+		}},
+		{FUNCN(mremu_media_getreadbuffer), [](uc_engine* uc) {
+			VMUINT16** buffer = (VMUINT16**)ADDRESS_FROM_EMU(read_arg(uc, 0));
+			VMUINT16* host_buf = 0;
+
+			mremu_media_getreadbuffer(
+				&host_buf,
+				(VMUINT32*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+			);
+
+			if (host_buf && buffer)
+				*buffer = (VMUINT16*)ADDRESS_TO_EMU(host_buf);
+		}},
+		{FUNCN(mremu_media_record), [](uc_engine* uc) {
+			write_ret(uc,
+				mremu_media_record(
+					(Media_Format)read_arg(uc, 0),
+					(mremu_media_handler)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
+		}},
+		{FUNCN(mremu_media_readdatadone), [](uc_engine* uc) {
+			mremu_media_readdatadone(
+				read_arg(uc, 0)
+			);
+		}},
+		{FUNCN(mremu_media_stop), [](uc_engine* uc) {
+			mremu_media_stop();
 		}},
 
 

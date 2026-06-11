@@ -72,5 +72,48 @@ namespace MREngine {
 	};
 }
 
+typedef enum {
+	MEDIA_FORMAT_PCM_8K = 7,
+	MEDIA_FORMAT_PCM_16K = 8,
+} Media_Format;
+
+typedef enum {
+	MEDIA_NONE,
+	MEDIA_DATA_REQUEST,
+	MEDIA_DATA_NOTIFICATION,
+	MEDIA_END,
+	MEDIA_ERROR,
+} Media_Event;
+
+typedef enum {
+	MEDIA_SUCCESS = 200,
+	MEDIA_FAIL
+} Media_Status;
+
+typedef void (*mremu_media_handler)(Media_Event event);
+
+class BitstreamRecord : public sf::SoundRecorder {
+	int16_t* buf = 0;
+	size_t buf_len = 0;
+	size_t size = 0;
+	mutex_wrapper data_mutex;
+
+	bool onStart() override;
+	bool onProcessSamples(const std::int16_t* samples, std::size_t sampleCount) override;
+	void onStop() override;
+public:
+	void setBuffer(int16_t* buf, uint32_t buf_len);
+	void getReadBuffer(int16_t** buf, uint32_t* buf_len);
+	void readDataDone(uint32_t len);
+
+	~BitstreamRecord();
+};
+
+void mremu_media_setbufer(VMUINT16* buffer, VMUINT32 buf_len);
+void mremu_media_getreadbuffer(VMUINT16** buffer, VMUINT32* buf_len);
+Media_Status mremu_media_record(Media_Format format, mremu_media_handler handler, void* param);
+void mremu_media_readdatadone(VMUINT32 len);
+void mremu_media_stop();
+
 MREngine::AppAudio& get_current_app_audio();
 bool cur_app_is_native();
