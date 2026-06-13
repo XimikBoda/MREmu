@@ -31,7 +31,7 @@ namespace MREngine {
 
 	class AppIO{
 	public:
-		ItemsMng<std::fstream*> files;
+		ItemsMng<FILE*> files;
 
 		ItemsMng<find_el> find;
 		ItemsMng<find_el> find_ext;
