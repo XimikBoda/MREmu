@@ -23,6 +23,7 @@ namespace MREngine {
 	class Graphic {
 	public:
 		int width = 240, height = 320;
+		bool screen_changed = true;
 
 		sf::Texture screen_tex;
 

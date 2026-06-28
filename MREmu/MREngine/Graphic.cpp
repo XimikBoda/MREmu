@@ -116,7 +116,10 @@ void MREngine::Graphic::activate()
 }
 
 void MREngine::Graphic::update_screen() {
-	buf_to_texture(screen.data(), width, height, screen_tex);
+	if (screen_changed) {
+		buf_to_texture(screen.data(), width, height, screen_tex);
+		screen_changed = false;
+	}
 }
 
 void MREngine::Graphic::imgui_screen() {
@@ -317,6 +320,7 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 				break;
 			}
 
+	graphic->screen_changed = true;
 	return VM_GDI_SUCCEED;
 }
 
@@ -364,6 +368,7 @@ VM_GDI_RESULT vm_graphic_flatten_layer(VMINT* hhandle, VMINT count) {
 		if (hhandle[count - 1 - i] != gr.active_layer)
 			gr.delete_layer(hhandle[count - 1 - i]);
 
+	graphic->screen_changed = true;
 	return VM_GDI_SUCCEED;
 }
 
