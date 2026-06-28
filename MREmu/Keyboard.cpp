@@ -111,11 +111,13 @@ bool Keyboard::keyboard_event(sf::Event &event) {
 
 	const auto& el = key_to_key.find(event.key.code);
 	
-	if(el != key_to_key.end())
+	if(el != key_to_key.end()) {
 		if(event.type == sf::Event::KeyPressed)
 			kc.press_key(el->second, KeyboardControl::Keyboard);
 		else
 			kc.unpress_key(el->second);
+	}
+	return true;
 }
 
 void Keyboard::imgui_keyboard() {

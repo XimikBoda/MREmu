@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <thread>
 
 #include "imgui.h"
@@ -99,17 +99,30 @@ int main(int argc, char** argv) {
 
 	sf::Clock deltaClock;
 	sf::Event event;
-	while (win_debug.isOpen()) {
+	sf::RenderWindow win_device(sf::VideoMode(240, graphic.height + 208), "MREmu Device");
+	win_device.setFramerateLimit(60);
+
+	while (win_debug.isOpen() && win_device.isOpen()) {
 		while (win_debug.pollEvent(event)) {
-			sf::IntRect kb_rect(keyboard.x, keyboard.y, keyboard.w, keyboard.h);;
 			ImGui::SFML::ProcessEvent(event);
-			keyboard.keyboard_event(event);
 			switch (event.type) {
 			case sf::Event::Closed:
 				win_debug.close();
+				win_device.close();
 				break;
 			case sf::Event::Resized:
 				win_debug.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+				break;
+			}
+		}
+
+		while (win_device.pollEvent(event)) {
+			sf::IntRect kb_rect(keyboard.x, keyboard.y, keyboard.w, keyboard.h);
+			keyboard.keyboard_event(event);
+			switch (event.type) {
+			case sf::Event::Closed:
+				win_device.close();
+				win_debug.close();
 				break;
 			case sf::Event::MouseButtonPressed:
 				if (event.mouseButton.button == sf::Mouse::Button::Left) {
@@ -127,6 +140,7 @@ int main(int argc, char** argv) {
 				break;
 			}
 		}
+
 		ImGui::SFML::Update(win_debug, deltaClock.restart());
 
 		graphic.update_screen();
@@ -158,18 +172,20 @@ int main(int argc, char** argv) {
 
 		{
 			sf::Sprite screen(graphic.screen_tex);
-			//screen.setScale(2, 2);
-			win_debug.draw(screen);
+			win_device.draw(screen);
 		}
 
 		Cpu::imgui_REG();
 
 		keyboard.imgui_keyboard();
-		keyboard.draw(&win_debug);
+		keyboard.draw(&win_device);
 
 		ImGui::SFML::Render(win_debug);
 		win_debug.display();
 		win_debug.clear();
+
+		win_device.display();
+		win_device.clear(sf::Color::Black);
 	}
 
 	work = false;
