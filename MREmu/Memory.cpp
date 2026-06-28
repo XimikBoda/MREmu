@@ -118,11 +118,13 @@ namespace Memory {
 		if (new_adr % align != 0)
 			new_adr = ((new_adr / align) + 1) * align;
 
-		if (new_adr + size < start_adr + mem_size) {
+		if (new_adr + size <= start_adr + mem_size) {
 			regions.push_back({ new_adr, size });
 			free_memory_size -= size;
 			return new_adr;
 		}
+
+		return 0;
 	}
 
 	size_t MemoryManager::realloc(size_t addr, size_t size)

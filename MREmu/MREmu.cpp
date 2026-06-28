@@ -25,6 +25,9 @@ sf::Clock global_clock;
 
 bool work = true;
 
+std::string error_message = "";
+bool show_error = false;
+
 AppManager* g_appManager = 0;
 
 void mre_main(AppManager* appManager_p) {
@@ -85,13 +88,14 @@ int main(int argc, char** argv) {
 
 	Keyboard keyboard;
 
-	if (app_path.size())
-		if (fs::exists(app_path) || path_is_local)
+	if (app_path.size()) {
+		if (fs::exists(app_path) || path_is_local) {
 			appManager.add_app_for_launch(app_path, path_is_local);
-		else {
-			printf("vxp file don't exists\n");
-			exit(1);
+		} else {
+			error_message = "VXP file does not exist:\n" + app_path;
+			show_error = true;
 		}
+	}
 
 	keyboard.update_pos_and_size(0, graphic.height, 240, 208);
 
@@ -100,7 +104,6 @@ int main(int argc, char** argv) {
 	sf::Clock deltaClock;
 	sf::Event event;
 	sf::RenderWindow win_device(sf::VideoMode(240, graphic.height + 208), "MREmu Device");
-	win_device.setFramerateLimit(60);
 
 	while (win_debug.isOpen() && win_device.isOpen()) {
 		while (win_debug.pollEvent(event)) {
@@ -142,6 +145,18 @@ int main(int argc, char** argv) {
 		}
 
 		ImGui::SFML::Update(win_debug, deltaClock.restart());
+
+		if (show_error) {
+			ImGui::OpenPopup("VXP Error");
+			show_error = false; // Only call OpenPopup once
+		}
+		if (ImGui::BeginPopupModal("VXP Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+			ImGui::Text("%s", error_message.c_str());
+			if (ImGui::Button("OK", ImVec2(120, 0))) {
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
 
 		graphic.update_screen();
 		graphic.imgui_screen();
