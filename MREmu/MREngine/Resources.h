@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <cstdint>
 
 namespace MREngine {
 	struct res_el {

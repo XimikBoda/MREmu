@@ -8,10 +8,10 @@
 #define _aligned_free(ptr) free((ptr))
 #endif // !WIN32
 
-#undef shared_memory_prt;
-#undef shared_memory_offset;
-#undef shared_memory_size;
-#undef shared_memory_in_emu_start;
+#undef shared_memory_prt
+#undef shared_memory_offset
+#undef shared_memory_size
+#undef shared_memory_in_emu_start
 
 void* shared_memory_prt = NULL;
 uint64_t shared_memory_offset = NULL;

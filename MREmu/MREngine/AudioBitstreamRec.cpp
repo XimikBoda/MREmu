@@ -1,4 +1,5 @@
 #include "Audio.h"
+#include <cstring>
 
 bool BitstreamRecord::onStart() {
 	this->setChannelCount(1);

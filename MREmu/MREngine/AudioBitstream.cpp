@@ -1,6 +1,7 @@
 #include "Audio.h"
 #include <SFML/Audio.hpp>
 #include <vmmm.h>
+#include <cstring>
 #include <vmbitstream.h>
 
 static const int sample_rate_enum_to_int[VM_BITSTREAM_SAMPLE_FREQ_TOTAL] =
