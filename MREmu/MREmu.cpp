@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
 
 #ifndef ANDROID
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
-	sf::RenderWindow win_device(sf::VideoMode(240, graphic.height + 208), "MREmu Device");
+	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	ImGui::SFML::Init(win_debug);
 	win_debug.setFramerateLimit(60);
 	win_device.setFramerateLimit(60);
@@ -109,7 +109,25 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	keyboard.update_pos_and_size(0, graphic.height, 240, 208);
+	int scale = 1;
+	sf::Sprite screen_sp(graphic.screen_tex);
+
+	auto update_screen_size = [&] {
+		int scale_x = win_device.getSize().x / graphic.width;
+		int scale_y = win_device.getSize().y / (graphic.height + 208);
+
+		scale = std::min(scale_x, scale_y);
+		if (scale < 1)
+			scale = 1;
+
+		screen_sp.setScale(scale, scale);
+		screen_sp.setPosition((win_device.getSize().x - graphic.width * scale) / 2, 0);
+
+		keyboard.update_pos_and_size((win_device.getSize().x - 240 * scale) / 2, graphic.height * scale, 240 * scale, 208 * scale);
+		//keyboard.update_pos_and_size(0, graphic.height * scale, win_device.getSize().x, win_device.getSize().y - graphic.height * scale);
+	};
+
+	update_screen_size();
 
 	sf::Clock fps;
 
@@ -148,6 +166,7 @@ int main(int argc, char** argv) {
 				break;
             case sf::Event::Resized:
                 win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+				update_screen_size();
                 break;
 			case sf::Event::MouseButtonPressed:
 				if (event.mouseButton.button == sf::Mouse::Button::Left) {
@@ -219,8 +238,8 @@ int main(int argc, char** argv) {
 #endif
 
 		{
-			sf::Sprite screen(graphic.screen_tex);
-			win_device.draw(screen);
+			screen_sp.setTexture(graphic.screen_tex, true);
+			win_device.draw(screen_sp);
 		}
 
 #ifndef ANDROID
