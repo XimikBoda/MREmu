@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.8)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 # Enable Hot Reload for MSVC compilers if supported.
@@ -10,6 +10,12 @@ endif()
 project ("MREmu")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
+# Enable optimizations by default
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
 
 # Include sub-projects.
 add_subdirectory (imgui)

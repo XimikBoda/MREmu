@@ -6,6 +6,8 @@
 #include "GDB.h"
 #include <string>
 #include <iostream>
+#include <thread>
+#include <chrono>
 #include <unicorn/unicorn.h>
 
 #include <vmgraph.h>
@@ -1154,11 +1156,11 @@ namespace Bridge {
 
 		if (ret == 0)
 			if (str == "vm_vsprintf")
-				ret = vsprintf;
+				ret = (void*)vsprintf;
 			else if (str == "vm_sprintf")
-				ret = sprintf;
+				ret = (void*)sprintf;
 			else if(str == "vm_sscanf")
-				ret = sscanf;
+				ret = (void*)sscanf;
 
 		printf("vm_get_sym_entry_native(%s) -> %08x\n", symbol, ret);
 
@@ -1243,7 +1245,7 @@ namespace Bridge {
 				printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
 				Cpu::printREG(uc);
 				while (1) {
-					Sleep(1000);
+					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 				}
 			}
 		}

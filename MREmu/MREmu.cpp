@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <thread>
 
 #include "imgui.h"
@@ -24,6 +24,9 @@
 sf::Clock global_clock;
 
 bool work = true;
+
+std::string error_message = "";
+bool show_error = false;
 
 AppManager* g_appManager = 0;
 
@@ -85,13 +88,14 @@ int main(int argc, char** argv) {
 
 	Keyboard keyboard;
 
-	if (app_path.size())
-		if (fs::exists(app_path) || path_is_local)
+	if (app_path.size()) {
+		if (fs::exists(app_path) || path_is_local) {
 			appManager.add_app_for_launch(app_path, path_is_local);
-		else {
-			printf("vxp file don't exists\n");
-			exit(1);
+		} else {
+			error_message = "VXP file does not exist:\n" + app_path;
+			show_error = true;
 		}
+	}
 
 	keyboard.update_pos_and_size(0, graphic.height, 240, 208);
 
@@ -99,17 +103,29 @@ int main(int argc, char** argv) {
 
 	sf::Clock deltaClock;
 	sf::Event event;
-	while (win_debug.isOpen()) {
+	sf::RenderWindow win_device(sf::VideoMode(240, graphic.height + 208), "MREmu Device");
+
+	while (win_debug.isOpen() && win_device.isOpen()) {
 		while (win_debug.pollEvent(event)) {
-			sf::IntRect kb_rect(keyboard.x, keyboard.y, keyboard.w, keyboard.h);;
 			ImGui::SFML::ProcessEvent(event);
-			keyboard.keyboard_event(event);
 			switch (event.type) {
 			case sf::Event::Closed:
 				win_debug.close();
+				win_device.close();
 				break;
 			case sf::Event::Resized:
 				win_debug.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+				break;
+			}
+		}
+
+		while (win_device.pollEvent(event)) {
+			sf::IntRect kb_rect(keyboard.x, keyboard.y, keyboard.w, keyboard.h);
+			keyboard.keyboard_event(event);
+			switch (event.type) {
+			case sf::Event::Closed:
+				win_device.close();
+				win_debug.close();
 				break;
 			case sf::Event::MouseButtonPressed:
 				if (event.mouseButton.button == sf::Mouse::Button::Left) {
@@ -127,7 +143,20 @@ int main(int argc, char** argv) {
 				break;
 			}
 		}
+
 		ImGui::SFML::Update(win_debug, deltaClock.restart());
+
+		if (show_error) {
+			ImGui::OpenPopup("VXP Error");
+			show_error = false; // Only call OpenPopup once
+		}
+		if (ImGui::BeginPopupModal("VXP Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+			ImGui::Text("%s", error_message.c_str());
+			if (ImGui::Button("OK", ImVec2(120, 0))) {
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
 
 		graphic.update_screen();
 		graphic.imgui_screen();
@@ -158,18 +187,20 @@ int main(int argc, char** argv) {
 
 		{
 			sf::Sprite screen(graphic.screen_tex);
-			//screen.setScale(2, 2);
-			win_debug.draw(screen);
+			win_device.draw(screen);
 		}
 
 		Cpu::imgui_REG();
 
 		keyboard.imgui_keyboard();
-		keyboard.draw(&win_debug);
+		keyboard.draw(&win_device);
 
 		ImGui::SFML::Render(win_debug);
 		win_debug.display();
 		win_debug.clear();
+
+		win_device.display();
+		win_device.clear(sf::Color::Black);
 	}
 
 	work = false;

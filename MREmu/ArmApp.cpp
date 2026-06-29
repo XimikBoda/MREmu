@@ -76,8 +76,10 @@ bool ArmApp::preparation()
 		{
 			std::stringstream ss;
 			ss.write((char*)file_context.data(), file_context.size());
-			if (!elf.load(ss))
-				abort();
+			if (!elf.load(ss)) {
+				printf("Failed to load ELF!\n");
+				return false;
+			}
 		}
 
 		entry_point = (elf.get_entry() + offset_mem);

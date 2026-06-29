@@ -2,6 +2,10 @@
 #include "Bridge.h"
 #include "ArmApp.h"
 #include "DLLApp.h"
+#include <string>
+
+extern std::string error_message;
+extern bool show_error;
 
 void AppManager::add_app_for_launch(fs::path path, bool local)
 {
@@ -31,14 +35,23 @@ void AppManager::launch_apps()
 		app = std::make_shared<DLLApp>();
 #endif // WIN32
 
-	if (!app)
+	if (!app) {
+		error_message = "VXP file format not recognized or unsupported:\n" + launch_data.path.string();
+		show_error = true;
 		return;
+	}
 
-	if (!app->load_from_file(launch_data.path, launch_data.local))
+	if (!app->load_from_file(launch_data.path, launch_data.local)) {
+		error_message = "Failed to load VXP file (file not found or access denied):\n" + launch_data.path.string();
+		show_error = true;
 		return;
+	}
 	
-	if (!app->preparation())
+	if (!app->preparation()) {
+		error_message = "VXP preparation failed (corrupt file or invalid ELF):\n" + launch_data.path.string();
+		show_error = true;
 		return;
+	}
 
 	apps.push_back(app);
 

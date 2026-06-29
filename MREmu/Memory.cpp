@@ -8,10 +8,10 @@
 #define _aligned_free(ptr) free((ptr))
 #endif // !WIN32
 
-#undef shared_memory_prt;
-#undef shared_memory_offset;
-#undef shared_memory_size;
-#undef shared_memory_in_emu_start;
+#undef shared_memory_prt
+#undef shared_memory_offset
+#undef shared_memory_size
+#undef shared_memory_in_emu_start
 
 void* shared_memory_prt = NULL;
 uint64_t shared_memory_offset = NULL;
@@ -118,11 +118,13 @@ namespace Memory {
 		if (new_adr % align != 0)
 			new_adr = ((new_adr / align) + 1) * align;
 
-		if (new_adr + size < start_adr + mem_size) {
+		if (new_adr + size <= start_adr + mem_size) {
 			regions.push_back({ new_adr, size });
 			free_memory_size -= size;
 			return new_adr;
 		}
+
+		return 0;
 	}
 
 	size_t MemoryManager::realloc(size_t addr, size_t size)

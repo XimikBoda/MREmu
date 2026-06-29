@@ -189,15 +189,15 @@ namespace Cpu {
 	static bool hook_read_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
 		printf(">>> Try to read block at 0x%08X, block size = 0x%08X                  ---- UNMAPPED\n", (int)address, size);
-		//uc_mem_map(uc, address / 0x1000* 0x1000, 0x100000, UC_PROT_ALL);
-		return 0;
+		uc_mem_map(uc, (address / 0x1000) * 0x1000, 0x1000, UC_PROT_ALL);
+		return true;
 	}
 
 	static bool hook_write_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
 		printf(">>> Try to write block at 0x%08X, block size = 0x%08X, value = 0x%08X  ---- UNMAPPED\n", (int)address, size, (int)value);
-		//uc_mem_map(uc, address / 0x1000 * 0x1000, 0x100000, UC_PROT_ALL);
-		return 0;
+		uc_mem_map(uc, (address / 0x1000) * 0x1000, 0x1000, UC_PROT_ALL);
+		return true;
 	}
 
 	void init() {

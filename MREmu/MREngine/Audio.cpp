@@ -81,6 +81,11 @@ void vm_set_volume(VMINT volume) {
 		volume = 0;
 	if (volume > 6)
 		volume = 6;
+		
+	// Force SFML AudioDevice initialization by creating a dummy object.
+	// This prevents AL_INVALID_OPERATION if this is the first audio call on this thread.
+	static sf::SoundBuffer dummy_buffer; 
+	
 	sf::Listener::setGlobalVolume(volume * 100 / 6);
 }
 

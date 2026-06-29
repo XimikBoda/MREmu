@@ -6,6 +6,7 @@
 #include <SFML/Audio.hpp>
 #include <adlmidi.h>
 #include <vmbitstream.h>
+#include <condition_variable>
 
 const int bitstream_buf_size = 10 * 1024;
 const int play_buf = 4410;

@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.8)
 
 add_library (MREngine 
 						"Graphic.cpp" "Graphic.h"
@@ -25,4 +25,4 @@ target_link_libraries(MREngine imgui)
 target_link_libraries(MREngine ADLMIDI_static)
 target_link_libraries(MREngine libiconv)
 
-target_include_directories(imgui PUBLIC "$ENV{MRE_SDK}/include")
+target_include_directories(MREngine PUBLIC "$ENV{MRE_SDK}/include")
