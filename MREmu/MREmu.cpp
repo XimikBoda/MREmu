@@ -146,6 +146,9 @@ int main(int argc, char** argv) {
 				win_debug.close();
 #endif
 				break;
+            case sf::Event::Resized:
+                win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+                break;
 			case sf::Event::MouseButtonPressed:
 				if (event.mouseButton.button == sf::Mouse::Button::Left) {
 					if (event.mouseButton.x >= kb_rect.left &&

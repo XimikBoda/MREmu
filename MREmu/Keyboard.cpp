@@ -31,7 +31,7 @@ int KeyboardControl::find_key(int key_code) {
 void KeyboardControl::press_key(int key_code, key_source source) {
     if (key_code == MREMU_KEY_NONE)
         return;
-    
+
 	int i = find_key(key_code);
 	if (i == -1) {
 		pkey.push_back(pkey_t(key_code, source));
