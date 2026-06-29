@@ -105,6 +105,11 @@ bool ArmApp::preparation()
 			if (psec->get_name() == std::string(".rel.dyn") || psec->get_name() == std::string(".rel.plt")) {
 				ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_address()]; //TODO
 				for (int i = 0; i < psec->get_size() / sizeof(ELFIO::Elf32_Rel); ++i) {
+					if (sym[i].r_offset & 3) {
+						printf("[FATAL WARNING] Unaligned relocation pointer detected!\n");
+						printf("  -> Offset: 0x%08X\n", sym[i].r_offset);
+						printf("  -> MRE Loader will corrupt memory at this address on ARMv5TE!\n");
+					}
 					switch (sym[i].r_info & 0xFF) {
 					case 0x17:
 						*(uint32_t*)((unsigned char*)mem_location + sym[i].r_offset) += offset_mem;

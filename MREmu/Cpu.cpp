@@ -140,6 +140,52 @@ namespace Cpu {
 		print_code(code, size);
 	}
 
+	static void hook_unaligned_access(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
+	{
+		if (size > 1 && (address & (size - 1))) {
+			uint32_t pc;
+			uc_reg_read(uc, UC_ARM_REG_PC, &pc);
+
+			uint32_t aligned_addr = address & ~3;
+			uint32_t shift_bits = (address & 3) * 8;
+
+			uint32_t real_pc = pc & ~1;
+
+			if (type == UC_MEM_READ) {
+				uint32_t unicorn_val = 0;
+				uc_mem_read(uc, address, &unicorn_val, size);
+
+				uint32_t aligned_word = 0;
+				uc_mem_read(uc, aligned_addr, &aligned_word, 4);
+
+				printf("\n[!] UNALIGNED READ!\n");
+				printf("    Instruction PC : 0x%08X\n", real_pc);
+				printf("    Memory Address : 0x%08X (Size: %d bytes)\n", (uint32_t)address, size);
+
+
+				if (size == 4) {
+					printf("    -> Unicorn gets: 0x%08X (Standard x86/ARMv7 behavior)\n", unicorn_val);
+					uint32_t armv5_val = (aligned_word >> shift_bits) | (aligned_word << (32 - shift_bits));
+					printf("    -> ARMv5TE gets: 0x%08X (Rotated right by %d bits!)\n", armv5_val, shift_bits);
+				}
+				else if (size == 2) {
+					printf("    -> Unicorn gets: 0x%04X (Standard x86/ARMv7 behavior)\n", unicorn_val & 0xFFFF);
+					uint16_t armv5_val = (uint16_t)(aligned_word & 0xFFFF);
+					printf("    -> ARMv5TE gets: 0x%04X (UNPREDICTABLE! Usually forces aligned read)\n", armv5_val);
+				}
+			}
+			else if (type == UC_MEM_WRITE) {
+				printf("\n[!] UNALIGNED WRITE!\n");
+				printf("    Instruction PC : 0x%08X\n", real_pc);
+				printf("    Memory Address : 0x%08X (Size: %d bytes)\n", (uint32_t)address, size);
+				printf("    Value Written  : 0x%08X\n", (uint32_t)value);
+
+				printf("    -> Unicorn writes: 0x%08X to 0x%08X\n", (uint32_t)value, (uint32_t)address);
+				printf("    -> ARMv5TE writes: 0x%08X to ALIGNED 0x%08X (Corrupting nearby data!)\n", (uint32_t)value, aligned_addr);
+			}
+		}
+	}
+
 	static bool hook_read_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
 		printf(">>> Try to read block at 0x%08X, block size = 0x%08X                  ---- UNMAPPED\n", (int)address, size);
@@ -180,6 +226,8 @@ namespace Cpu {
 
 
 		//uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_stack, 0, 0, 0x100000000);
+
+		//uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE | UC_HOOK_MEM_READ, (void*)hook_unaligned_access, 0, 1, 0);
 
 		//uc_mem_map(uc, 0, 0x1000, UC_PROT_ALL);
 
