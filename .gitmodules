@@ -3,7 +3,7 @@
 	url = https://github.com/SFML/SFML.git
 [submodule "unicorn"]
 	path = unicorn
-	url = https://github.com/unicorn-engine/unicorn.git
+	url = https://github.com/XimikBoda/unicorn.git
 [submodule "capstone"]
 	path = capstone
 	url = https://github.com/capstone-engine/capstone.git

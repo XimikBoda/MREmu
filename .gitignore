@@ -364,3 +364,9 @@ FodyWeavers.xsd
 
 .vscode
 build/
+
+Android/.gradle
+Android/.idea
+Android/app/.cxx
+Android/app/build
+Android/local.properties

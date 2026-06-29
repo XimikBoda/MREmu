@@ -34,13 +34,22 @@ VMINT vm_get_curr_utc(VMUINT* utc) {
 }
 
 float vm_get_sys_time_zone(void) {
-	auto now = std::chrono::system_clock::now();
+#ifdef ANDROID
+    time_t t = time(nullptr);
+    struct tm lt = {0};
+
+    localtime_r(&t, &lt);
+
+    return static_cast<float>(lt.tm_gmtoff) / 3600.0f;
+#else
+    auto now = std::chrono::system_clock::now();
 
 	auto tz = std::chrono::current_zone();
 
 	auto info = tz->get_info(now);
 
 	return static_cast<float>(info.offset.count()) / 3600.0f;
+#endif
 }
 
 malloc_stat_t* vm_get_malloc_stat(void) {

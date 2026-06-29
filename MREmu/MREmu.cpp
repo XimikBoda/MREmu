@@ -45,6 +45,9 @@ void mre_main(AppManager* appManager_p) {
 }
 
 int main(int argc, char** argv) {
+    std::string app_path = "";
+    bool path_is_local = false;
+#ifndef ANDROID
 	cli::Parser parser(argc, argv);
 	{
 		parser.set_optional<std::string>("", "", "", "Path to vxp");
@@ -53,13 +56,15 @@ int main(int argc, char** argv) {
 		parser.set_optional<int>("p", "gdb_port", 1234, "Port for gdb server");
 	}
 	parser.run_and_exit_if_error();
-	auto app_path = parser.get<std::string>("");
-	bool path_is_local = parser.get<bool>("l");
+	app_path = parser.get<std::string>("");
+	path_is_local = parser.get<bool>("l");
 
 	GDB::gdb_mode = parser.get<bool>("g");
 	GDB::gdb_port = parser.get<int>("p");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
+#else
+#endif
 
 	if(GDB::gdb_mode)
 		GDB::wait();
