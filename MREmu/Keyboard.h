@@ -5,6 +5,7 @@
 
 #define MREMU_KEY_SEND (VM_KEY_QWERTY_MENU + 1)
 #define MREMU_KEY_POWER (MREMU_KEY_SEND + 1)
+#define MREMU_KEY_NONE (MREMU_KEY_POWER + 1)
 
 #define MREMU_NEGATIVE_KEY_COUNT VM_KEY_BACK
 #define MREMU_FULL_KEY_COUNT (MREMU_KEY_POWER + 1 + MREMU_NEGATIVE_KEY_COUNT)
@@ -16,7 +17,16 @@ public:
 		Keyboard,
 		Mouse,
 		ImGui,
-		Touch
+        Touch0,
+        Touch1,
+        Touch2,
+        Touch3,
+        Touch4,
+        Touch5,
+        Touch6,
+        Touch7,
+        Touch8,
+        Touch9
 	};
 
 	struct pkey_t {
