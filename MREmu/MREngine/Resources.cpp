@@ -86,6 +86,17 @@ VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
 	
 }
 
+VMUINT vm_get_resource_offset(char* res_name) {
+	MREngine::Resources& resources = get_current_app_resources();
+
+	MREngine::res_el* res = resources.find_py_name(res_name);
+
+	if (!res)
+		return 0;
+	
+	return res->offset;
+}
+
 VMINT vm_get_res_header() {
 	return 8;
 }

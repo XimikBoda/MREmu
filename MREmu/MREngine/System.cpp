@@ -34,7 +34,13 @@ VMINT vm_get_curr_utc(VMUINT* utc) {
 }
 
 float vm_get_sys_time_zone(void) {
-	return 0;
+	auto now = std::chrono::system_clock::now();
+
+	auto tz = std::chrono::current_zone();
+
+	auto info = tz->get_info(now);
+
+	return static_cast<float>(info.offset.count()) / 3600.0f;
 }
 
 malloc_stat_t* vm_get_malloc_stat(void) {
@@ -97,8 +103,8 @@ VMUINT vm_get_sys_property(const VMINT key, VMCHAR* value, VMUINT len) { // TODO
 	}
 	}
 	if (value) {
-		size_t len_to_cpy = std::min<size_t>(strlen(str) + 1, len);
-		memcpy(value, str, len_to_cpy);
+		size_t len_to_cpy = std::min<size_t>(strlen(str), len);
+		memcpy(value, str, len_to_cpy + (len_to_cpy < len ? 1 : 0));
 		return len_to_cpy;
 	}
 	return 0;

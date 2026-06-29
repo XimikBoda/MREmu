@@ -1,6 +1,7 @@
 #include "Graphic.h"
 #include "../Memory.h"
 #include <vmgraph.h>
+#include <vmstdlib.h>
 #include "unifont.h"
 #include <iostream>
 #include <cstring>
@@ -175,7 +176,7 @@ VM_GDI_RESULT vm_graphic_textout_to_layer(VMINT handle, VMINT x, VMINT y, VMWSTR
 }
 
 VMINT vm_graphic_get_string_baseline(VMWSTR string) {
-	return 2;
+	return vm_graphic_get_string_height(string) - 2;
 }
 
 VM_GDI_RESULT vm_graphic_textout_to_layer_by_baseline(VMINT handle, VMINT x, VMINT y, VMWSTR s, VMINT length, VMINT baseline);
@@ -224,7 +225,49 @@ vm_font_engine_error_message_enum vm_graphic_show_truncated_text(VM_GDI_HANDLE d
 	VMWCHAR* st,
 	VMWCHAR* truncated_symbol,
 	VMINT bordered,
-	VMUINT16 color);
+	VMUINT16 color) {
+
+	auto& layers = get_current_app_graphic().layers;
+
+	if (dest_layer_handle < 0 || dest_layer_handle >= layers.size())
+		return VM_FONT_ENGINE_ERROR;
+
+	if (!st)
+		return VM_FONT_ENGINE_ERROR;
+
+	auto& layer = layers[dest_layer_handle];
+
+	if (vm_graphic_get_string_width(st) <= xwidth) {
+		vm_graphic_textout((VMUINT8*)layer.buf, x, y, st, vm_wstrlen(st), color);
+		return VM_FONT_ENGINE_NO_ERROR;
+	}
+
+	int truncated_w = 0;
+	int truncated_i = 0;
+	if (truncated_symbol) {
+		for (truncated_i = 0; truncated_symbol[truncated_i]; ++truncated_i) {
+			int char_w = vm_graphic_get_character_width(truncated_symbol[truncated_i]);
+			if (truncated_w + char_w > xwidth)
+				break;
+			truncated_w += char_w;
+		}
+	}
+
+	int text_w = 0;
+	int text_i = 0;
+	for (text_i = 0; st[text_i]; ++text_i) {
+		int char_w = vm_graphic_get_character_width(st[text_i]);
+		if (text_w + char_w + truncated_w > xwidth)
+			break;
+		text_w += char_w;
+	}
+
+	vm_graphic_textout((VMUINT8*)layer.buf, x, y, st, text_i, color);
+	if (truncated_symbol)
+		vm_graphic_textout((VMUINT8*)layer.buf, x + text_w, y, truncated_symbol, truncated_i, color);
+
+	return VM_FONT_ENGINE_NO_ERROR;
+}
 
 VMINT vm_graphic_get_character_height_ex(VMUWCHAR c);
 

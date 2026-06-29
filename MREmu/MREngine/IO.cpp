@@ -142,27 +142,20 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 
 	std::string fmode;
 
-	bool read = (mode & MODE_READ);
-	bool write = (mode & MODE_WRITE);
-	bool create_always = (mode & MODE_CREATE_ALWAYS_WRITE);
-	bool append = (mode & MODE_APPEND);
-
-	if (append) {
-		fmode = read ? "a+b" : "ab";
-	}
-	else if (create_always) {
-		fmode = read ? "w+b" : "wb";
-	}
-	else if (read && write) {
-		fmode = "r+b";
-	}
-	else if (write) {
-		fmode = "wb";
-	}
-	else if (read) {
+	switch (mode) {
+	case MODE_READ:
 		fmode = "rb";
-	}
-	else {
+		break;
+	case MODE_WRITE:
+		fmode = "r+b";
+		break;
+	case MODE_CREATE_ALWAYS_WRITE:
+		fmode = "w+b";
+		break;
+	case MODE_APPEND:
+		fmode = "a+b";
+		break;
+	default:
 		return -1;
 	}
 
