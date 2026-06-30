@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
 
 	auto update_screen_size = [&] {
 		int scale_x = win_device.getSize().x / graphic.width;
-		int scale_y = win_device.getSize().y / (graphic.height + 208);
+		int scale_y = win_device.getSize().y / (graphic.height + graphic.height / 2);
 
 		scale = std::min(scale_x, scale_y);
 		if (scale < 1)
@@ -123,8 +123,19 @@ int main(int argc, char** argv) {
 		screen_sp.setScale(scale, scale);
 		screen_sp.setPosition((win_device.getSize().x - graphic.width * scale) / 2, 0);
 
-		keyboard.update_pos_and_size((win_device.getSize().x - 240 * scale) / 2, graphic.height * scale, 240 * scale, 208 * scale);
-		//keyboard.update_pos_and_size(0, graphic.height * scale, win_device.getSize().x, win_device.getSize().y - graphic.height * scale);
+		int keyboard_y = graphic.height * scale; // 15x13
+
+		int keyboard_h = win_device.getSize().y - keyboard_y;
+		int keyboard_w = (float)(keyboard_h) / 13.f * 15.f;
+
+		if (keyboard_w > win_device.getSize().x) {
+			keyboard_w = win_device.getSize().x;
+			keyboard_h = (float)(keyboard_w) / 15.f * 13.f;
+		}
+
+		int keyboard_x = (win_device.getSize().x - keyboard_w) / 2;
+
+		keyboard.update_pos_and_size(keyboard_x, keyboard_y, keyboard_w, keyboard_h);
 	};
 
 	update_screen_size();
