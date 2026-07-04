@@ -29,6 +29,9 @@ int KeyboardControl::find_key(int key_code) {
 }
 
 void KeyboardControl::press_key(int key_code, key_source source) {
+    if (key_code == MREMU_KEY_NONE)
+        return;
+
 	int i = find_key(key_code);
 	if (i == -1) {
 		pkey.push_back(pkey_t(key_code, source));
@@ -304,11 +307,14 @@ void Keyboard::draw_press_key(sf::RenderTarget* rt, int key) {
 			v[j].position += sf::Vector2f(this->x, this->y);
 			v[j].color = c;
 		}
-		rt->draw(v, 4, sf::Quads);
+		rt->draw(v, 4, sf::TriangleFan);
 	}
 }
 
 int Keyboard::find_key_by_pos(int px, int py) {
+    if(px < 0 || py < 0 || px >= w || py >= h)
+        return MREMU_KEY_NONE;
+
 	float kw = (float)w / 3;
 	float kh = (float)h / 6;
 

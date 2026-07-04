@@ -16,12 +16,18 @@ using namespace std::string_literals;
 
 namespace fs = std::filesystem;
 
+#ifdef ANDROID
+const fs::path base_path = "/sdcard/Android/data/com.ximikboda.mremu/files/";
+#else
+const fs::path base_path = "./";
+#endif
+
 void MREngine::IO::init()
 {
-	fs::create_directory(fs::path("./fs").make_preferred());
-	fs::create_directory(fs::path("./fs/e").make_preferred());
-	fs::create_directory(fs::path("./fs/c").make_preferred());
-	fs::create_directory(fs::path("./fs/d").make_preferred());
+	fs::create_directory(base_path / fs::path("fs").make_preferred());
+	fs::create_directory(base_path / fs::path("fs/e").make_preferred());
+	fs::create_directory(base_path / fs::path("fs/c").make_preferred());
+	fs::create_directory(base_path / fs::path("fs/d").make_preferred());
 }
 
 
@@ -41,7 +47,7 @@ fs::path UCS2_to_path(const VMWSTR wstr) {
 }
 
 fs::path path_from_emu(fs::path path) { // TODO rewrite this
-	fs::path res = "./fs";
+	fs::path res = base_path / "fs";
 
 	std::string root_n;
 	fs::path path_relative = "";
@@ -472,14 +478,15 @@ VMINT vm_file_get_modify_time(const VMWSTR filename, vm_time_t* modify_time) {
 
 	auto fileTime = fs::last_write_time(path);
 
-	std::chrono::time_point<std::chrono::system_clock> systemTime;
-#ifdef  __GNUC__
-	systemTime = std::chrono::file_clock::to_sys(fileTime);
-#else // MSVC, CLANG
-	systemTime = std::chrono::utc_clock::to_sys(std::chrono::file_clock::to_utc(fileTime));
+    std::time_t time;
+#if defined(_WIN32)
+    auto systemTime = std::chrono::utc_clock::to_sys(std::chrono::file_clock::to_utc(fileTime));
+    time = std::chrono::system_clock::to_time_t(systemTime);
+#else
+    auto sysTimeHighRes = std::chrono::file_clock::to_sys(fileTime);
+    auto systemTime = std::chrono::time_point_cast<std::chrono::system_clock::duration>(sysTimeHighRes);
+    time = std::chrono::system_clock::to_time_t(systemTime);
 #endif
-
-	auto time = std::chrono::system_clock::to_time_t(systemTime);
 
 	std::tm* const pTInfo = std::localtime(&time);
 	modify_time->year = 1900 + pTInfo->tm_year;

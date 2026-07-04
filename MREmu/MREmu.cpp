@@ -45,6 +45,9 @@ void mre_main(AppManager* appManager_p) {
 }
 
 int main(int argc, char** argv) {
+    std::string app_path = "";
+    bool path_is_local = false;
+#ifndef ANDROID
 	cli::Parser parser(argc, argv);
 	{
 		parser.set_optional<std::string>("", "", "", "Path to vxp");
@@ -53,13 +56,15 @@ int main(int argc, char** argv) {
 		parser.set_optional<int>("p", "gdb_port", 1234, "Port for gdb server");
 	}
 	parser.run_and_exit_if_error();
-	auto app_path = parser.get<std::string>("");
-	bool path_is_local = parser.get<bool>("l");
+	app_path = parser.get<std::string>("");
+	path_is_local = parser.get<bool>("l");
 
 	GDB::gdb_mode = parser.get<bool>("g");
 	GDB::gdb_port = parser.get<int>("p");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
+#else
+#endif
 
 	if(GDB::gdb_mode)
 		GDB::wait();
@@ -81,10 +86,17 @@ int main(int argc, char** argv) {
 
 	std::thread second_thread(mre_main, &appManager);
 
+#ifndef ANDROID
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
+	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	ImGui::SFML::Init(win_debug);
 	win_debug.setFramerateLimit(60);
+	win_device.setFramerateLimit(60);
 	//win_debug.setVerticalSyncEnabled(true);
+#else
+    sf::RenderWindow win_device(sf::VideoMode::getDesktopMode(), "MREmu");
+    win_device.setFramerateLimit(60);
+#endif
 
 	Keyboard keyboard;
 
@@ -97,15 +109,48 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	keyboard.update_pos_and_size(0, graphic.height, 240, 208);
+	int scale = 1;
+	sf::Sprite screen_sp(graphic.screen_tex);
+
+	auto update_screen_size = [&] {
+		int scale_x = win_device.getSize().x / graphic.width;
+		int scale_y = win_device.getSize().y / (graphic.height + graphic.height / 2);
+
+		scale = std::min(scale_x, scale_y);
+		if (scale < 1)
+			scale = 1;
+
+		screen_sp.setScale(scale, scale);
+		screen_sp.setPosition((win_device.getSize().x - graphic.width * scale) / 2, 0);
+
+		int keyboard_y = graphic.height * scale; // 15x13
+
+		int keyboard_h = win_device.getSize().y - keyboard_y;
+		int keyboard_w = (float)(keyboard_h) / 13.f * 15.f;
+
+		if (keyboard_w > win_device.getSize().x) {
+			keyboard_w = win_device.getSize().x;
+			keyboard_h = (float)(keyboard_w) / 15.f * 13.f;
+		}
+
+		int keyboard_x = (win_device.getSize().x - keyboard_w) / 2;
+
+		keyboard.update_pos_and_size(keyboard_x, keyboard_y, keyboard_w, keyboard_h);
+	};
+
+	update_screen_size();
 
 	sf::Clock fps;
 
 	sf::Clock deltaClock;
 	sf::Event event;
-	sf::RenderWindow win_device(sf::VideoMode(240, graphic.height + 208), "MREmu Device");
 
-	while (win_debug.isOpen() && win_device.isOpen()) {
+	while (win_device.isOpen()
+#ifndef ANDROID
+        && win_debug.isOpen()
+#endif
+    ) {
+#ifndef ANDROID
 		while (win_debug.pollEvent(event)) {
 			ImGui::SFML::ProcessEvent(event);
 			switch (event.type) {
@@ -118,6 +163,7 @@ int main(int argc, char** argv) {
 				break;
 			}
 		}
+#endif
 
 		while (win_device.pollEvent(event)) {
 			sf::IntRect kb_rect(keyboard.x, keyboard.y, keyboard.w, keyboard.h);
@@ -125,8 +171,14 @@ int main(int argc, char** argv) {
 			switch (event.type) {
 			case sf::Event::Closed:
 				win_device.close();
+#ifndef ANDROID
 				win_debug.close();
+#endif
 				break;
+            case sf::Event::Resized:
+                win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+				update_screen_size();
+                break;
 			case sf::Event::MouseButtonPressed:
 				if (event.mouseButton.button == sf::Mouse::Button::Left) {
 					if (event.mouseButton.x >= kb_rect.left &&
@@ -141,9 +193,16 @@ int main(int argc, char** argv) {
 				if (event.mouseButton.button == sf::Mouse::Button::Left)
 					keyboard.kc.unpress_by_source(keyboard.kc.Mouse);
 				break;
+            case sf::Event::TouchBegan:
+                keyboard.kc.press_key(keyboard.find_key_by_pos(event.touch.x - kb_rect.left,
+                    event.touch.y - kb_rect.top), (KeyboardControl::key_source)(keyboard.kc.Touch0 + event.touch.finger));
+                break;
+            case sf::Event::TouchEnded:
+                keyboard.kc.unpress_by_source((KeyboardControl::key_source)(keyboard.kc.Touch0 + event.touch.finger));
+                break;
 			}
 		}
-
+#ifndef ANDROID
 		ImGui::SFML::Update(win_debug, deltaClock.restart());
 
 		if (show_error) {
@@ -157,8 +216,11 @@ int main(int argc, char** argv) {
 			}
 			ImGui::EndPopup();
 		}
+#endif
 
 		graphic.update_screen();
+
+#ifndef ANDROID
 		graphic.imgui_screen();
 		App* active_app = appManager.get_active_app();
 		if (active_app) {
@@ -184,20 +246,25 @@ int main(int argc, char** argv) {
 			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
 		}
 		ImGui::End();
+#endif
 
 		{
-			sf::Sprite screen(graphic.screen_tex);
-			win_device.draw(screen);
+			screen_sp.setTexture(graphic.screen_tex, true);
+			win_device.draw(screen_sp);
 		}
 
+#ifndef ANDROID
 		Cpu::imgui_REG();
 
 		keyboard.imgui_keyboard();
+#endif
 		keyboard.draw(&win_device);
 
+#ifndef ANDROID
 		ImGui::SFML::Render(win_debug);
 		win_debug.display();
 		win_debug.clear();
+#endif
 
 		win_device.display();
 		win_device.clear(sf::Color::Black);
@@ -206,6 +273,8 @@ int main(int argc, char** argv) {
 	work = false;
 	second_thread.join();
 
+#ifndef ANDROID
 	ImGui::SFML::Shutdown();
+#endif
 	return 0;
 }
