@@ -1,15 +1,15 @@
 [submodule "SFML"]
-	path = SFML
+	path = deps/SFML
 	url = https://github.com/SFML/SFML.git
 [submodule "unicorn"]
 	path = unicorn
 	url = https://github.com/unicorn-engine/unicorn.git
 [submodule "capstone"]
-	path = capstone
+	path = deps/capstone
 	url = https://github.com/capstone-engine/capstone.git
 [submodule "libADLMIDI"]
-	path = libADLMIDI
+	path = deps/libADLMIDI
 	url = https://github.com/Wohlstand/libADLMIDI.git
 [submodule "libiconv-cmake"]
-	path = libiconv-cmake
+	path = deps/libiconv-cmake
 	url = https://github.com/XimikBoda/libiconv-cmake

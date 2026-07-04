@@ -17,20 +17,16 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 endif()
 
+add_definitions(-DLIBICONV_PLUG)
+
 # Include sub-projects.
 add_subdirectory (imgui)
 
-add_definitions( -DLIBICONV_PLUG)
 set(BUILD_SHARED_LIBS FALSE) 
+
 set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures") 
-add_subdirectory(SFML) 
 add_subdirectory(unicorn) 
-add_subdirectory(libiconv-cmake) 
 
-set(CAPSTONE_ARCHITECTURE_DEFAULT FALSE) 
-set(CAPSTONE_ARM_SUPPORT TRUE) 
-add_subdirectory(capstone) 
-
-add_subdirectory(libADLMIDI) 
+add_subdirectory (deps)
 
 add_subdirectory (MREmu)
