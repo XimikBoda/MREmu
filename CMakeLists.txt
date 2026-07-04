@@ -18,14 +18,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 add_definitions(-DLIBICONV_PLUG)
-
-# Include sub-projects.
-add_subdirectory (imgui)
-
 set(BUILD_SHARED_LIBS FALSE) 
-
-set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures") 
-add_subdirectory(unicorn) 
 
 add_subdirectory (deps)
 

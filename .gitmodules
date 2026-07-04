@@ -2,7 +2,7 @@
 	path = deps/SFML
 	url = https://github.com/SFML/SFML.git
 [submodule "unicorn"]
-	path = unicorn
+	path = deps/unicorn
 	url = https://github.com/XimikBoda/unicorn.git
 [submodule "capstone"]
 	path = deps/capstone
