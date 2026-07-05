@@ -896,6 +896,19 @@ namespace Bridge {
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
 				));
 		}},
+		{FUNCN(vm_wstrcat), [](uc_engine* uc) {
+			write_ret(uc,vm_wstrcat(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
+		}},
+		{FUNCN(vm_wstrncpy), [](uc_engine* uc) {
+			write_ret(uc,vm_wstrncpy(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2)
+				));
+		}},
 		{FUNCN(vm_wstrcmp), [](uc_engine* uc) {
 			write_ret(uc,vm_wstrcmp(
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
