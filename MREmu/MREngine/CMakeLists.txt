@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.8)
 
 add_library (MREngine 
 						"Graphic.cpp" "Graphic.h"
+						"Canvas.cpp" "Canvas.h"
+						"Image.cpp" "Image.h"
 						"System.cpp" "System.h" 
 						"Resources.cpp" "Resources.h"
 						"Timer.cpp" "Timer.h"

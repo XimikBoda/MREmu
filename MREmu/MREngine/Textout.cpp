@@ -1,4 +1,5 @@
 #include "Graphic.h"
+#include "Canvas.h"
 #include "../Memory.h"
 #include <vmgraph.h>
 #include <vmstdlib.h>

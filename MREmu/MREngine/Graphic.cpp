@@ -1,4 +1,5 @@
 #include "Graphic.h"
+#include "Canvas.h"
 #include "../Memory.h"
 #include <imgui.h>
 #include <imgui-SFML.h>
@@ -24,47 +25,7 @@ void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 	sf::Image im;
 	im.create(w, h, &pix_data[0]);
 
-	//sf::Texture tex;
 	tex.loadFromImage(im);
-
-	//return tex;
-}
-
-void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
-	static std::vector<unsigned char> pix_data;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)p.first;
-
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
-		return;
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	int w = cfp->width, h = cfp->height;
-
-	if (!(w * h))
-		return;
-
-	if (pix_data.size() < w * h * 4)
-		pix_data.resize(w * h * 4);
-
-	unsigned short trans_color = cfp->trans_color;
-	bool flag = cfp->flag;
-
-	unsigned short* buf16 = (unsigned short*)(cfp + 1);
-	for (int i = 0; i < w * h; ++i) {
-		if (flag && trans_color == buf16[i])
-			pix_data[i * 4 + 3] = 0x00;
-		else
-			pix_data[i * 4 + 3] = 0xFF;
-		pix_data[i * 4 + 0] = VM_COLOR_GET_RED(buf16[i]);
-		pix_data[i * 4 + 1] = VM_COLOR_GET_GREEN(buf16[i]);
-		pix_data[i * 4 + 2] = VM_COLOR_GET_BLUE(buf16[i]);
-	}
-	sf::Image im;
-	im.create(w, h, pix_data.data());
-
-	p.second.loadFromImage(im);
 }
 
 MREngine::Graphic::Graphic()
@@ -214,33 +175,6 @@ void MREngine::AppGraphic::imgui_layers() {
 	ImGui::End();
 }
 
-void MREngine::AppGraphic::imgui_canvases() {
-	std::lock_guard lock(canvases_list_mutex);
-	if (ImGui::Begin("Canvases")) {
-		for (int i = 0; i < canvases_list.size(); ++i) {
-			auto& el = canvases_list[i];
-			canvas_to_texture(el);
-
-			MREngine::canvas_signature* cs = (MREngine::canvas_signature*)el.first;
-
-			if (memcmp(cs->magic, CANVAS_MAGIC, 9)) {
-				ImGui::Text("Wrong canvas magic");
-				break;
-			}
-
-			MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-			int w = cfp->width, h = cfp->height;
-
-			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d",
-				i, cfp->left, cfp->top, cfp->width, cfp->height);
-			ImGui::Image(el.second);
-		}
-	}
-	ImGui::End();
-}
-
-
 //MRE API
 
 VMINT vm_graphic_get_screen_width(void)
@@ -386,200 +320,6 @@ VM_GDI_RESULT vm_graphic_translate_layer(VMINT handle, VMINT tx, VMINT ty) {
 
 VMINT vm_graphic_get_bits_per_pixel(void) {
 	return 2;
-}
-
-MREngine::canvas_signature* find_canvas_signature(VMUINT8* buf) {
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)buf;
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9) == 0)
-		return cs;
-	cs = (MREngine::canvas_signature*)(buf - VM_CANVAS_DATA_OFFSET);
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9) == 0)
-		return cs;
-	return 0;
-}
-
-VMINT_CANVAS vm_graphic_create_canvas_FIX(VMINT width, VMINT height) {
-	int image_size = width * height * 2;
-	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-	if (canvas_buf == 0)
-		return 0;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-	*cs = MREngine::canvas_signature();
-	memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	*cfp = MREngine::canvas_frame_property();
-	cfp->width = width;
-	cfp->height = height;
-
-	cfp->offset = image_size;
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
-
-	return (VMINT_CANVAS)canvas_buf;
-}
-
-VMINT_CANVAS vm_graphic_create_canvas_cf_FIX(vm_graphic_color_famat cf, VMINT width, VMINT height) {
-	if (cf != VM_GRAPHIC_COLOR_FORMAT_16)
-		return (VMINT_CANVAS)0;
-
-	return vm_graphic_create_canvas_FIX(width, height);
-}
-
-void vm_graphic_release_canvas_FIX(VMINT_CANVAS hcanvas) {
-	if (!hcanvas)
-		return;
-
-	void* hcanvas_adr = hcanvas;
-	auto& canvases_list = get_current_app_graphic().canvases_list;
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-
-	for (int i = 0; i < canvases_list.size(); ++i)
-		if (canvases_list[i].first == hcanvas_adr) {
-			canvases_list.erase(canvases_list.begin() + i);
-			break;
-		}
-
-	vm_free(hcanvas_adr);
-}
-
-void vm_graphic_release_canvas_ex_FIX(VMINT_CANVAS hcanvas) {
-	vm_graphic_release_canvas_FIX(hcanvas); // TODO
-}
-
-VMUINT8* vm_graphic_get_canvas_buffer_FIX(VMINT_CANVAS hcanvas) {
-	return (VMUINT8*)hcanvas;
-}
-
-VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {
-	sf::Image im;
-	if (!im.loadFromMemory(img, img_len))
-		return 0;
-
-	int image_size = im.getSize().x * im.getSize().y * 2;
-	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-	if (canvas_buf == 0)
-		return 0;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-	*cs = MREngine::canvas_signature();
-	memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	int t = sizeof(MREngine::canvas_frame_property);
-
-	*cfp = MREngine::canvas_frame_property();
-	cfp->width = im.getSize().x;
-	cfp->height = im.getSize().y;
-
-	cfp->offset = image_size;
-
-	uint16_t* image_buf = (uint16_t*)(cfp + 1);
-	sf::Color* rgb_buf = (sf::Color*)im.getPixelsPtr();
-
-	for (int i = 0; i < image_size / 2; ++i) {
-		sf::Color c = rgb_buf[i];
-		image_buf[i] = VM_COLOR_888_TO_565(c.r, c.g, c.b);
-	}
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
-
-	return (VMINT_CANVAS)canvas_buf;
-}
-
-VMINT_CANVAS vm_graphic_load_image_resized_FIX(VMUINT8* img, VMINT img_len, VMINT width, VMINT height) {
-	sf::Image im;
-	if (!im.loadFromMemory(img, img_len))
-		return 0;
-
-	int image_size = width * height * 2;
-	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-	if (canvas_buf == 0)
-		return 0;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-	*cs = MREngine::canvas_signature();
-	memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	int t = sizeof(MREngine::canvas_frame_property);
-
-	*cfp = MREngine::canvas_frame_property();
-	cfp->width = width;
-	cfp->height = height;
-
-	cfp->offset = image_size;
-
-	uint16_t* image_buf = (uint16_t*)(cfp + 1);
-	sf::Color* rgb_buf = (sf::Color*)im.getPixelsPtr();
-	int im_width = im.getSize().x;
-	int im_height = im.getSize().y;
-
-	for (int y = 0; y < height; ++y) {
-		int ny = y * im_height / height;
-
-		for (int x = 0; x < width; ++x) {
-			int nx = x * im_width / width;
-
-			sf::Color c = rgb_buf[nx + ny * im_width];
-			image_buf[x + y * width] = VM_COLOR_888_TO_565(c.r, c.g, c.b);
-		}
-	}
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
-
-	return (VMINT_CANVAS)canvas_buf;
-}
-
-struct frame_prop* vm_graphic_get_img_property_FIX(VMINT_CANVAS hcanvas, VMUINT8 frame_index) {
-	if (hcanvas == 0)
-		return 0;
-
-	static struct frame_prop* info = (frame_prop*)Memory::shared_malloc(sizeof(frame_prop));
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
-		return 0;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
-
-	//TODO frame index
-
-	info->flag = cfp_dst->flag;
-	info->left = cfp_dst->left;
-	info->top = cfp_dst->top;
-	info->width = cfp_dst->width;
-	info->height = cfp_dst->height;
-	info->delay_time = cfp_dst->delay * 10; //todo check this
-	info->trans_color_index = cfp_dst->trans_color_index;
-	info->trans_color = cfp_dst->trans_color;
-	info->offset = cfp_dst->offset;
-
-	return info;
-}
-
-VM_GDI_RESULT vm_graphic_get_img_property_ex(VMUINT8* img_data, VMINT img_len, vm_graphic_imgprop* img_prop) {
-	sf::Image im;
-	if (!img_prop || !im.loadFromMemory(img_data, img_len))
-		return VM_GDI_FAILED;
-
-	img_prop->width = im.getSize().x;
-	img_prop->height = im.getSize().y;
-
-	return VM_GDI_SUCCEED;
 }
 
 void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,
@@ -1374,17 +1114,5 @@ VMINT vm_graphic_is_r2l_state(void) {
 
 VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {
 	get_current_app_graphic().global_color = *color;
-	return VM_GDI_SUCCEED;
-}
-
-VM_GDI_RESULT vm_graphic_canvas_set_trans_color_FIX(VMINT_CANVAS hcanvas, VMINT trans_color) {
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
-	if (!hcanvas || memcmp(cs->magic, CANVAS_MAGIC, 9))
-		return VM_GDI_FAILED;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
-
-	//TODO frame index
-	cfp_dst->flag = 1;
-	cfp_dst->trans_color = trans_color;
 	return VM_GDI_SUCCEED;
 }

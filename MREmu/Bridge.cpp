@@ -1,7 +1,13 @@
 #include "Bridge.h"
 #include "Memory.h"
 #include "ARModule.h"
+
+#include "MREngine/Sock.h"
+#include "MREngine/Audio.h"
 #include "MREngine/Graphic.h"
+#include "MREngine/Canvas.h"
+#include "MREngine/Image.h"
+
 #include "Cpu.h"
 #include "GDB.h"
 #include <string>
@@ -21,8 +27,6 @@
 #include <vmmm.h>
 #include <vmbitstream.h>
 
-#include "MREngine/Sock.h"
-#include "MREngine/Audio.h"
 
 VMINT vm_get_res_header();//tmp
 VMWSTR vm_ucs2_string(VMSTR s);
