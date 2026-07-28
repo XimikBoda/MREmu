@@ -449,6 +449,11 @@ namespace Bridge {
 				vm_graphic_get_canvas_buffer_FIX(
 					ADDRESS_FROM_EMU(read_arg(uc, 0)))));
 		}},
+		{FUNCN_FIX(vm_graphic_get_canvas_buffer_size), [](uc_engine* uc) {
+			write_ret(uc, 
+				vm_graphic_get_canvas_buffer_size_FIX(
+					ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 		{FUNCN(vm_graphic_create_layer_ex), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_create_layer_ex(
 				read_arg(uc, 0),

@@ -34,27 +34,6 @@ namespace MREngine {
 		sf::Texture tex;
 	};
 
-#pragma pack (push, 1)
-	struct canvas_signature {
-		char magic[9];
-		uint8_t frame_count = 1;
-		uint8_t i_dont_know = 0xFF;
-		uint8_t color_format = 1;
-	};
-
-	struct canvas_frame_property {
-		uint8_t flag = 0; //?
-		uint16_t left = 0;
-		uint16_t top = 0;
-		uint16_t width = 0;
-		uint16_t height = 0;
-		uint16_t delay = 0;
-		uint8_t trans_color_index = 0;
-		uint16_t trans_color = 0;
-		uint16_t reserved = 0; 
-		uint32_t offset = 0;
-	};
-#pragma pack(pop)
 
 	class AppGraphic {
 	public:
