@@ -432,6 +432,9 @@ VMINT_CANVAS vm_graphic_create_canvas_cf_FIX(vm_graphic_color_famat cf, VMINT wi
 }
 
 void vm_graphic_release_canvas_FIX(VMINT_CANVAS hcanvas) {
+	if (!hcanvas)
+		return;
+
 	void* hcanvas_adr = hcanvas;
 	auto& canvases_list = get_current_app_graphic().canvases_list;
 
@@ -1376,7 +1379,7 @@ VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {
 
 VM_GDI_RESULT vm_graphic_canvas_set_trans_color_FIX(VMINT_CANVAS hcanvas, VMINT trans_color) {
 	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
+	if (!hcanvas || memcmp(cs->magic, CANVAS_MAGIC, 9))
 		return VM_GDI_FAILED;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
 
