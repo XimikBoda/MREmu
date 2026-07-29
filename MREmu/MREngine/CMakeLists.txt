@@ -4,6 +4,7 @@ add_library (MREngine
 						"Graphic.cpp" "Graphic.h"
 						"Canvas.cpp" "Canvas.h"
 						"Image.cpp" "Image.h"
+						"Blt.cpp" "Blt.h"
 						"System.cpp" "System.h" 
 						"Resources.cpp" "Resources.h"
 						"Timer.cpp" "Timer.h"
