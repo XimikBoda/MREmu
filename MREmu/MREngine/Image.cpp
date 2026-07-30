@@ -1,15 +1,26 @@
 #include "Graphic.h"
 #include "Image.h"
+#include "Blt.h"
+#include "Canvas.h"
 #include "../Memory.h"
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 
+extern write_color_t write_color_funcs[4];
+
 VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {
+	return vm_graphic_load_image_cf_FIX(VM_GRAPHIC_COLOR_FORMAT_16, img, img_len);
+}
+
+VMINT_CANVAS vm_graphic_load_image_cf_FIX(vm_graphic_color_famat cf, VMUINT8* img_data, VMINT img_len) {
 	sf::Image im;
-	if (!im.loadFromMemory(img, img_len))
+	if (!im.loadFromMemory(img_data, img_len))
 		return 0;
 
-	int image_size = im.getSize().x * im.getSize().y * 2;
+	if (cf >= VM_GRAPHIC_COLOR_FORMAT_END)
+		return 0;
+
+	int image_size = im.getSize().x * im.getSize().y * color_format_size(cf);
 	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
 
 	if (canvas_buf == 0)
@@ -19,6 +30,7 @@ VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {
 
 	*cs = MREngine::canvas_signature();
 	memcpy(cs->magic, CANVAS_MAGIC, 9);
+	cs->color_format = cf;
 
 	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
 
@@ -30,13 +42,13 @@ VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {
 
 	cfp->offset = image_size;
 
-	uint16_t* image_buf = (uint16_t*)(cfp + 1);
-	sf::Color* rgb_buf = (sf::Color*)im.getPixelsPtr();
+	void* image_buf = (void*)(cfp + 1);
+	ColorRGBA* rgb_buf = (ColorRGBA*)im.getPixelsPtr();
 
-	for (int i = 0; i < image_size / 2; ++i) {
-		sf::Color c = rgb_buf[i];
-		image_buf[i] = VM_COLOR_888_TO_565(c.r, c.g, c.b);
-	}
+	auto write_func = write_color_funcs[cf];
+
+	for (int i = 0; i < image_size / 2; ++i) 
+		write_func(image_buf, i, -1, rgb_buf[i]);
 
 	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
@@ -45,11 +57,18 @@ VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {
 }
 
 VMINT_CANVAS vm_graphic_load_image_resized_FIX(VMUINT8* img, VMINT img_len, VMINT width, VMINT height) {
+	return vm_graphic_load_image_resized_cf_FIX(VM_GRAPHIC_COLOR_FORMAT_16, img, img_len, width, height);
+}
+
+VMINT_CANVAS vm_graphic_load_image_resized_cf_FIX(vm_graphic_color_famat cf, VMUINT8* img, VMINT img_len, VMINT width, VMINT height) {
 	sf::Image im;
 	if (!im.loadFromMemory(img, img_len))
 		return 0;
 
-	int image_size = width * height * 2;
+	if (cf >= VM_GRAPHIC_COLOR_FORMAT_END)
+		return 0;
+
+	int image_size = width * height * color_format_size(cf);
 	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
 
 	if (canvas_buf == 0)
@@ -59,6 +78,7 @@ VMINT_CANVAS vm_graphic_load_image_resized_FIX(VMUINT8* img, VMINT img_len, VMIN
 
 	*cs = MREngine::canvas_signature();
 	memcpy(cs->magic, CANVAS_MAGIC, 9);
+	cs->color_format = cf;
 
 	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
 
@@ -70,10 +90,12 @@ VMINT_CANVAS vm_graphic_load_image_resized_FIX(VMUINT8* img, VMINT img_len, VMIN
 
 	cfp->offset = image_size;
 
-	uint16_t* image_buf = (uint16_t*)(cfp + 1);
-	sf::Color* rgb_buf = (sf::Color*)im.getPixelsPtr();
+	void* image_buf = (void*)(cfp + 1);
+	ColorRGBA* rgb_buf = (ColorRGBA*)im.getPixelsPtr();
 	int im_width = im.getSize().x;
 	int im_height = im.getSize().y;
+
+	auto write_func = write_color_funcs[cf];
 
 	for (int y = 0; y < height; ++y) {
 		int ny = y * im_height / height;
@@ -81,8 +103,7 @@ VMINT_CANVAS vm_graphic_load_image_resized_FIX(VMUINT8* img, VMINT img_len, VMIN
 		for (int x = 0; x < width; ++x) {
 			int nx = x * im_width / width;
 
-			sf::Color c = rgb_buf[nx + ny * im_width];
-			image_buf[x + y * width] = VM_COLOR_888_TO_565(c.r, c.g, c.b);
+			write_func(image_buf, x + y * width, -1, rgb_buf[nx + ny * im_width]);
 		}
 	}
 

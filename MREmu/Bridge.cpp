@@ -483,6 +483,14 @@ namespace Bridge {
 						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 						read_arg(uc, 1))));
 		}},
+		{FUNCN_FIX(vm_graphic_load_image_cf), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(
+					vm_graphic_load_image_cf_FIX(
+						read_arg(uc, 0),
+						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+						read_arg(uc, 2))));
+		}},
 		{FUNCN_FIX(vm_graphic_load_image_resized), [](uc_engine* uc) {
 			write_ret(uc,
 				ADDRESS_TO_EMU(
@@ -491,6 +499,16 @@ namespace Bridge {
 						read_arg(uc, 1),
 						read_arg(uc, 2),
 						read_arg(uc, 3))));
+		}},
+		{FUNCN_FIX(vm_graphic_load_image_resized_cf), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(
+					vm_graphic_load_image_resized_cf_FIX(
+						read_arg(uc, 0),
+						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+						read_arg(uc, 2),
+						read_arg(uc, 3),
+						read_arg(uc, 4))));
 		}},
 		{FUNCN_FIX(vm_graphic_get_img_property), [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(

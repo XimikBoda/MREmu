@@ -1,13 +1,9 @@
 #include "Graphic.h"
 #include "Canvas.h"
+#include "Blt.h"
 #include <vmgraph.h>
 
 extern MREngine::Graphic* graphic;
-
-struct ColorRGBA { uint8_t r, g, b, a; };
-
-typedef ColorRGBA (*read_color_t)(const void* buf, int idx, int trans_color);
-typedef void (*write_color_t)(void* buf, int idx, int trans_color, ColorRGBA c);
 
 ColorRGBA read_16_color(const void* buf, int idx, int trans_color) {
 	uint16_t c = ((const uint16_t*)buf)[idx];

@@ -15,6 +15,8 @@ VMINT vm_graphic_get_canvas_buffer_size_FIX(VMINT_CANVAS hcanvas);
 
 VM_GDI_RESULT vm_graphic_canvas_set_trans_color_FIX(VMINT_CANVAS hcanvas, VMINT trans_color);
 
+int color_format_size(vm_graphic_color_famat cf);
+
 namespace MREngine {
 	#pragma pack (push, 1)
 	struct canvas_signature {
