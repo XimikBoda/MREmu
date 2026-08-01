@@ -287,8 +287,8 @@ void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* sr
 		};
 
 	master_blt<false>(
-		buf_dst, cfp_dst->width, cfp_dst->height, cs_dst->color_format, cfp_dst->trans_color,
-		buf_src, cfp_src->width, cfp_src->height, cs_src->color_format, cfp_src->trans_color,
+		buf_dst, cfp_dst->width, cfp_dst->height, cs_dst->color_format, cfp_dst->flag ? cfp_dst->trans_color : -1,
+		buf_src, cfp_src->width, cfp_src->height, cs_src->color_format, cfp_src->flag ? cfp_src->trans_color : -1,
 		st_x, st_y, end_x, end_y,
 		255, blt_mapper);
 }
@@ -338,8 +338,8 @@ void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE*
 		};
 
 	master_blt<true>(
-		buf_dst, cfp_dst->width, cfp_dst->height, cs_dst->color_format, cfp_dst->trans_color,
-		buf_src, cfp_src->width, cfp_src->height, cs_src->color_format, cfp_src->trans_color,
+		buf_dst, cfp_dst->width, cfp_dst->height, cs_dst->color_format, cfp_dst->flag ? cfp_dst->trans_color : -1,
+		buf_src, cfp_src->width, cfp_src->height, cs_src->color_format, cfp_src->flag ? cfp_src->trans_color : -1,
 		st_x, st_y, end_x, end_y,
 		alpha, blt_mapper);
 }
@@ -386,8 +386,8 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 	int src_h = cfp_src->height;
 	vm_graphic_color_famat dst_fmt = cs_dst->color_format;
 	vm_graphic_color_famat src_fmt = cs_src->color_format;
-	int dst_tc = cfp_dst->trans_color;
-	int src_tc = cfp_src->trans_color;
+	int dst_tc = cfp_dst->flag ? cfp_dst->trans_color : -1;
+	int src_tc = cfp_src->flag ? cfp_src->trans_color : -1;
 
 	switch (degrees) {
 	case VM_ROTATE_DEGREE_90:
@@ -475,8 +475,8 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 	int src_h = cfp_src->height;
 	vm_graphic_color_famat dst_fmt = cs_dst->color_format;
 	vm_graphic_color_famat src_fmt = cs_src->color_format;
-	int dst_tc = cfp_dst->trans_color;
-	int src_tc = cfp_src->trans_color;
+	int dst_tc = cfp_dst->flag ? cfp_dst->trans_color : -1;
+	int src_tc = cfp_src->flag ? cfp_src->trans_color : -1;
 
 	if (direction == VM_MIRROR_X) {
 		master_blt<false>(
