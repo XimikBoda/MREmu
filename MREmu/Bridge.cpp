@@ -26,6 +26,7 @@
 #include <vmstdlib.h>
 #include <vmmm.h>
 #include <vmbitstream.h>
+#include <vmsensor.h>
 
 
 VMINT vm_get_res_header();//tmp
@@ -1179,7 +1180,10 @@ namespace Bridge {
 				));
 		}},
 
-
+		// Sensor
+		{FUNCN(vm_srv_sensor_is_available), [](uc_engine* uc) {
+			vm_srv_sensor_is_available((vm_srv_sensor_type_enum)read_arg(uc, 0));
+		}},
 
 		// Some
 		{FUNCN(srand), [](uc_engine* uc) {

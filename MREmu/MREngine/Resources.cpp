@@ -1,8 +1,15 @@
 #include "Resources.h"
 #include <cstring>
 #include <vmres.h>
+#include <ranges>
+#include <algorithm>
 
-#include <cstring>
+static std::string to_lower(std::string str) {
+	std::transform(str.begin(), str.end(), str.begin(),
+		[](unsigned char c) { return std::tolower(c); });
+
+	return str;
+}
 
 void MREngine::Resources::scan()
 {
@@ -32,7 +39,7 @@ void MREngine::Resources::scan()
 		if (res_offset < offset || res_offset + res_size > offset + size)
 			abort();
 
-		res_map[name] = { res_offset, res_size };
+		res_map[to_lower(name)] = {res_offset, res_size};
 	}
 }
 
@@ -56,7 +63,7 @@ VMUINT8* vm_load_resource(char* res_name, VMINT* res_size) {
 
 	printf("vm_load_resource(%s)\n", res_name);
 
-	MREngine::res_el* res = resources.find_py_name(res_name);
+	MREngine::res_el* res = resources.find_py_name(to_lower(res_name));
 
 	if (!res)
 		return 0;
@@ -89,7 +96,7 @@ VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
 VMUINT vm_get_resource_offset(char* res_name) {
 	MREngine::Resources& resources = get_current_app_resources();
 
-	MREngine::res_el* res = resources.find_py_name(res_name);
+	MREngine::res_el* res = resources.find_py_name(to_lower(res_name));
 
 	if (!res)
 		return 0;
