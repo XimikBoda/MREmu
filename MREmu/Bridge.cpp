@@ -18,6 +18,7 @@
 
 #include <vmgraph.h>
 #include <vmres.h>
+#include <vm4res.h>
 #include <vmtimer.h>
 #include <vmpromng.h>
 #include <vmgettag.h>
@@ -852,6 +853,51 @@ namespace Bridge {
 		{FUNCN(vm_get_res_header), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_get_res_header());
+		}},
+		{FUNCN(vm_res_init), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_res_init());
+		}},
+		{FUNCN(vm_res_init_with_language), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_res_init_with_language(
+					read_arg(uc, 0)
+				));
+		}},
+		{FUNCN(vm_res_deinit), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_res_deinit());
+		}},
+		{FUNCN(vm_res_get_string), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_res_get_string(
+					read_arg(uc, 0)
+				)));
+		}},
+		{FUNCN(vm_res_get_image), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_res_get_image(
+					read_arg(uc, 0)
+				)));
+		}},
+		{FUNCN(vm_res_get_audio), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_res_get_audio(
+					read_arg(uc, 0)
+				)));
+		}},
+		{FUNCN(vm_res_get_image_and_size), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_res_get_image_and_size(
+					read_arg(uc, 0),
+					(VMUINT32*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				)));
+		}},
+		{FUNCN(vm_res_delete), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_res_delete(
+					read_arg(uc, 0)
+				));
 		}},
 
 
