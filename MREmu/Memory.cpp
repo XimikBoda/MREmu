@@ -106,7 +106,7 @@ namespace Memory {
 			if (new_adr % align != 0)
 				new_adr = ((new_adr / align) + 1) * align;
 
-			if (new_adr + size < regions[i].adr) {
+			if (new_adr + size <= regions[i].adr) {
 				regions.insert(regions.begin() + i, { new_adr, size });
 				free_memory_size -= size;
 				return new_adr;
@@ -164,13 +164,16 @@ namespace Memory {
 			return regions[mem_ind].adr;
 		}
 
+		size_t old_adr = regions[mem_ind].adr;
+		size_t old_size = regions[mem_ind].size;
+
 		size_t new_adr = malloc(size);
 
 		if (new_adr == 0)
 			return 0;
 
-		memcpy((void*)new_adr, (void*)regions[mem_ind].adr, regions[mem_ind].size); //need to be careful
-		free(regions[mem_ind].adr);
+		memcpy((void*)new_adr, (void*)old_adr, old_size);
+		free(old_adr);
 
 		return new_adr;
 	}
