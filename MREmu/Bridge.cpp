@@ -32,6 +32,7 @@
 
 VMINT vm_get_res_header();//tmp
 VMWSTR vm_ucs2_string(VMSTR s);
+void vm_app_log(char* str);
 
 namespace Cpu {
 	void printREG(uc_engine* uc);
@@ -179,6 +180,10 @@ namespace Bridge {
 					read_arg(uc, 0),
 					(vm_install_id*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+		}},
+		{FUNCN(vm_app_log), [](uc_engine* uc) {
+			vm_app_log(
+				(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
 		}},
 
 

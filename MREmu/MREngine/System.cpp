@@ -135,3 +135,7 @@ VMINT vm_appmgr_get_installed_list(VMINT flag, vm_install_id* install_id_list, V
 	*num = 0;
 	return 0; // tmp
 }
+
+void vm_app_log(char* str) {
+	printf("%s", str);
+}
