@@ -20,7 +20,7 @@ public:
 	mutex_wrapper access_mutex;
 	int repeat = 0;
 	void* source = 0;
-	bool done = true;
+	bool done = false;
 
 	Midi(const char* file);
 	Midi(void* buf, size_t len);
@@ -68,6 +68,7 @@ namespace MREngine {
 
 		ItemsMng<std::shared_ptr<Bitstream>> bitstreams;
 
+		sf::Music music;
 		
 		~AppAudio();
 	};

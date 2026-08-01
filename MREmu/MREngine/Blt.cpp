@@ -2,6 +2,7 @@
 #include "Canvas.h"
 #include "Blt.h"
 #include <vmgraph.h>
+#include <cstring>
 
 extern MREngine::Graphic* graphic;
 

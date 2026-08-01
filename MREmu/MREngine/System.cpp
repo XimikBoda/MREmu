@@ -52,6 +52,10 @@ float vm_get_sys_time_zone(void) {
 #endif
 }
 
+VMINT vm_get_sys_scene(void) {
+	return 0; // standard mode
+}
+
 malloc_stat_t* vm_get_malloc_stat(void) {
 	return 0; //TODO: make this correct
 }

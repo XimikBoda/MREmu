@@ -76,6 +76,51 @@ MREngine::AppAudio::~AppAudio() {
 		}
 }
 
+VMINT vm_audio_play_bytes(void* audio_data, VMUINT len, VMUINT8 format, VMUINT start_time, VMUINT path, void (*f)(VMINT result)) {
+	auto& audio = get_current_app_audio();
+
+	auto& music = audio.music;
+
+	if (!music.openFromMemory(audio_data, len))
+		return VM_AUDIO_FAILED;
+
+	music.setPlayingOffset(sf::milliseconds(start_time));
+	
+	music.play();
+
+	return VM_AUDIO_SUCCEED;
+}
+
+VMINT vm_audio_pause(void (*f)(VMINT result)) {
+	auto& audio = get_current_app_audio();
+
+	auto& music = audio.music;
+
+	music.pause();
+
+	return VM_AUDIO_SUCCEED;
+}
+
+VMINT vm_audio_resume(void (*f)(VMINT result)) {
+	auto& audio = get_current_app_audio();
+
+	auto& music = audio.music;
+
+	music.play();
+
+	return VM_AUDIO_SUCCEED;
+}
+
+VMINT vm_audio_stop(void (*f)(VMINT result)) {
+	auto& audio = get_current_app_audio();
+
+	auto& music = audio.music;
+
+	music.stop();
+
+	return VM_AUDIO_SUCCEED;
+}
+
 void vm_set_volume(VMINT volume) {
 	if (volume < 0)
 		volume = 0;
@@ -87,6 +132,12 @@ void vm_set_volume(VMINT volume) {
 	static sf::SoundBuffer dummy_buffer; 
 	
 	sf::Listener::setGlobalVolume(volume * 100 / 6);
+}
+
+VMINT vm_get_volume(void) {
+	static sf::SoundBuffer dummy_buffer;
+
+	return sf::Listener::getGlobalVolume() * 6 / 100;
 }
 
 VMINT vm_midi_play_by_bytes(VMUINT8* midibuf, VMINT len, VMINT repeat, void (*f)(VMINT handle, VMINT event)) {
@@ -171,3 +222,8 @@ void vm_midi_stop_all(void) {
 			audio.midis.remove(i);
 		}
 }
+
+
+void vm_audio_resume_bg_play(void) {} //TODO
+
+void vm_audio_suspend_bg_play(void) {} //TODO

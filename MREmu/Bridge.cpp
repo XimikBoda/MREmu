@@ -113,6 +113,9 @@ namespace Bridge {
 		{FUNCN(vm_get_sys_time_zone), [](uc_engine* uc) {
 			write_ret(uc, vm_get_sys_time_zone());
 		}},
+		{FUNCN(vm_get_sys_scene), [](uc_engine* uc) {
+			write_ret(uc, vm_get_sys_scene());
+		}},
 		{FUNCN(vm_get_malloc_stat), [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_get_malloc_stat()));
 		}},
@@ -946,8 +949,41 @@ namespace Bridge {
 
 
 		// Audio
+		{FUNCN(vm_audio_play_bytes), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_audio_play_bytes(
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					read_arg(uc, 2),
+					read_arg(uc, 3),
+					read_arg(uc, 4),
+					(void(*)(VMINT))read_arg(uc, 5)
+				));
+		}},
+		{FUNCN(vm_audio_pause), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_audio_pause(
+					(void(*)(VMINT))read_arg(uc, 0)
+				));
+		}},
+		{FUNCN(vm_audio_resume), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_audio_resume(
+					(void(*)(VMINT))read_arg(uc, 0)
+				));
+		}},
+		{FUNCN(vm_audio_stop), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_audio_stop(
+					(void(*)(VMINT))read_arg(uc, 0)
+				));
+		}},
 		{FUNCN(vm_set_volume), [](uc_engine* uc) {
 			vm_set_volume(read_arg(uc, 0));
+		}},
+		{FUNCN(vm_get_volume), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_volume());
 		}},
 		{FUNCN(vm_midi_play_by_bytes), [](uc_engine* uc) {
 			write_ret(uc,
@@ -986,6 +1022,12 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_midi_stop_all), [](uc_engine* uc) {
 			vm_midi_stop_all();
+		}},
+		{FUNCN(vm_audio_resume_bg_play), [](uc_engine* uc) {
+			vm_audio_resume_bg_play();
+		}},
+		{FUNCN(vm_audio_suspend_bg_play), [](uc_engine* uc) {
+			vm_audio_suspend_bg_play();
 		}},
 
 

@@ -5,6 +5,7 @@
 #include "../Memory.h"
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
+#include <cstring>
 
 extern write_color_t write_color_funcs[4];
 
