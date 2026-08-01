@@ -105,7 +105,7 @@ bool ArmApp::preparation()
 			ELFIO::section* psec = elf.sections[i];
 
 			if (psec->get_name() == std::string(".rel.dyn") || psec->get_name() == std::string(".rel.plt")) {
-				ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_address()]; //TODO
+				ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_offset()]; //TODO
 				for (int i = 0; i < psec->get_size() / sizeof(ELFIO::Elf32_Rel); ++i) {
 					if (sym[i].r_offset & 3) {
 						printf("[FATAL WARNING] Unaligned relocation pointer detected!\n");
