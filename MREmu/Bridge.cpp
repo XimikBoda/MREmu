@@ -203,6 +203,25 @@ namespace Bridge {
 					read_arg(uc, 2),
 					read_arg(uc, 3)));
 		}},
+		{FUNCN(vm_start_app), [](uc_engine* uc) {
+			vm_start_app(
+				(const VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2)
+			);
+		}},
+		{FUNCN(vm_start_app_with_para), [](uc_engine* uc) {
+			vm_start_app_with_para(
+				(const VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				read_arg(uc, 4)
+			);
+		}},
+		{FUNCN(vm_exit_app), [](uc_engine* uc) {
+			vm_exit_app();
+		}},
 
 
 

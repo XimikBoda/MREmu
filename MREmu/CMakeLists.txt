@@ -9,6 +9,7 @@ set(SOURCES
 						"App.cpp" "App.h" 
 						"ArmApp.cpp" "ArmApp.h" 
 						"DLLApp.cpp" "DLLApp.h" 
+						"NativeApp.cpp" "NativeApp.h" 
 						"MreTags.cpp" "MreTags.h" 
 						"Disassembler.cpp" "Disassembler.h"
 						"ARModule.cpp" "ARModule.h"
@@ -34,6 +35,7 @@ target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu capstone)
 target_link_libraries(MREmu ADLMIDI_static)
 target_link_libraries(MREmu MREngine)
+target_link_libraries(MREmu NativeApps)
 target_link_libraries(MREmu libiconv)
 
 if (ANDROID)
@@ -47,3 +49,4 @@ endif()
 target_include_directories(MREmu PUBLIC "../include")
 
 add_subdirectory (MREngine)
+add_subdirectory (NativeApps)

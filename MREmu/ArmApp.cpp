@@ -21,7 +21,11 @@ typedef struct
 	uint32_t res_size;
 } compress_ads_elf_info;
 
-bool ArmApp::check_format(fs::path path) {
+bool ArmApp::check_format(fs::path path, bool local) {
+	if (local) {
+		path = path_from_emu(path);
+	}
+
 	unsigned char buf[4];
 	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
 	if (!in.is_open())

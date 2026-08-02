@@ -1,5 +1,5 @@
 #include "Graphic.h"
-#include "image.h"
+#include "Image.h"
 #include "Canvas.h"
 #include "../Memory.h"
 #include <imgui.h>

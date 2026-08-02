@@ -11,24 +11,16 @@
 #include "MREngine/Audio.h"
 #include <filesystem>
 #include <vector>
-#include <elfio/elfio.hpp>
-#include <elfio/elf_types.hpp>
-#include "Bridge.h"
+
+#include "NativeApps/Menu/AppSelector.h"
 
 namespace fs = std::filesystem;
 
-class ArmApp : public App
+class NativeApp : public App
 {
 public:
-	uint32_t entry_point;
-
-	bool is_ads;
-	bool is_zipped;
-
-	static bool check_format(fs::path path, bool local);
+	nativeapp_conf conf;
 
 	bool preparation() override;
 	void start() override;
-
-	bool is_native() { return false; }
 };

@@ -21,6 +21,9 @@
 #include "MREngine/CharSet.h"
 #include <cmdparser.hpp>
 
+
+#include "NativeApps/Menu/AppSelector.h"
+
 sf::Clock global_clock;
 
 bool work = true;
@@ -108,6 +111,9 @@ int main(int argc, char** argv) {
 			show_error = true;
 		}
 	}
+	else
+		appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
+
 
 	int scale = 1;
 	sf::Sprite screen_sp(graphic.screen_tex);

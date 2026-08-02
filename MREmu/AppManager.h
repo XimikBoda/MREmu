@@ -3,12 +3,18 @@
 #include <mutex>
 #include <filesystem>
 #include <queue>
+#include "NativeApps/Menu/AppSelector.h"
 
 namespace fs = std::filesystem;
 
 struct launch_el {
 	fs::path path;
 	bool local;
+	const nativeapp_conf* conf = 0;
+};
+
+struct close_el {
+	int app_id;
 };
 
 struct keyboard_event_el {
@@ -34,6 +40,8 @@ class AppManager {
 	std::queue<launch_el> launch_queue;
 	std::mutex launch_queue_mutex;
 
+	std::queue<close_el> close_queue;
+	std::mutex close_queue_mutex;
 
 	std::queue<keyboard_event_el> keyboard_events_queue;
 	std::mutex keyboard_events_queue_mutex;
@@ -48,8 +56,11 @@ public:
 	int active_app_id = -1;
 	int current_work_app_id = -1;
 
-	void add_app_for_launch(fs::path path, bool local);
+	void add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf = 0);
 	void launch_apps();
+
+	void add_app_for_close(int id);
+	void close_apps();
 
 	void add_keyboard_event(int event, int keycode);
 	void process_keyboard_events();

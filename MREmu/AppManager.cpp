@@ -2,15 +2,16 @@
 #include "Bridge.h"
 #include "ArmApp.h"
 #include "DLLApp.h"
+#include "NativeApp.h"
 #include <string>
 
 extern std::string error_message;
 extern bool show_error;
 
-void AppManager::add_app_for_launch(fs::path path, bool local)
+void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
 {
 	std::lock_guard lock(launch_queue_mutex);
-	launch_queue.push({ path, local });
+	launch_queue.push({ path, local, conf });
 }
 
 void AppManager::launch_apps()
@@ -27,30 +28,37 @@ void AppManager::launch_apps()
 
 	std::shared_ptr<App> app;
 
-	if (ArmApp::check_format(launch_data.path))
-		app = std::make_shared<ArmApp>();
+	if (launch_data.conf) {
+		app = std::make_shared<NativeApp>();
+
+		((NativeApp*)app.get())->conf = *launch_data.conf;
+	}
+	else {
+		if (ArmApp::check_format(launch_data.path, launch_data.local))
+			app = std::make_shared<ArmApp>();
 
 #ifdef WIN32
-	if (DLLApp::check_format(launch_data.path))
-		app = std::make_shared<DLLApp>();
+		if (DLLApp::check_format(launch_data.path, launch_data.local))
+			app = std::make_shared<DLLApp>();
 #endif // WIN32
 
-	if (!app) {
-		error_message = "VXP file format not recognized or unsupported:\n" + launch_data.path.string();
-		show_error = true;
-		return;
-	}
+		if (!app) {
+			error_message = "VXP file format not recognized or unsupported:\n" + launch_data.path.string();
+			show_error = true;
+			return;
+		}
 
-	if (!app->load_from_file(launch_data.path, launch_data.local)) {
-		error_message = "Failed to load VXP file (file not found or access denied):\n" + launch_data.path.string();
-		show_error = true;
-		return;
-	}
-	
-	if (!app->preparation()) {
-		error_message = "VXP preparation failed (corrupt file or invalid ELF):\n" + launch_data.path.string();
-		show_error = true;
-		return;
+		if (!app->load_from_file(launch_data.path, launch_data.local)) {
+			error_message = "Failed to load VXP file (file not found or access denied):\n" + launch_data.path.string();
+			show_error = true;
+			return;
+		}
+
+		if (!app->preparation()) {
+			error_message = "VXP preparation failed (corrupt file or invalid ELF):\n" + launch_data.path.string();
+			show_error = true;
+			return;
+		}
 	}
 
 	apps.push_back(app);
@@ -69,6 +77,41 @@ void AppManager::launch_apps()
 
 	add_system_event(ph_app_id, VM_MSG_CREATE, 0);
 	add_system_event(ph_app_id, VM_MSG_PAINT, 0);
+}
+
+void AppManager::add_app_for_close(int id)
+{
+	std::lock_guard lock(close_queue_mutex);
+	close_queue.push({ id });
+}
+
+void AppManager::close_apps()
+{
+	if (!close_queue.size())
+		return;
+
+	close_el close_data;
+	{
+		std::lock_guard lock(close_queue_mutex);
+		close_data = close_queue.front();
+		close_queue.pop();
+	}
+
+	int app_id = -1;
+
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->system_callbacks.ph_app_id == close_data.app_id)
+			app_id = i;
+
+	if (app_id == -1)
+		return;
+
+	apps.erase(apps.begin() + app_id);
+
+	if (active_app_id > app_id)
+		active_app_id--;
+	else if (active_app_id == app_id)
+		active_app_id = apps.size() - 1;
 }
 
 void AppManager::add_keyboard_event(int event, int keycode)
@@ -128,9 +171,9 @@ void AppManager::process_message_events()
 
 		current_work_app_id = app_id;
 
-		App& cur_app = *apps[current_work_app_id];
-		if (cur_app.system_callbacks.msg_proc)
-			cur_app.run(cur_app.system_callbacks.msg_proc, 
+		App *cur_app = apps[current_work_app_id].get();
+		if (cur_app && cur_app->system_callbacks.msg_proc)
+			cur_app->run(cur_app->system_callbacks.msg_proc,
 				me.phandle_sender, me.msg_id, me.wparam, me.lparam);
 	}
 }
@@ -172,13 +215,17 @@ void AppManager::process_system_events()
 
 void AppManager::update(size_t delta_ms) {
 	launch_apps();
+	close_apps();
 	process_system_events();
 	process_keyboard_events();
 	process_message_events();
 	for (int i = 0; i < apps.size(); ++i) {
 		current_work_app_id = i;
 		bool active = active_app_id == current_work_app_id;
-		App* cur_app = &*apps[current_work_app_id];
+		App* cur_app = apps[current_work_app_id].get();
+
+		if (!cur_app)
+			continue;
 
 		apps[i]->timer.update(delta_ms, cur_app);//active
 		apps[i]->sock.update(cur_app);
