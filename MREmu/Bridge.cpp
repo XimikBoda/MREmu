@@ -431,6 +431,9 @@ namespace Bridge {
 		{FUNCN(vm_graphic_get_layer_buffer), [](uc_engine* uc) {
 			write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
 		}},
+		{FUNCN(vm_graphic_clear_layer_bg), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_clear_layer_bg(read_arg(uc, 0)));
+		}},
 		{FUNCN(vm_graphic_flush_layer), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_flush_layer(
 				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),

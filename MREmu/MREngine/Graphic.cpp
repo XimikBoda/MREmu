@@ -227,6 +227,22 @@ VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
 	return (VMUINT8*)get_current_app_graphic().get_layer_buf(handle);
 }
 
+VMINT vm_graphic_clear_layer_bg(VMINT handle) {
+	auto& gr = get_current_app_graphic();
+
+	if (handle < 0 || handle >= gr.layers.size())
+		return VM_GDI_FAILED;
+
+	auto& layer = gr.layers[handle];
+	auto trans_color = layer.trans_color;
+
+	if(trans_color == -1)
+		return VM_GDI_FAILED;
+
+	vm_graphic_fill_rect((VMUINT8*)layer.buf, 0, 0, layer.w, layer.h, trans_color, trans_color);
+	return VM_GDI_SUCCEED;
+}
+
 VM_GDI_RESULT vm_graphic_translate_layer(VMINT handle, VMINT tx, VMINT ty) {
 	MREngine::AppGraphic& gr = get_current_app_graphic();
 
