@@ -4,6 +4,7 @@
 #include "DLLApp.h"
 #include "NativeApp.h"
 #include <string>
+#include <vmcert.h>
 
 extern std::string error_message;
 extern bool show_error;
@@ -12,6 +13,19 @@ void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_c
 {
 	std::lock_guard lock(launch_queue_mutex);
 	launch_queue.push({ path, local, conf });
+}
+
+void AppManager::fix_mtone_wireless() {
+	auto app = get_active_app();
+
+	if (app->tags.get_dev_name() == u8"Mtone Wireless") {
+#ifdef _WIN32
+		auto f = fopen("NUL", "rb");
+#else
+		auto f = fopen("/dev/null", "rb");
+#endif
+		app->io.files.push(f);
+	}
 }
 
 void AppManager::launch_apps()
@@ -72,6 +86,8 @@ void AppManager::launch_apps()
 	ph_app_id++;
 
 	apps[current_work_app_id]->system_callbacks.ph_app_id = ph_app_id;
+
+	fix_mtone_wireless(); // file handle 0 fix
 
 	apps[current_work_app_id]->start();
 

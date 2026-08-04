@@ -51,6 +51,8 @@ class AppManager {
 
 	std::queue<system_event_el> system_events_queue;
 	std::mutex system_events_queue_mutex;
+
+	void fix_mtone_wireless();
 public:
 	std::vector<std::shared_ptr<App>> apps;
 	int active_app_id = -1;
