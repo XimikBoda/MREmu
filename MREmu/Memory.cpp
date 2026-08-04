@@ -67,7 +67,7 @@ namespace Memory {
 
 	void* app_malloc(int size) {
 		MemoryManager& mm = get_current_app_memory();
-		return (void*)mm.malloc(size, 4);
+		return (void*)mm.malloc(size, false, 4);
 	}
 
 	void* app_realloc(void* p, int size) {
@@ -97,6 +97,9 @@ namespace Memory {
 
 	size_t MemoryManager::malloc(size_t size, bool allow_protected, size_t align)
 	{
+		if (!size)
+			return 0;
+
 		if (size > free_memory_size - (allow_protected ? 0 : protected_size))
 			return 0;
 
@@ -180,6 +183,9 @@ namespace Memory {
 
 	void MemoryManager::free(size_t addr)
 	{
+		if (addr < start_adr + protected_size)
+			return;
+
 		for (int i = 0; i < regions.size(); ++i) {
 			if (regions[i].adr == addr) {
 				free_memory_size += regions[i].size;
