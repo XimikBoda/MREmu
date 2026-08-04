@@ -335,9 +335,12 @@ VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
 }
 
 VMINT vm_file_mkdir(const VMWSTR dirname) {
-	fs::path path = path_from_emu(dirname);
-	bool res = fs::create_directory(path);
-	if (res)
+	fs::path path = path_from_emu(dirname); 
+	std::error_code ec;
+
+	bool res = fs::create_directories(path, ec);
+
+	if (!ec)
 		return 0;
 	else
 		return -1;

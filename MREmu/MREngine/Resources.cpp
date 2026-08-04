@@ -38,6 +38,9 @@ void MREngine::Resources::scan()
 			res_offset += offset, global = true;
 
 		if (res_offset < offset || res_offset + res_size > offset + size)
+			printf("Warning: resource outside the resource segment (%s)\n", name.c_str());
+
+		if (res_offset + res_size > file_context->size())
 			abort();
 
 		res_map[to_lower(name)] = {res_offset, res_size};

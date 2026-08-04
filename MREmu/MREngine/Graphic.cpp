@@ -86,6 +86,8 @@ void MREngine::Graphic::update_screen() {
 void MREngine::Graphic::imgui_screen() {
 	if (ImGui::Begin("Screen")) {
 		ImGui::Image(screen_tex);
+		if (ImGui::Button("Paint"))
+			vm_graphic_flush_screen();
 	}
 	ImGui::End();
 }

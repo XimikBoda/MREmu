@@ -14,6 +14,7 @@ public:
 	bool load(std::vector<uint8_t>&file);
 
 	bool is_ads();
+	bool is_vre_ads();
 	bool is_simple_ads();
 	bool is_zipped();
 	bool is_tags_ucs2();

@@ -59,7 +59,7 @@ bool ArmApp::preparation()
 
 	resources.file_context = &file_context;
 
-	is_ads = tags.is_ads();
+	is_ads = tags.is_ads() || tags.is_vre_ads();
 	is_zipped = tags.is_zipped();
 
 	mem_size = tags.get_ram() * 1024;
@@ -89,25 +89,39 @@ bool ArmApp::preparation()
 		entry_point = (elf.get_entry() + offset_mem);
 
 		segments_size = 0;
-		for (int i = 0; i < elf.segments.size(); ++i) {
-			const ELFIO::segment* pseg = elf.segments[i];
+		if (!is_ads)
+			for (int i = 0; i < elf.segments.size(); ++i) {
+				const ELFIO::segment* pseg = elf.segments[i];
 
-			if (pseg->get_virtual_address() + pseg->get_memory_size() > mem_size) {
-				printf("Segment loading error, %d bytes required, but %d allocated\n",
-					pseg->get_virtual_address() + pseg->get_memory_size(), mem_size);
-				return false;
+				if (pseg->get_virtual_address() + pseg->get_memory_size() > mem_size) {
+					printf("Segment loading error, %d bytes required, but %d allocated\n",
+						pseg->get_virtual_address() + pseg->get_memory_size(), mem_size);
+					return false;
+				}
+
+				memcpy((unsigned char*)mem_location + pseg->get_virtual_address(),
+					file_context.data() + pseg->get_offset(), pseg->get_file_size());
+
+				segments_size = std::max<size_t>(segments_size,
+					pseg->get_virtual_address() + pseg->get_memory_size());
 			}
-
-			memcpy((unsigned char*)mem_location + pseg->get_virtual_address(),
-				file_context.data() + pseg->get_offset(), pseg->get_file_size());
-
-			segments_size = std::max<size_t>(segments_size,
-				pseg->get_virtual_address() + pseg->get_memory_size());
-		}
 
 		for (int i = 0; i < elf.sections.size(); ++i) {
 			ELFIO::section* psec = elf.sections[i];
 
+			if (psec->get_name() == "ER_RO" || psec->get_name() == "ER_RW") {
+				if (psec->get_address() + psec->get_size() > mem_size) {
+					printf("Segment loading error, %d bytes required, but %d allocated\n",
+						psec->get_address() + psec->get_size(), mem_size);
+					return false;
+				}
+
+				memcpy((unsigned char*)mem_location + psec->get_address(),
+					file_context.data() + psec->get_offset(), psec->get_size());
+
+				segments_size = std::max<size_t>(segments_size,
+					psec->get_address() + psec->get_size());
+			}
 			if (psec->get_name() == std::string(".rel.dyn") || psec->get_name() == std::string(".rel.plt")) {
 				ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_offset()]; //TODO
 				for (int i = 0; i < psec->get_size() / sizeof(ELFIO::Elf32_Rel); ++i) {

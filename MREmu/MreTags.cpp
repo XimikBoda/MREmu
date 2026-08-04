@@ -46,6 +46,15 @@ bool MreTags::is_ads() {
 	int t = read_uint32(VM_CE_INFO_FILE_TYPE);
 	return (t == 0 || t == 1 || t == 5);
 }
+
+bool MreTags::is_vre_ads() {
+	if (!is_tag_exist(VM_CE_INFO_COMPILER))
+		return 0;
+
+	int t = read_uint32(VM_CE_INFO_COMPILER);
+	return t == 1;
+}
+
 bool MreTags::is_simple_ads() {
 	int t = read_uint32(VM_CE_INFO_FILE_TYPE);
 
