@@ -9,6 +9,10 @@
 
 extern MREngine::Graphic* graphic;
 
+static bool is_skip_symbol(VMWCHAR c) {
+	return c < 0x20 || c == 0x7F;
+}
+
 VMINT vm_graphic_get_character_height(void) {
 	return 16; // temp
 }
@@ -16,7 +20,7 @@ VMINT vm_graphic_get_character_height(void) {
 VMINT vm_graphic_get_character_width(VMWCHAR c) {
 	int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)c];
 
-	if (data_offset == 0)
+	if (data_offset == 0 || is_skip_symbol(c))
 		return 0;
 
 	int ch_d = unifont_15_1_04_bin[data_offset];
@@ -29,7 +33,7 @@ VMINT vm_graphic_get_string_width(VMWSTR str) {
 	for (int i = 0; str[i]; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)str[i]];
 
-		if (data_offset == 0)
+		if (data_offset == 0 || is_skip_symbol(str[i]))
 			continue;
 
 		int ch_d = unifont_15_1_04_bin[data_offset];
@@ -60,7 +64,7 @@ VMINT vm_graphic_get_character_info(VMWCHAR c, vm_graphic_char_info* char_info) 
 
 	unsigned int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)c];
 
-	if (data_offset == 0)
+	if (data_offset == 0 || is_skip_symbol(c))
 		return -1;
 
 	int ch_d = unifont_15_1_04_bin[data_offset];
@@ -112,7 +116,7 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	for (int i = 0; i < length && s[i]; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)s[i]];
 
-		if (data_offset == 0)
+		if (data_offset == 0 || is_skip_symbol(s[i]))
 			continue;
 
 		int ch_d = unifont_15_1_04_bin[data_offset];
@@ -193,7 +197,7 @@ VMUINT vm_graphic_get_char_num_in_width(VMWCHAR* string, VMUINT width, VMINT  ch
 	for (i = 0; string[i]; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)string[i]];
 
-		if (data_offset == 0)
+		if (data_offset == 0 || is_skip_symbol(string[i]))
 			continue;
 
 		int ch_d = unifont_15_1_04_bin[data_offset];
