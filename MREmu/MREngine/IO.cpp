@@ -588,10 +588,9 @@ VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size
 	if (!tags)
 		return GET_TAG_ERROR;
 
-	if (tag_num < 0 || tag_num >= tags->raw_tags.size())
-		return GET_TAG_NOT_FOUND;
+	auto tag_data = tags->get_raw_tag(tag_num);
 
-	int tag_size = tags->raw_tags[tag_num].size();
+	int tag_size = tag_data.size();
 
 	if (tag_size == 0)
 		return GET_TAG_NOT_FOUND;
@@ -599,7 +598,7 @@ VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size
 	if (*buf_size < tag_size)
 		return GET_TAG_INSUFFICIENT_BUF;
 
-	memcpy(buf, tags->raw_tags[tag_num].data(), tag_size);
+	memcpy(buf, tag_data.data(), tag_size);
 
 	*buf_size = tag_size;
 

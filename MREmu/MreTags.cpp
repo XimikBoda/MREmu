@@ -1,10 +1,13 @@
 #include "MreTags.h"
+#include "MREngine/CharSet.h"
 #include <cstring>
+#include <vmcert.h>
 
-bool MreTags::load(std::vector<unsigned char>& file)
+using namespace std::string_literals;
+
+bool MreTags::load(std::vector<uint8_t>& file)
 {
 	raw_tags.clear();
-	raw_tags.resize(0x34);
 
 	size_t file_size = file.size();
 
@@ -26,9 +29,6 @@ bool MreTags::load(std::vector<unsigned char>& file)
 		if (pos + tag_size >= file_size)
 			return false;
 
-		//if (id >= raw_tags.size())
-		//	raw_tags.resize(id + 1);
-
 		raw_tags[id].resize(tag_size);
 		if (tag_size)
 			memcpy(raw_tags[id].data(), &file[pos], tag_size);
@@ -39,34 +39,68 @@ bool MreTags::load(std::vector<unsigned char>& file)
 	return true;
 }
 
-bool MreTags::is_ads()
-{
-	if (raw_tags[0x21].size() == 4) {
-		int t = *(int*)raw_tags[0x21].data();
-		return (t == 0 || t == 1 || t == 5);
+bool MreTags::is_ads() {
+	if (!is_tag_exist(VM_CE_INFO_FILE_TYPE))
+		return 0;
+
+	int t = read_uint32(VM_CE_INFO_FILE_TYPE);
+	return (t == 0 || t == 1 || t == 5);
+}
+bool MreTags::is_simple_ads() {
+	int t = read_uint32(VM_CE_INFO_FILE_TYPE);
+
+	return (t == 5);
+}
+
+bool MreTags::is_zipped() {
+	return read_bool(VM_CE_INFO_RO_RW_ZIP);
+}
+
+bool MreTags::is_tags_ucs2() {
+	return read_bool(VM_CE_INFO_CHARSET);
+}
+
+uint32_t MreTags::get_ram() {
+	return read_uint32(VM_CE_INFO_MEM_REQ);
+}
+
+std::u8string MreTags::get_dev_name() {
+	return read_string(VM_CE_INFO_DEV);
+}
+
+bool MreTags::read_bool(int id) {
+	return read_uint32(id);
+}
+
+bool MreTags::is_tag_exist(int id) {
+	auto it = raw_tags.find(id);
+	return it != raw_tags.end();
+}
+
+uint32_t MreTags::read_uint32(int id) {
+	auto it = raw_tags.find(id);
+	if (it != raw_tags.end())
+		if (it->second.size() == 4)
+			return *(uint32_t*)it->second.data();
+	return 0;
+}
+
+std::u8string MreTags::read_string(int id) {
+	auto it = raw_tags.find(id);
+	if (it != raw_tags.end()) {
+		if (is_tags_ucs2()) {
+			auto str16 = std::u16string((char16_t*)it->second.data(), it->second.size());
+			return ucs2_to_utf8(str16);
+		}
+		else
+			return std::u8string((char8_t*)it->second.data(), it->second.size());
 	}
-	return false;
-}
-bool MreTags::is_simple_ads()
-{
-	if (raw_tags[0x21].size() == 4) {
-		int t = *(int*)raw_tags[0x21].data();
-		return (t == 5);
-	}
-	return false;
+	return u8"";
 }
 
-bool MreTags::is_zipped()
-{
-	if (raw_tags[0x22].size() == 4)
-		return *(int*)raw_tags[0x22].data();
-	return false;
+std::vector<uint8_t> MreTags::get_raw_tag(int id) {
+	auto it = raw_tags.find(id);
+	if (it != raw_tags.end())
+		return it->second;
+	return {};
 }
-
-unsigned int MreTags::get_ram()
-{
-	if (raw_tags[0x0F].size() == 4)
-		return *(unsigned int*)raw_tags[0x0F].data();
-	return false;
-}
-
