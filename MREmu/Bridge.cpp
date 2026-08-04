@@ -17,6 +17,7 @@
 #include <unicorn/unicorn.h>
 
 #include <vmgraph.h>
+#include <vmgfxold.h>
 #include <vmres.h>
 #include <vm4res.h>
 #include <vmtimer.h>
@@ -753,6 +754,27 @@ namespace Bridge {
 				read_arg(uc, 1)));
 		}},
 
+		// Graphic Old
+		{FUNCN(vm_graphic_lock), [](uc_engine* uc) {
+			vm_graphic_lock();
+		}},
+		{FUNCN(vm_graphic_unlock), [](uc_engine* uc) {
+			vm_graphic_unlock();
+		}},
+		{FUNCN(vm_graphic_get_buffer), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_graphic_get_buffer()));
+		}},
+		{FUNCN(vm_graphic_flush_buffer), [](uc_engine* uc) {
+			vm_graphic_flush_buffer();
+		}},
+		{FUNCN(vm_initialize_screen_buffer), [](uc_engine* uc) {
+			vm_initialize_screen_buffer();
+		}},
+		{FUNCN(vm_finalize_screen_buffer), [](uc_engine* uc) {
+			vm_finalize_screen_buffer();
+		}},
+
 
 
 		// Textout
@@ -872,6 +894,13 @@ namespace Bridge {
 			write_ret(uc,
 				vm_get_resource_offset(
 					(char*)ADDRESS_FROM_EMU(read_arg(uc, 0))
+				));
+		}},
+		{FUNCN(vm_get_resource_offset_from_file), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_resource_offset_from_file(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(char*)ADDRESS_FROM_EMU(read_arg(uc, 1))
 				));
 		}},
 		{FUNCN(vm_get_res_header), [](uc_engine* uc) {

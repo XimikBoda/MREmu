@@ -147,6 +147,10 @@ VMUINT vm_get_resource_offset(char* res_name) {
 	return res->offset;
 }
 
+VMUINT vm_get_resource_offset_from_file(VMWSTR filename, char* res_name) {
+	return vm_get_resource_offset(res_name); //todo
+}
+
 VMINT vm_get_res_header() {
 	return 8;
 }

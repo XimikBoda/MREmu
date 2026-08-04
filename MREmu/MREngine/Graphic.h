@@ -47,6 +47,10 @@ namespace MREngine {
 
 		clip_rect clip = { 0, 0, 0, 0, 0 };
 
+		//old
+		int old_layer = -1;
+		bool old_layer_inited = false;
+
 		int create_layer(int x, int y, int w, int h, int trans_color);
 		int create_layer_ex(int x, int y, int w, int h, int trans_color, int mode, void*buf);
 		void* get_layer_buf(int handle);
