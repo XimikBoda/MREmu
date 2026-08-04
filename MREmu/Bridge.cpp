@@ -1016,6 +1016,39 @@ namespace Bridge {
 
 
 		// STDLib
+		{FUNCN(vm_create_dyn_array), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_create_dyn_array(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					read_arg(uc, 2)
+				)));
+		}},
+		{FUNCN(vm_dyn_array_add), [](uc_engine* uc) {
+			write_ret(uc, 
+				vm_dyn_array_add(
+					(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				));
+		}},
+		{FUNCN(vm_dyn_array_del), [](uc_engine* uc) {
+			write_ret(uc, 
+				vm_dyn_array_del(
+					(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1)
+				));
+		}},
+		{FUNCN(vm_dyn_array_del_all), [](uc_engine* uc) {
+			write_ret(uc, 
+				vm_dyn_array_del_all(
+					(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))
+				));
+		}},
+		{FUNCN(vm_free_dyn_array), [](uc_engine* uc) {
+			vm_free_dyn_array(
+				(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))
+			);
+		}},
 		{FUNCN(vm_wstrlen), [](uc_engine* uc) {
 			write_ret(uc,vm_wstrlen(
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
