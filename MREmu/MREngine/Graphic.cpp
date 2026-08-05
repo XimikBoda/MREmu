@@ -258,6 +258,24 @@ VMINT vm_graphic_get_bits_per_pixel(void) {
 	return 2;
 }
 
+VMUINT16 vm_graphic_get_pixel(VMUINT8* buf, VMINT x, VMINT y) {
+	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
+	if (!cs_dst)
+		return 0;
+	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
+	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
+
+	int left = 0;
+	int top = 0;
+	int right = cfp_dst->width;
+	int bottom = cfp_dst->height;
+
+	if (x < left || x >= right || y < top || y >= bottom)
+		return 0;
+
+	return buf16_dst[y * cfp_dst->width + x];
+}
+
 void vm_graphic_set_pixel(VMUINT8* buf, VMINT x, VMINT y, VMUINT16 color) {
 	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
 	if (!cs_dst)

@@ -487,6 +487,18 @@ namespace Bridge {
 				vm_graphic_get_canvas_buffer_size_FIX(
 					ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{FUNCN_FIX(vm_graphic_get_img_buffer), [](uc_engine* uc) {
+			write_ret(uc,  ADDRESS_TO_EMU(
+				vm_graphic_get_img_buffer_FIX(
+					ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1)
+				)));
+		}},
+		{FUNCN_FIX(vm_graphic_get_frame_number), [](uc_engine* uc) {
+			write_ret(uc, 
+				vm_graphic_get_frame_number_FIX(
+					ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 		{FUNCN(vm_graphic_create_layer_ex), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_create_layer_ex(
 				read_arg(uc, 0),
@@ -603,6 +615,14 @@ namespace Bridge {
 				read_arg(uc, 4),
 				read_arg(uc, 5)
 			);
+		}},
+		{FUNCN(vm_graphic_get_pixel), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_graphic_get_pixel(
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					read_arg(uc, 2)
+				));
 		}},
 		{FUNCN(vm_graphic_set_pixel), [](uc_engine* uc) {
 			vm_graphic_set_pixel(

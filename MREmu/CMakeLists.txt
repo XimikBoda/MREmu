@@ -46,7 +46,5 @@ if (ANDROID)
 	target_link_libraries(MREmu AL)
 endif()
 
-target_include_directories(MREmu PUBLIC "../include")
-
 add_subdirectory (MREngine)
 add_subdirectory (NativeApps)

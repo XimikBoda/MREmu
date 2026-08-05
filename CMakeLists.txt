@@ -20,6 +20,8 @@ endif()
 add_definitions(-DLIBICONV_PLUG)
 set(BUILD_SHARED_LIBS FALSE) 
 
+include_directories("include")
+
 add_subdirectory (deps)
 
 add_subdirectory (MREmu)

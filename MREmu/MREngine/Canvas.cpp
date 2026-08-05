@@ -90,7 +90,7 @@ void MREngine::AppGraphic::imgui_canvases() {
 
 			if (memcmp(cs->magic, CANVAS_MAGIC, 9)) {
 				ImGui::Text("Wrong canvas magic");
-				break;
+				continue;
 			}
 
 			MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
@@ -99,8 +99,8 @@ void MREngine::AppGraphic::imgui_canvases() {
 
 			const char* format = cs->color_format < VM_GRAPHIC_COLOR_FORMAT_END ? formats[cs->color_format] : "Error";
 
-			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d, f: %s",
-				i, cfp->left, cfp->top, cfp->width, cfp->height, format);
+			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d, tr: %d, f: %s",
+				i, cfp->left, cfp->top, cfp->width, cfp->height, cfp->trans_color, format);
 			ImGui::Image(el.second);
 		}
 	}
@@ -193,11 +193,41 @@ VMINT vm_graphic_get_canvas_buffer_size_FIX(VMINT_CANVAS hcanvas) { // actually,
 	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
 	if (!hcanvas || memcmp(cs->magic, CANVAS_MAGIC, 9))
 		return VM_GDI_FAILED;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
 
-	//TODO frame index
-	cfp_dst->flag = 1;
-	return VM_CANVAS_DATA_OFFSET + cfp_dst->offset;
+	size_t offset = sizeof(MREngine::canvas_signature);
+	for (int i = 0; i < cs->frame_count; ++i) {
+		MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)((uint8_t*)hcanvas + offset);
+		offset += sizeof(MREngine::canvas_frame_property) + cfp->offset;
+	}
+
+	return offset;
+}
+
+VMUINT8* vm_graphic_get_img_buffer_FIX(VMINT_CANVAS hcanvas, VMUINT8 frame_index) {
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
+	if (!hcanvas || memcmp(cs->magic, CANVAS_MAGIC, 9))
+		return 0;
+
+	if (frame_index > 0)
+		frame_index--;
+	if (frame_index < 0 || frame_index >= cs->frame_count)
+		return 0;
+
+	size_t offset = sizeof(MREngine::canvas_signature);
+	for (int i = 0; i < frame_index; ++i) {
+		MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)((uint8_t*)hcanvas + offset);
+		offset += sizeof(MREngine::canvas_frame_property) + cfp_src->offset;
+	}
+	return (uint8_t*)hcanvas + offset + sizeof(MREngine::canvas_frame_property);
+}
+
+
+VMINT vm_graphic_get_frame_number_FIX(VMINT_CANVAS hcanvas) {
+	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
+	if (!hcanvas || memcmp(cs->magic, CANVAS_MAGIC, 9))
+		return 0;
+
+	return cs->frame_count;
 }
 
 VM_GDI_RESULT vm_graphic_canvas_set_trans_color_FIX(VMINT_CANVAS hcanvas, VMINT trans_color) {
