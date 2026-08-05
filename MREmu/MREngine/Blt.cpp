@@ -255,41 +255,32 @@ void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* sr
 	if (!cs_dst || !cs_src)
 		return;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
+	MREngine::canvas_frame_property* cfp_src = get_canvas_frame_by_ind(cs_src, frame_index);
 	void* buf_dst = (void*)(cfp_dst + 1);
 	void* buf_src = (void*)(cfp_src + 1);
 
-	if (x_src + width > cfp_src->width)
-		width = cfp_src->width - x_src;
-	if (y_src + height > cfp_src->height)
-		height = cfp_src->height - y_src;
+	if (!cfp_src)
+		return;
 
-	int st_x = std::max(0, x_dest);
-	int st_y = std::max(0, y_dest);
+	MREngine::RenderBox b(x_dest, y_dest, x_dest + width, y_dest + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x_dest + width);
-	int end_y = std::min<int>(cfp_dst->height, y_dest + height);
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
+	int x_offset = x_dest - x_src + cfp_src->left;
+	int y_offset = y_dest - y_src + cfp_src->top;
 
-	auto blt_mapper = [x_dest, y_dest, x_src, y_src](int sx, int sy) -> std::pair<int, int> {
-		return { sx - x_dest + x_src, sy - y_dest + y_src };
+	b.clip(x_offset, y_offset, x_offset + cfp_src->width, y_offset + cfp_src->height);
+
+	auto blt_mapper = [x_offset, y_offset](int sx, int sy) -> std::pair<int, int> {
+		return { sx - x_offset, sy - y_offset };
 		};
 
 	master_blt<false>(
 		buf_dst, cfp_dst->width, cfp_dst->height, cs_dst->color_format, cfp_dst->flag ? cfp_dst->trans_color : -1,
 		buf_src, cfp_src->width, cfp_src->height, cs_src->color_format, cfp_src->flag ? cfp_src->trans_color : -1,
-		st_x, st_y, end_x, end_y,
+		b.st_x, b.st_y, b.end_x, b.end_y,
 		255, blt_mapper);
 }
 
@@ -303,44 +294,32 @@ void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE*
 	if (!cs_dst || !cs_src)
 		return;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
+	MREngine::canvas_frame_property* cfp_src = get_canvas_frame_by_ind(cs_src, frame_index);
 	void* buf_dst = (void*)(cfp_dst + 1);
 	void* buf_src = (void*)(cfp_src + 1);
 
-	if (x_src + width > cfp_src->width)
-		width = cfp_src->width - x_src;
-	if (y_src + height > cfp_src->height)
-		height = cfp_src->height - y_src;
+	if (!cfp_src)
+		return;
 
-	int st_x = std::max(0, x_dest);
-	int st_y = std::max(0, y_dest);
+	MREngine::RenderBox b(x_dest, y_dest, x_dest + width, y_dest + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x_dest + width);
-	int end_y = std::min<int>(cfp_dst->height, y_dest + height);
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
+	int x_offset = x_dest - x_src + cfp_src->left;
+	int y_offset = y_dest - y_src + cfp_src->top;
 
-	bool flag = cfp_src->flag;
-	unsigned short trans_color = cfp_src->trans_color;
+	b.clip(x_offset, y_offset, x_offset + cfp_src->width, y_offset + cfp_src->height);
 
-	auto blt_mapper = [x_dest, y_dest, x_src, y_src](int sx, int sy) -> std::pair<int, int> {
-		return { sx - x_dest + x_src, sy - y_dest + y_src };
+	auto blt_mapper = [x_offset, y_offset](int sx, int sy) -> std::pair<int, int> {
+		return { sx - x_offset, sy - y_offset };
 		};
 
 	master_blt<true>(
 		buf_dst, cfp_dst->width, cfp_dst->height, cs_dst->color_format, cfp_dst->flag ? cfp_dst->trans_color : -1,
 		buf_src, cfp_src->width, cfp_src->height, cs_src->color_format, cfp_src->flag ? cfp_src->trans_color : -1,
-		st_x, st_y, end_x, end_y,
+		b.st_x, b.st_y, b.end_x, b.end_y,
 		alpha, blt_mapper);
 }
 
@@ -354,9 +333,12 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 	if (!cs_dst || !cs_src)
 		return;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
+	MREngine::canvas_frame_property* cfp_src = get_canvas_frame_by_ind(cs_src, frame_index);
 	void* buf_dst = (void*)(cfp_dst + 1);
 	void* buf_src = (void*)(cfp_src + 1);
+
+	if (!cfp_src)
+		return;
 
 	int width = cfp_src->width;
 	int height = cfp_src->height;
@@ -364,23 +346,11 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 	if (degrees == VM_ROTATE_DEGREE_90 || degrees == VM_ROTATE_DEGREE_270)
 		std::swap(width, height);
 
-	int st_x = std::max(0, x_des);
-	int st_y = std::max(0, y_des);
+	MREngine::RenderBox b(x_des, y_des, x_des + width, y_des + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x_des + width);
-	int end_y = std::min<int>(cfp_dst->height, y_des + height);
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
 
 	int src_w = cfp_src->width;
 	int src_h = cfp_src->height;
@@ -394,7 +364,7 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 		master_blt<false>(
 			buf_dst, cfp_dst->width, cfp_dst->height, dst_fmt, dst_tc,
 			buf_src, src_w, src_h, src_fmt, src_tc,
-			st_x, st_y, end_x, end_y, 255,
+			b.st_x, b.st_y, b.end_x, b.end_y, 255,
 			[x_des, y_des, src_h](int sx, int sy) -> std::pair<int, int> {
 				return { sy - y_des, src_h - (sx - x_des) - 1 };
 			}
@@ -405,7 +375,7 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 		master_blt<false>(
 			buf_dst, cfp_dst->width, cfp_dst->height, dst_fmt, dst_tc,
 			buf_src, src_w, src_h, src_fmt, src_tc,
-			st_x, st_y, end_x, end_y, 255,
+			b.st_x, b.st_y, b.end_x, b.end_y, 255,
 			[x_des, y_des, src_w, src_h](int sx, int sy) -> std::pair<int, int> {
 				return { src_w - (sx - x_des) - 1, src_h - (sy - y_des) - 1 };
 			}
@@ -416,7 +386,7 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 		master_blt<false>(
 			buf_dst, cfp_dst->width, cfp_dst->height, dst_fmt, dst_tc,
 			buf_src, src_w, src_h, src_fmt, src_tc,
-			st_x, st_y, end_x, end_y, 255,
+			b.st_x, b.st_y, b.end_x, b.end_y, 255,
 			[x_des, y_des, src_w](int sx, int sy) -> std::pair<int, int> {
 				return { src_w - (sy - y_des) - 1, sx - x_des };
 			}
@@ -427,7 +397,7 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 		master_blt<false>(
 			buf_dst, cfp_dst->width, cfp_dst->height, dst_fmt, dst_tc,
 			buf_src, src_w, src_h, src_fmt, src_tc,
-			st_x, st_y, end_x, end_y, 255,
+			b.st_x, b.st_y, b.end_x, b.end_y, 255,
 			[x_des, y_des](int sx, int sy) -> std::pair<int, int> {
 				return { sx - x_des, sy - y_des };
 			}
@@ -446,30 +416,21 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 	if (!cs_dst || !cs_src)
 		return;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
+	MREngine::canvas_frame_property* cfp_src = get_canvas_frame_by_ind(cs_src, frame_index);
 	void* buf_dst = (void*)(cfp_dst + 1);
 	void* buf_src = (void*)(cfp_src + 1);
+
+	if (!cfp_src)
+		return;
 
 	int width = cfp_src->width;
 	int height = cfp_src->height;
 
-	int st_x = std::max(0, x_des);
-	int st_y = std::max(0, y_des);
+	MREngine::RenderBox b(x_des, y_des, x_des + width, y_des + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x_des + width);
-	int end_y = std::min<int>(cfp_dst->height, y_des + height);
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
 
 	int src_w = cfp_src->width;
 	int src_h = cfp_src->height;
@@ -482,7 +443,7 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 		master_blt<false>(
 			buf_dst, cfp_dst->width, cfp_dst->height, dst_fmt, dst_tc,
 			buf_src, src_w, src_h, src_fmt, src_tc,
-			st_x, st_y, end_x, end_y, 255,
+			b.st_x, b.st_y, b.end_x, b.end_y, 255,
 			[x_des, y_des, src_w](int sx, int sy) -> std::pair<int, int> {
 				return { src_w - (sx - x_des) - 1, sy - y_des };
 			}
@@ -492,7 +453,7 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 		master_blt<false>(
 			buf_dst, cfp_dst->width, cfp_dst->height, dst_fmt, dst_tc,
 			buf_src, src_w, src_h, src_fmt, src_tc,
-			st_x, st_y, end_x, end_y, 255,
+			b.st_x, b.st_y, b.end_x, b.end_y, 255,
 			[x_des, y_des, src_h](int sx, int sy) -> std::pair<int, int> {
 				return { sx - x_des, src_h - (sy - y_des) - 1 };
 			}
@@ -502,7 +463,7 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 		master_blt<false>(
 			buf_dst, cfp_dst->width, cfp_dst->height, dst_fmt, dst_tc,
 			buf_src, src_w, src_h, src_fmt, src_tc,
-			st_x, st_y, end_x, end_y, 255,
+			b.st_x, b.st_y, b.end_x, b.end_y, 255,
 			[x_des, y_des](int sx, int sy) -> std::pair<int, int> {
 				return { sx - x_des, sy - y_des };
 			}

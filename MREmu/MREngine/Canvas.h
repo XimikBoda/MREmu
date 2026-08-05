@@ -43,3 +43,4 @@ namespace MREngine {
 }
 
 MREngine::canvas_signature* find_canvas_signature(VMUINT8* buf);
+MREngine::canvas_frame_property* get_canvas_frame_by_ind(MREngine::canvas_signature* cs, int frame_index);

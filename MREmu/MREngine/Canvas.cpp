@@ -117,6 +117,21 @@ MREngine::canvas_signature* find_canvas_signature(VMUINT8* buf) {
 	return 0;
 }
 
+MREngine::canvas_frame_property* get_canvas_frame_by_ind(MREngine::canvas_signature* cs, int frame_index) {
+	if (frame_index > 0)
+		frame_index--;
+	if (frame_index < 0 || frame_index >= cs->frame_count)
+		return 0;
+
+	size_t offset = sizeof(MREngine::canvas_signature);
+	for (int i = 0; i < frame_index; ++i) {
+		MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)((uint8_t*)cs + offset);
+		offset += sizeof(MREngine::canvas_frame_property) + cfp_src->offset;
+	}
+
+	return (MREngine::canvas_frame_property*)((uint8_t*)cs + offset);
+}
+
 int color_format_size(vm_graphic_color_famat cf) {
 	switch (cf) {
 	case VM_GRAPHIC_COLOR_FORMAT_16:
@@ -208,17 +223,12 @@ VMUINT8* vm_graphic_get_img_buffer_FIX(VMINT_CANVAS hcanvas, VMUINT8 frame_index
 	if (!hcanvas || memcmp(cs->magic, CANVAS_MAGIC, 9))
 		return 0;
 
-	if (frame_index > 0)
-		frame_index--;
-	if (frame_index < 0 || frame_index >= cs->frame_count)
+	MREngine::canvas_frame_property* cfp_src = get_canvas_frame_by_ind(cs, frame_index);
+	
+	if (!cfp_src)
 		return 0;
 
-	size_t offset = sizeof(MREngine::canvas_signature);
-	for (int i = 0; i < frame_index; ++i) {
-		MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)((uint8_t*)hcanvas + offset);
-		offset += sizeof(MREngine::canvas_frame_property) + cfp_src->offset;
-	}
-	return (uint8_t*)hcanvas + offset + sizeof(MREngine::canvas_frame_property);
+	return (VMUINT8*)(cfp_src + 1);
 }
 
 
