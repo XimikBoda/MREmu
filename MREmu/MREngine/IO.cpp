@@ -115,7 +115,12 @@ MREngine::find_el::find_el(fs::path path_f) {
 	if (!fs::exists(path.parent_path()))
 		return;
 
-	di = fs::directory_iterator(path.parent_path());
+	std::error_code ec;
+
+	di = fs::directory_iterator(path.parent_path(), ec);
+
+	if(ec)
+		return;
 
 	first = true;
 }
@@ -309,13 +314,14 @@ VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 VMINT vm_file_delete(const VMWSTR filename) {
 	fs::path path = path_from_emu(filename);
 
-	try {
-		if (fs::remove(path))
-			return 0;
-	}
-	catch (...) {}
+	std::error_code ec;
 
-	return -1;
+	fs::remove(path);
+	
+	if (!ec)
+		return 0;
+	else 
+		return -1;
 }
 
 VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
@@ -325,13 +331,14 @@ VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
 	if (!fs::exists(old_path))
 		return -1;
 
-	try {
-		fs::rename(old_path, new_path);
+	std::error_code ec;
+
+	fs::rename(old_path, new_path, ec);
+
+	if (!ec)
 		return 0;
-	}
-	catch (...) {
+	else
 		return -1;
-	}
 }
 
 VMINT vm_file_mkdir(const VMWSTR dirname) {
