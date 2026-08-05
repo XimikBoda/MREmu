@@ -31,9 +31,29 @@ namespace MREngine {
 		void* buf = 0;
 		int x = 0, y = 0, w = 0, h = 0;
 		int trans_color = -1;
+		clip_rect clip = { 0, 0, 0, 0, 0 };
 		sf::Texture tex;
 	};
 
+	class RenderBox {
+	public:
+		int st_x = 0, st_y = 0;
+		int end_x = 0, end_y = 0;
+
+		RenderBox(int st_x, int st_y, int end_x, int end_y);
+		RenderBox(const class canvas_frame_property& cfp);
+
+		void clip(const class canvas_frame_property& cfp);
+		void clip(const layer& layer);
+		void clip(const clip_rect& clip);
+		void clip(int x1, int y1, int x2, int y2);
+
+		void include(int x, int y);
+
+		bool in(int x, int y);
+		bool x_in(int x);
+		bool y_in(int y);
+	};
 
 	class AppGraphic {
 	public:
@@ -50,6 +70,9 @@ namespace MREngine {
 		//old
 		int old_layer = -1;
 		bool old_layer_inited = false;
+
+		layer* find_layer_by_buf(void* buf);
+		clip_rect clip_by_buf(void* buf);
 
 		int create_layer(int x, int y, int w, int h, int trans_color);
 		int create_layer_ex(int x, int y, int w, int h, int trans_color, int mode, void*buf);

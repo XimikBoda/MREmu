@@ -751,6 +751,21 @@ namespace Bridge {
 				(vm_graphic_point*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 				read_arg(uc, 2));
 		}},
+		{FUNCN(vm_graphic_get_layer_clip), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_graphic_get_layer_clip(
+					read_arg(uc, 0),
+					(clip_rect*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
+		{FUNCN(vm_graphic_set_layer_clip), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_graphic_set_layer_clip(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					read_arg(uc, 2),
+					read_arg(uc, 3),
+					read_arg(uc, 4)));
+		}},
 		{FUNCN(vm_graphic_set_clip), [](uc_engine* uc) {
 			vm_graphic_set_clip(
 				read_arg(uc, 0),
