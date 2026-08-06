@@ -249,6 +249,10 @@ namespace Bridge {
 			vm_reg_keyboard_callback(
 				(vm_key_handler_t)read_arg(uc, 0));
 		}},
+		{FUNCN(vm_reg_pen_callback), [](uc_engine* uc) {
+			vm_reg_pen_callback(
+				(vm_pen_handler_t)read_arg(uc, 0));
+		}},
 		{FUNCN(vm_file_open), [](uc_engine* uc) {
 			write_ret(uc, vm_file_open(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -361,6 +365,9 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_is_support_keyborad), [](uc_engine* uc) {
 			write_ret(uc, vm_is_support_keyborad());
+		}},
+		{FUNCN(vm_is_support_pen_touch), [](uc_engine* uc) {
+			write_ret(uc, vm_is_support_pen_touch());
 		}},
 
 

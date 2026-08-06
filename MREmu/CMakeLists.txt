@@ -15,6 +15,7 @@ set(SOURCES
 						"ARModule.cpp" "ARModule.h"
 						"AppManager.cpp" "AppManager.h"
 						"Keyboard.cpp" "Keyboard.h"
+						"Touch.cpp" "Touch.h"
 						"miniz.c" "miniz.h" "mutex_wrapper.h" )
 
 if (ANDROID)

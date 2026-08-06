@@ -22,6 +22,11 @@ struct keyboard_event_el {
 	int keycode;
 };
 
+struct pen_event_el {
+	int event;
+	int x, y;
+};
+
 struct message_event_el {
 	int phandle;
 	unsigned int msg_id;
@@ -46,6 +51,9 @@ class AppManager {
 	std::queue<keyboard_event_el> keyboard_events_queue;
 	std::mutex keyboard_events_queue_mutex;
 
+	std::queue<pen_event_el> pen_events_queue;
+	std::mutex pen_events_queue_mutex;
+
 	std::queue<message_event_el> message_events_queue;
 	std::mutex message_events_queue_mutex;
 
@@ -66,6 +74,9 @@ public:
 
 	void add_keyboard_event(int event, int keycode);
 	void process_keyboard_events();
+
+	void add_pen_event(int event, int x, int y);
+	void process_pen_events();
 
 	void add_message_event(int phandle, unsigned int msg_id,
 		int wparam, int lparam, int phandle_sender);

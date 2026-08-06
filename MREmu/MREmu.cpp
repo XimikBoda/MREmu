@@ -14,6 +14,7 @@
 #include "App.h"
 #include "AppManager.h"
 #include "Keyboard.h"
+#include "Touch.h"
 
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
@@ -102,6 +103,7 @@ int main(int argc, char** argv) {
 #endif
 
 	Keyboard keyboard;
+	Touch touch;
 
 	if (app_path.size()) {
 		if (fs::exists(app_path) || path_is_local) {
@@ -117,6 +119,7 @@ int main(int argc, char** argv) {
 
 	int scale = 1;
 	sf::Sprite screen_sp(graphic.screen_tex);
+	touch.screen = &screen_sp;
 
 	auto update_screen_size = [&] {
 		int scale_x = win_device.getSize().x / graphic.width;
@@ -172,8 +175,8 @@ int main(int argc, char** argv) {
 #endif
 
 		while (win_device.pollEvent(event)) {
-			sf::IntRect kb_rect(keyboard.x, keyboard.y, keyboard.w, keyboard.h);
-			keyboard.keyboard_event(event);
+			keyboard.event(event);
+			touch.sf_event(event);
 			switch (event.type) {
 			case sf::Event::Closed:
 				win_device.close();
@@ -184,27 +187,6 @@ int main(int argc, char** argv) {
             case sf::Event::Resized:
                 win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
 				update_screen_size();
-                break;
-			case sf::Event::MouseButtonPressed:
-				if (event.mouseButton.button == sf::Mouse::Button::Left) {
-					if (event.mouseButton.x >= kb_rect.left &&
-						event.mouseButton.x < kb_rect.left + kb_rect.width &&
-						event.mouseButton.y >= kb_rect.top &&
-						event.mouseButton.y < kb_rect.top + kb_rect.height)
-						keyboard.kc.press_key(keyboard.find_key_by_pos(event.mouseButton.x - kb_rect.left,
-							event.mouseButton.y - kb_rect.top), keyboard.kc.Mouse);
-				}
-				break;
-			case sf::Event::MouseButtonReleased:
-				if (event.mouseButton.button == sf::Mouse::Button::Left)
-					keyboard.kc.unpress_by_source(keyboard.kc.Mouse);
-				break;
-            case sf::Event::TouchBegan:
-                keyboard.kc.press_key(keyboard.find_key_by_pos(event.touch.x - kb_rect.left,
-                    event.touch.y - kb_rect.top), (KeyboardControl::key_source)(keyboard.kc.Touch0 + event.touch.finger));
-                break;
-            case sf::Event::TouchEnded:
-                keyboard.kc.unpress_by_source((KeyboardControl::key_source)(keyboard.kc.Touch0 + event.touch.finger));
                 break;
 			}
 		}

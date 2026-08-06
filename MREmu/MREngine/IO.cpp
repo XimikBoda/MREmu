@@ -146,6 +146,12 @@ void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 	io.key_handler = handler;
 }
 
+void vm_reg_pen_callback(vm_pen_handler_t handler) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	io.pen_handler = handler;
+}
+
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	MREngine::AppIO& io = get_current_app_io();
 
@@ -526,6 +532,10 @@ VMINT vm_get_disk_info(const VMCHAR* drv_name, vm_fs_disk_info* fs_disk, vm_fs_d
 }
 
 VMINT vm_is_support_keyborad(void) {
+	return 1;
+}
+
+VMINT vm_is_support_pen_touch(void) {
 	return 1;
 }
 

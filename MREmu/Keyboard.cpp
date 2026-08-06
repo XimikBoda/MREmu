@@ -108,19 +108,37 @@ const std::map<sf::Keyboard::Key, int> key_to_key =
 	{sf::Keyboard::Multiply, VM_KEY_POUND},
 };
 
-bool Keyboard::keyboard_event(sf::Event &event) {
-	if (event.type != sf::Event::KeyPressed && event.type != sf::Event::KeyReleased)
-		return false;
+bool Keyboard::event(sf::Event &event) {
+	switch (event.type) {
+		case sf::Event::KeyPressed:
+		case sf::Event::KeyReleased: {
+			const auto& el = key_to_key.find(event.key.code);
 
-	const auto& el = key_to_key.find(event.key.code);
-	
-	if(el != key_to_key.end()) {
-		if(event.type == sf::Event::KeyPressed)
-			kc.press_key(el->second, KeyboardControl::Keyboard);
-		else
-			kc.unpress_key(el->second);
+			if (el != key_to_key.end()) {
+				if (event.type == sf::Event::KeyPressed)
+					kc.press_key(el->second, KeyboardControl::Keyboard);
+				else
+					kc.unpress_key(el->second);
+			}
+			return true;
+		}
+		case sf::Event::MouseButtonPressed:
+			if (event.mouseButton.button == sf::Mouse::Button::Left) 
+				kc.press_key(find_key_by_pos(event.mouseButton.x - x, event.mouseButton.y - y), kc.Mouse);
+			return true;
+		case sf::Event::MouseButtonReleased:
+			if (event.mouseButton.button == sf::Mouse::Button::Left)
+				kc.unpress_by_source(kc.Mouse);
+			return true;
+		case sf::Event::TouchBegan:
+			kc.press_key(find_key_by_pos(event.touch.x - x, event.touch.y - y), 
+				(KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
+			return true;
+		case sf::Event::TouchEnded:
+			kc.unpress_by_source((KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
+			return true;
 	}
-	return true;
+	return false;
 }
 
 void Keyboard::imgui_keyboard() {

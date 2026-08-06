@@ -157,6 +157,33 @@ void AppManager::process_keyboard_events()
 	}
 }
 
+void AppManager::add_pen_event(int event, int x, int y)
+{
+	std::lock_guard lock(pen_events_queue_mutex);
+	pen_events_queue.push({ event, x, y });
+}
+
+void AppManager::process_pen_events()
+{
+	while (pen_events_queue.size()) {
+		pen_event_el pe;
+		{
+			std::lock_guard lock(pen_events_queue_mutex);
+			pe = pen_events_queue.front();
+			pen_events_queue.pop();
+		}
+
+		current_work_app_id = active_app_id;
+
+		if (current_work_app_id < 0 || current_work_app_id >= apps.size())
+			return;
+
+		App& cur_app = *apps[current_work_app_id];
+		if (cur_app.io.pen_handler)
+			cur_app.run(cur_app.io.pen_handler, pe.event, pe.x, pe.y);
+	}
+}
+
 void AppManager::add_message_event(int phandle, unsigned int msg_id,
 	int wparam, int lparam, int phandle_sender)
 {
@@ -234,6 +261,7 @@ void AppManager::update(size_t delta_ms) {
 	close_apps();
 	process_system_events();
 	process_keyboard_events();
+	process_pen_events();
 	process_message_events();
 	for (int i = 0; i < apps.size(); ++i) {
 		current_work_app_id = i;
@@ -329,6 +357,11 @@ MreTags* get_tags_by_mem_adr(size_t offset_mem) {
 void add_keyboard_event(int event, int keycode) {
 	if (g_appManager)
 		g_appManager->add_keyboard_event(event, keycode);
+}
+
+void add_pen_event(int event, int x, int y) {
+	if (g_appManager)
+		g_appManager->add_pen_event(event, x, y);
 }
 
 void add_message_event(int phandle, unsigned int msg_id,

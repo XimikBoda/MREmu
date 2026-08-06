@@ -37,6 +37,7 @@ namespace MREngine {
 		ItemsMng<find_el> find_ext;
 
 		vm_key_handler_t key_handler = 0;
+		vm_pen_handler_t pen_handler = 0;
 	};
 };
 
