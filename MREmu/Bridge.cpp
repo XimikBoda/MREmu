@@ -141,7 +141,7 @@ namespace Bridge {
 			vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
 		}},
 		{FUNCN(vm_get_mre_total_mem_size), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(vm_get_mre_total_mem_size()));
+			write_ret(uc, vm_get_mre_total_mem_size());
 		}},
 		{FUNCN(vm_get_tick_count), [](uc_engine* uc) {
 			write_ret(uc, vm_get_tick_count());
