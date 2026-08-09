@@ -101,103 +101,108 @@ struct frame_t {
 	int delay_ms;
 };
 
-std::vector<frame_t> load_image(const uint8_t* data, size_t size) {
-	if (data && size > 3 && memcmp(data, "GIF", 3) == 0) {
-		GIF_Context ctx;
-		std::vector<frame_t> frames;
+std::vector<frame_t> load_image_gif(const uint8_t* data, size_t size) {
+	GIF_Context ctx;
+	std::vector<frame_t> frames;
 
-		std::vector<uint8_t> scratch(GIF_SCRATCH_BUFFER_REQUIRED_SIZE);
+	std::vector<uint8_t> scratch(GIF_SCRATCH_BUFFER_REQUIRED_SIZE);
 
-		int result = gif_init(&ctx, data, size, scratch.data(), scratch.size());
-		if (result != GIF_SUCCESS) {
-			return {};
-		}
-
-
-		int width, height;
-		gif_get_info(&ctx, &width, &height);
-
-		while (1) {
-			auto g_f = gif_get_next_frame(&ctx);
-			ctx.loop_count = 0;
-
-			if (g_f.ret == GIF_ERROR_NO_FRAME || g_f.ret == GIF_ERROR_EARLY_EOF)
-				break;
-			if (g_f.ret != GIF_SUCCESS) {
-				gif_close(&ctx);
-				return {};
-			}
-
-			frame_t frame;
-			frame.img_w = g_f.img_w, frame.img_h = g_f.img_h;
-			frame.x = g_f.min_x, frame.y = g_f.min_y;
-			frame.w = g_f.max_x - g_f.min_x, frame.h = g_f.max_y - g_f.min_y;
-			frame.transparent_ind = g_f.transparent;
-			frame.has_transparency = g_f.has_transparency;
-			frame.delay_ms = g_f.delay_ms;
-
-			if (g_f.has_transparency) {
-				auto to_rgb565 = [](const ColorRGBA& c) -> uint16_t {
-					return VM_COLOR_888_TO_565(c.r, c.g, c.b);
-					};
-
-				uint16_t safe_trans_565 = 0xF81F;
-				bool collision = true;
-
-				while (collision) {
-					collision = false;
-					for (int i = 0; i < (int)g_f.palette.size(); ++i) {
-						if (i != g_f.transparent && to_rgb565(g_f.palette[i]) == safe_trans_565) {
-							collision = true;
-							safe_trans_565++;
-							break;
-						}
-					}
-				}
-
-				g_f.palette[g_f.transparent] = {
-					(uint8_t)VM_COLOR_GET_RED(safe_trans_565),
-					(uint8_t)VM_COLOR_GET_GREEN(safe_trans_565),
-					(uint8_t)VM_COLOR_GET_BLUE(safe_trans_565),
-					0x00
-				};
-
-				frame.transparent_color = g_f.palette[g_f.transparent];
-			} else
-				frame.transparent_color = { 0xFF, 0xFF, 0xFF, 0xFF };
-
-
-			int buf_size = g_f.img_w * g_f.img_h;
-			frame.buf.resize(buf_size);
-			for (int i = 0; i < buf_size; ++i)
-				frame.buf[i] = g_f.palette[g_f.ind[i]];
-
-			frames.push_back(frame);
-		}
-		gif_close(&ctx);
-		return frames;
+	int result = gif_init(&ctx, data, size, scratch.data(), scratch.size());
+	if (result != GIF_SUCCESS) {
+		return {};
 	}
-	else {
-		sf::Image im;
-		if (!im.loadFromMemory(data, size))
+
+	int width, height;
+	gif_get_info(&ctx, &width, &height);
+
+	while (1) {
+		auto g_f = gif_get_next_frame(&ctx);
+		ctx.loop_count = 0;
+
+		if (g_f.ret == GIF_ERROR_NO_FRAME || g_f.ret == GIF_ERROR_EARLY_EOF)
+			break;
+		if (g_f.ret != GIF_SUCCESS) {
+			gif_close(&ctx);
 			return {};
+		}
 
 		frame_t frame;
-		frame.img_w = im.getSize().x, frame.img_h = im.getSize().y;
-		frame.x = 0, frame.y = 0;
-		frame.w = frame.img_w, frame.h = frame.img_h;
-		frame.transparent_ind = 0;
-		frame.transparent_color = { 0xFF, 0xFF, 0xFF, 0xFF };
-		frame.has_transparency = 0;
-		frame.delay_ms = 0;
+		frame.img_w = g_f.img_w, frame.img_h = g_f.img_h;
+		frame.x = g_f.min_x, frame.y = g_f.min_y;
+		frame.w = g_f.max_x - g_f.min_x, frame.h = g_f.max_y - g_f.min_y;
+		frame.transparent_ind = g_f.transparent;
+		frame.has_transparency = g_f.has_transparency;
+		frame.delay_ms = g_f.delay_ms;
 
-		int image_size = im.getSize().x * im.getSize().y;
-		ColorRGBA* rgb_buf = (ColorRGBA*)im.getPixelsPtr();
+		if (g_f.has_transparency) {
+			auto to_rgb565 = [](const ColorRGBA& c) -> uint16_t {
+				return VM_COLOR_888_TO_565(c.r, c.g, c.b);
+				};
 
-		frame.buf = std::vector<ColorRGBA>(rgb_buf, rgb_buf + image_size);
+			uint16_t safe_trans_565 = 0xF81F;
+			bool collision = true;
 
-		return {frame};
+			while (collision) {
+				collision = false;
+				for (int i = 0; i < (int)g_f.palette.size(); ++i) {
+					if (i != g_f.transparent && to_rgb565(g_f.palette[i]) == safe_trans_565) {
+						collision = true;
+						safe_trans_565++;
+						break;
+					}
+				}
+			}
+
+			g_f.palette[g_f.transparent] = {
+				(uint8_t)VM_COLOR_GET_RED(safe_trans_565),
+				(uint8_t)VM_COLOR_GET_GREEN(safe_trans_565),
+				(uint8_t)VM_COLOR_GET_BLUE(safe_trans_565),
+				0x00
+			};
+
+			frame.transparent_color = g_f.palette[g_f.transparent];
+		}
+		else
+			frame.transparent_color = { 0xFF, 0xFF, 0xFF, 0xFF };
+
+
+		int buf_size = g_f.img_w * g_f.img_h;
+		frame.buf.resize(buf_size);
+		for (int i = 0; i < buf_size; ++i)
+			frame.buf[i] = g_f.palette[g_f.ind[i]];
+
+		frames.push_back(frame);
 	}
+	gif_close(&ctx);
+	return frames;
+}
+
+std::vector<frame_t> load_image(const uint8_t* data, size_t size) {
+	if (data && size > 3 && memcmp(data, "GIF", 3) == 0) {
+		auto frames = load_image_gif(data, size);
+		if (frames.size())
+			return frames;
+	}
+
+	sf::Image im;
+	if (!im.loadFromMemory(data, size))
+		return {};
+
+	frame_t frame;
+	frame.img_w = im.getSize().x, frame.img_h = im.getSize().y;
+	frame.x = 0, frame.y = 0;
+	frame.w = frame.img_w, frame.h = frame.img_h;
+	frame.transparent_ind = 0;
+	frame.transparent_color = { 0xFF, 0xFF, 0xFF, 0xFF };
+	frame.has_transparency = 0;
+	frame.delay_ms = 0;
+
+	int image_size = im.getSize().x * im.getSize().y;
+	ColorRGBA* rgb_buf = (ColorRGBA*)im.getPixelsPtr();
+
+	frame.buf = std::vector<ColorRGBA>(rgb_buf, rgb_buf + image_size);
+
+	return {frame};
 }
 
 VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {

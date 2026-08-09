@@ -21,6 +21,13 @@ size_t shared_memory_in_emu_start = 0;
 uint32_t ADDRESS_TO_EMU(size_t x) {
 	if (x == 0)
 		return 0;
+#ifdef _DEBUG
+	auto nx = ((uint32_t)(uint64_t(x) - shared_memory_offset));
+	if (nx < shared_memory_in_emu_start || nx >= shared_memory_in_emu_start + shared_memory_size) {
+		printf("Warning: wrong address in ADDRESS_TO_EMU!!!\n");
+		return 0;
+	}
+#endif
 	return ((uint32_t)(uint64_t(x) - shared_memory_offset));
 }
 
@@ -31,6 +38,12 @@ uint32_t ADDRESS_TO_EMU(void* x) {
 void* ADDRESS_FROM_EMU(uint32_t x) {
 	if (x == 0)
 		return 0;
+#ifdef _DEBUG
+	if (x < shared_memory_in_emu_start || x >= shared_memory_in_emu_start + shared_memory_size) {
+		printf("Warning: wrong address in ADDRESS_FROM_EMU!!!\n");
+		return 0;
+	}
+#endif
 	return ((void*)((x)+shared_memory_offset));
 }
 

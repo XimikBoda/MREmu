@@ -29,6 +29,8 @@ VMINT vm_graphic_get_character_width(VMWCHAR c) {
 }
 
 VMINT vm_graphic_get_string_width(VMWSTR str) {
+	if (!str)
+		return 0;
 	int w = 0;
 	for (int i = 0; str[i]; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)str[i]];
@@ -83,7 +85,7 @@ void vm_graphic_set_font(font_size_t size) {
 }
 
 void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT length, VMUINT16 color) {
-	if (disp_buf == 0)
+	if (disp_buf == 0 || !s)
 		return;
 
 	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(disp_buf - VM_CANVAS_DATA_OFFSET);

@@ -51,7 +51,7 @@ bool Touch::d_event(d_event_e ev, touch_source s, sf::Vector2i d_pos) {
 			auto s_pos = to_screen_coords(d_pos);
 			if (is_on_screen(s_pos)) {
 				last_touch_pos = s_pos;
-				add_pen_event(VM_PEN_EVENT_RELEASE, s_pos.x, s_pos.y);
+				add_pen_event(VM_PEN_EVENT_MOVE, s_pos.x, s_pos.y);
 				return true;
 			}
 		}
