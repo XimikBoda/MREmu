@@ -43,7 +43,6 @@ const unsigned char bxlr[2] = { 0x70, 0x47 };
 const unsigned char idle_bin[2] = { 0xfe, 0xe7 };
 
 extern uc_engine* uc;
-uc_hook trace;
 
 namespace Bridge {
 	struct br_func {
@@ -1471,7 +1470,6 @@ namespace Bridge {
 
 	void init() {
 		size_t func_count = func_map.size();
-
 		func_ptr = (unsigned char*)Memory::shared_malloc(func_count * 2 + 2);
 
 		for (int i = 0; i < func_count; ++i)
@@ -1481,7 +1479,7 @@ namespace Bridge {
 
 		idle_p = ADDRESS_TO_EMU(func_ptr + func_count * 2) | 1;
 
-		uc_hook_add(uc, &trace, UC_HOOK_CODE, (void*)bridge_hoock, 0,
+		Cpu::add_hook(UC_HOOK_CODE, (void*)bridge_hoock, 0,
 			ADDRESS_TO_EMU(func_ptr), ADDRESS_TO_EMU(func_ptr + func_count * 2 - 1));
 
 		armodule.init(vm_get_sym_entry("armodule_malloc"),
