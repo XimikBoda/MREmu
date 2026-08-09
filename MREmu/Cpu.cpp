@@ -4,11 +4,15 @@
 #include <imgui.h>
 #include <imgui-SFML.h>
 #include <unicorn/unicorn.h>
+
+
+#ifdef CAPSTONE
 #include <capstone/capstone.h>
+Disassembler dism; //TODO
+#endif
 
 uc_engine* uc = 0;
 
-Disassembler dism; //TODO
 
 namespace Cpu {
 	void* stack_p = 0;
@@ -109,11 +113,14 @@ namespace Cpu {
 		unsigned char code[8];
 		uc_mem_read(uc, address, code, size);
 
+
+#ifdef CAPSTONE
 		cs_insn insn;
 		if (dism.disasm_one(&insn, code, size, address, is_thumb))
 			printf("0x%" PRIx64 ":\t%s\t%s\n", insn.address, insn.mnemonic, insn.op_str);
 		else
 			printf("Failed for disasm\n");
+#endif
 
 		print_code(code, size);
 	}
