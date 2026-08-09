@@ -45,14 +45,8 @@ public:
 
 	virtual bool is_native() { return true; }
 
-	template <typename Func, typename... Args>
+	template <bool from_hook = false, typename Func, typename... Args>
 	auto run(Func func, Args... args) {
-		if (is_native())
-			return func(std::forward<Args>(args)...);
-		else {
-			int n = sizeof...(args);
-
-			return (decltype(func(std::forward<Args>(args)...)))Bridge::run_cpu(FUNC_TO_UINT32(func), n, args...);
-		}
+		return Bridge::run<from_hook>(is_native(), func, std::forward<Args>(args)...);
 	}
 };
