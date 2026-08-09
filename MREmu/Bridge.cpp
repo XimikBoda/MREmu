@@ -819,6 +819,14 @@ namespace Bridge {
 		{FUNCN(vm_finalize_screen_buffer), [](uc_engine* uc) {
 			vm_finalize_screen_buffer();
 		}},
+		{FUNCN(vm_graphic_drawtext), [](uc_engine* uc) {
+			vm_graphic_drawtext(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+				read_arg(uc, 3),
+				read_arg(uc, 4));
+		}},
 		{FUNCN(vm_dd_initialize_clip_rect), [](uc_engine* uc) {
 			vm_dd_initialize_clip_rect();
 		}},
@@ -1420,6 +1428,9 @@ namespace Bridge {
 		}},
 		{FUNCN(rand), [](uc_engine* uc) {
 			write_ret(uc, rand());
+		}},
+		{FUNCN(strtoi), [](uc_engine* uc) {
+			write_ret(uc, strtoi((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 
 

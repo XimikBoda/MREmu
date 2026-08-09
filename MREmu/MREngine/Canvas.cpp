@@ -108,6 +108,9 @@ void MREngine::AppGraphic::imgui_canvases() {
 }
 
 MREngine::canvas_signature* find_canvas_signature(VMUINT8* buf) {
+	if (!buf)
+		return 0;
+
 	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)buf;
 	if (memcmp(cs->magic, CANVAS_MAGIC, 9) == 0)
 		return cs;

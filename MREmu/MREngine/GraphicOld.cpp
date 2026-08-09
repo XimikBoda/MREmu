@@ -75,6 +75,19 @@ void vm_finalize_screen_buffer(void) {
 	}
 }
 
+void vm_graphic_drawtext(VMINT x, VMINT y, VMWSTR s, VMINT32 length, VMINT color) {
+	MREngine::AppGraphic& gr = get_current_app_graphic();
+
+	VMUINT8* disp_buf = 0;
+
+	if (gr.old_layer != -1)
+		disp_buf = vm_graphic_get_layer_buffer(gr.old_layer);
+	else if(gr.layers.size())
+		disp_buf = (VMUINT8*)gr.layers[0].buf;
+
+	vm_graphic_textout(disp_buf, x, y, s, length, color);
+}
+
 void vm_dd_initialize_clip_rect(void) {
 	int w = vm_graphic_get_screen_width();
 	int h = vm_graphic_get_screen_height();

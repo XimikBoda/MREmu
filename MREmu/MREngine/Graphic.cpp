@@ -269,6 +269,8 @@ void MREngine::AppGraphic::imgui_layers() {
 	if (ImGui::Begin("Layers")) {
 		for (int i = 0; i < layers.size(); ++i) {
 			auto& el = layers[i];
+			if (el.w > 1000 || el.h > 1000)
+				return;
 			buf_to_texture(el.buf, el.w, el.h, el.tex);
 			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d, t: %d",
 				i, el.x, el.y, el.w, el.h, el.trans_color);

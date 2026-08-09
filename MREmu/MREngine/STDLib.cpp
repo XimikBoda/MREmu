@@ -1,6 +1,11 @@
 #include <vmstdlib.h>
 #include <cstring>
 #include <cstdint>
+#include <stdlib.h>
+
+int strtoi(char* s) {
+	return atoi(s);
+}
 
 vm_dyn_array_t* vm_create_dyn_array(VMINT init_size, VMINT inc_size, VMINT block_size) {
 	if (init_size < 0 || inc_size <= 0 || block_size < 0)

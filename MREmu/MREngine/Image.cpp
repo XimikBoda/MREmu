@@ -13,8 +13,6 @@
 #define GIF_OUTPUT_FORMAT GIF_OUTPUT_RGBA8888
 #include "gif.h"
 
-uint8_t scratch[GIF_SCRATCH_BUFFER_REQUIRED_SIZE];
-
 extern write_color_t write_color_funcs[4];
 
 struct gif_frame {
@@ -30,7 +28,7 @@ struct gif_frame {
 	int ret = 0;
 };
 
-static gif_frame gif_get_next_frame(GIF_Context *ctx){
+static gif_frame gif_get_next_frame(GIF_Context* ctx) {
 	gif_frame frame = {};
 
 	{
@@ -108,7 +106,9 @@ std::vector<frame_t> load_image(const uint8_t* data, size_t size) {
 		GIF_Context ctx;
 		std::vector<frame_t> frames;
 
-		int result = gif_init(&ctx, data, size, scratch, sizeof(scratch));
+		std::vector<uint8_t> scratch(GIF_SCRATCH_BUFFER_REQUIRED_SIZE);
+
+		int result = gif_init(&ctx, data, size, scratch.data(), scratch.size());
 		if (result != GIF_SUCCESS) {
 			return {};
 		}
@@ -121,7 +121,7 @@ std::vector<frame_t> load_image(const uint8_t* data, size_t size) {
 			auto g_f = gif_get_next_frame(&ctx);
 			ctx.loop_count = 0;
 
-			if (g_f.ret == GIF_ERROR_NO_FRAME)
+			if (g_f.ret == GIF_ERROR_NO_FRAME || g_f.ret == GIF_ERROR_EARLY_EOF)
 				break;
 			if (g_f.ret != GIF_SUCCESS) {
 				gif_close(&ctx);
