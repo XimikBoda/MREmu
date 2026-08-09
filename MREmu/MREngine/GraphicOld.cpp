@@ -1,4 +1,5 @@
 #include "Graphic.h"
+#include "Image.h"
 #include <vmgraph.h>
 #include <vmgfxold.h>
 
@@ -72,4 +73,27 @@ void vm_finalize_screen_buffer(void) {
 
 		gr.old_layer_inited = false;
 	}
+}
+
+void vm_dd_initialize_clip_rect(void) {
+	int w = vm_graphic_get_screen_width();
+	int h = vm_graphic_get_screen_height();
+
+	vm_graphic_set_clip(0, 0, w, h);
+}
+
+VMUINT8* vm_dd_load_image(VMUINT8* img, VMINT img_len) {
+	return (VMUINT8*)vm_graphic_load_image_FIX(img, img_len);
+}
+
+struct frame_prop* vm_dd_get_img_property(VMUINT8* img, VMUINT8 frame_index) {
+	return vm_graphic_get_img_property_FIX(img, frame_index);
+}
+
+VMINT vm_dd_get_frame_number(VMUINT8* img) {
+	return vm_graphic_get_frame_number_FIX(img);
+}
+
+void vm_dd_clean(VMUINT8* buf, VMUINT16 color16) {
+	vm_graphic_fill_rect(buf, 0, 0, 1000, 1000, color16, color16);
 }

@@ -819,6 +819,35 @@ namespace Bridge {
 		{FUNCN(vm_finalize_screen_buffer), [](uc_engine* uc) {
 			vm_finalize_screen_buffer();
 		}},
+		{FUNCN(vm_dd_initialize_clip_rect), [](uc_engine* uc) {
+			vm_dd_initialize_clip_rect();
+		}},
+		{FUNCN(vm_dd_load_image), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_dd_load_image(
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1)
+				)));
+		}},
+		{FUNCN(vm_dd_get_img_property), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_dd_get_img_property(
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1)
+				)));
+		}},
+		{FUNCN(vm_dd_get_frame_number), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_dd_get_frame_number(
+					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0))
+				));
+		}},
+		{FUNCN(vm_dd_clean), [](uc_engine* uc) {
+			vm_dd_clean(
+				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1)
+			);
+		}},
 
 
 
