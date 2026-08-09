@@ -10,7 +10,11 @@ using namespace std::string_literals;
 
 #ifdef  WIN32
 
-bool DLLApp::check_format(fs::path path) {
+bool DLLApp::check_format(fs::path path, bool local) {
+	if (local) {
+		path = path_from_emu(path);
+	}
+
 	unsigned char buf[4];
 	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
 	if (!in.is_open())

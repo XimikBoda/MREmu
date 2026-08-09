@@ -1,4 +1,5 @@
 #include "Graphic.h"
+#include "Canvas.h"
 #include "../Memory.h"
 #include <imgui.h>
 #include <imgui-SFML.h>
@@ -7,6 +8,90 @@
 #include <vmpromng.h>
 
 MREngine::Graphic* graphic = 0; // Do I really need this?
+
+MREngine::RenderBox::RenderBox(int st_x, int st_y, int end_x, int end_y) {
+	this->st_x = st_x;
+	this->st_y = st_y;
+	this->end_x = end_x;
+	this->end_y = end_y;
+}
+
+MREngine::RenderBox::RenderBox(const canvas_frame_property& cfp) {
+	this->st_x = 0;
+	this->st_y = 0;
+	this->end_x = cfp.width;
+	this->end_y = cfp.height;
+}
+
+void MREngine::RenderBox::clip(const canvas_frame_property& cfp) {
+	if (st_x < 0)
+		st_x = 0;
+	if (st_y < 0)
+		st_y = 0;
+	if (end_x > cfp.width)
+		end_x = cfp.width;
+	if (end_y > cfp.height)
+		end_y = cfp.height;
+}
+
+void MREngine::RenderBox::clip(const layer& layer) {
+	if (st_x < 0)
+		st_x = 0;
+	if (st_y < 0)
+		st_y = 0;
+	if (end_x > layer.w)
+		end_x = layer.w;
+	if (end_y > layer.h)
+		end_y = layer.h;
+}
+
+void MREngine::RenderBox::clip(const clip_rect& clip) {
+	if (clip.flag) {
+		if (st_x < clip.left)
+			st_x = clip.left;
+		if (st_y < clip.top)
+			st_y = clip.top;
+		if (end_x > clip.right + 1)
+			end_x = clip.right + 1;
+		if (end_y > clip.bottom + 1)
+			end_y = clip.bottom + 1;
+	}
+}
+
+void MREngine::RenderBox::clip(int x1, int y1, int x2, int y2) {
+	if (st_x < x1)
+		st_x = x1;
+	if (st_y < y1)
+		st_y = y1;
+	if (end_x > x2)
+		end_x = x2;
+	if (end_y > y2)
+		end_y = y2;
+}
+
+void MREngine::RenderBox::include(int x, int y) {
+	if (st_x > x)
+		st_x = x;
+	if (st_y > y)
+		st_y = y;
+	if (end_x <= x)
+		end_x = x;
+	if (end_y <= y)
+		end_y = y;
+}
+
+bool MREngine::RenderBox::in(int x, int y) {
+	return x >= st_x && y >= st_y && x < end_x && y < end_y;
+}
+
+bool MREngine::RenderBox::x_in(int x) {
+	return x >= st_x && x < end_x;
+}
+
+bool MREngine::RenderBox::y_in(int y) {
+	return y >= st_y && y < end_y;
+}
+
 
 void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 	static std::vector<unsigned char> pix_data;
@@ -24,47 +109,7 @@ void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 	sf::Image im;
 	im.create(w, h, &pix_data[0]);
 
-	//sf::Texture tex;
 	tex.loadFromImage(im);
-
-	//return tex;
-}
-
-void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
-	static std::vector<unsigned char> pix_data;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)p.first;
-
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
-		return;
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	int w = cfp->width, h = cfp->height;
-
-	if (!(w * h))
-		return;
-
-	if (pix_data.size() < w * h * 4)
-		pix_data.resize(w * h * 4);
-
-	unsigned short trans_color = cfp->trans_color;
-	bool flag = cfp->flag;
-
-	unsigned short* buf16 = (unsigned short*)(cfp + 1);
-	for (int i = 0; i < w * h; ++i) {
-		if (flag && trans_color == buf16[i])
-			pix_data[i * 4 + 3] = 0x00;
-		else
-			pix_data[i * 4 + 3] = 0xFF;
-		pix_data[i * 4 + 0] = VM_COLOR_GET_RED(buf16[i]);
-		pix_data[i * 4 + 1] = VM_COLOR_GET_GREEN(buf16[i]);
-		pix_data[i * 4 + 2] = VM_COLOR_GET_BLUE(buf16[i]);
-	}
-	sf::Image im;
-	im.create(w, h, pix_data.data());
-
-	p.second.loadFromImage(im);
 }
 
 MREngine::Graphic::Graphic()
@@ -125,6 +170,8 @@ void MREngine::Graphic::update_screen() {
 void MREngine::Graphic::imgui_screen() {
 	if (ImGui::Begin("Screen")) {
 		ImGui::Image(screen_tex);
+		if (ImGui::Button("Paint"))
+			vm_graphic_flush_screen();
 	}
 	ImGui::End();
 }
@@ -136,6 +183,23 @@ MREngine::Graphic::~Graphic()
 }
 
 
+MREngine::layer* MREngine::AppGraphic::find_layer_by_buf(void* buf)
+{
+	for (auto& layer : layers)
+		if (layer.buf == buf)
+			return &layer;
+
+	return 0;
+}
+
+clip_rect MREngine::AppGraphic::clip_by_buf(void* buf) {
+	auto layer = find_layer_by_buf(buf);
+	if (layer)
+		return layer->clip;
+	else
+		return { 0, 0, 0, 0, 0 };
+}
+
 int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_color) {
 	if (!graphic)
 		return -1;
@@ -144,7 +208,7 @@ int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_col
 		if (x != 0 || y != 0 || w != graphic->width || h != graphic->height)
 			return -1;
 
-		layers.push_back({ graphic->base_buf1, x, y, w, h, trans_color });
+		layers.push_back({ graphic->base_buf1, x, y, w, h, trans_color, {0, 0, (short)w, (short)h, 0} });
 		active_layer = 0;
 		return 0;
 	}
@@ -157,7 +221,7 @@ int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_col
 		cfp->width = w;
 		cfp->height = h;
 
-		layers.push_back({ graphic->base_buf2, x, y, w, h, trans_color });
+		layers.push_back({ graphic->base_buf2, x, y, w, h, trans_color, {0, 0, (short)w, (short)h, 0} });
 		return 1;
 	}
 	else
@@ -180,7 +244,7 @@ int MREngine::AppGraphic::create_layer_ex(int x, int y, int w, int h, int trans_
 	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
 	unsigned short* buf16 = (unsigned short*)(cfp + 1);
 
-	layers.push_back({ buf16, x, y, w, h, trans_color });
+	layers.push_back({ buf16, x, y, w, h, trans_color, {0, 0, (short)w, (short)h, 0} });
 
 	return layers.size() - 1;
 }
@@ -205,6 +269,8 @@ void MREngine::AppGraphic::imgui_layers() {
 	if (ImGui::Begin("Layers")) {
 		for (int i = 0; i < layers.size(); ++i) {
 			auto& el = layers[i];
+			if (el.w > 1000 || el.h > 1000)
+				return;
 			buf_to_texture(el.buf, el.w, el.h, el.tex);
 			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d, t: %d",
 				i, el.x, el.y, el.w, el.h, el.trans_color);
@@ -213,33 +279,6 @@ void MREngine::AppGraphic::imgui_layers() {
 	}
 	ImGui::End();
 }
-
-void MREngine::AppGraphic::imgui_canvases() {
-	std::lock_guard lock(canvases_list_mutex);
-	if (ImGui::Begin("Canvases")) {
-		for (int i = 0; i < canvases_list.size(); ++i) {
-			auto& el = canvases_list[i];
-			canvas_to_texture(el);
-
-			MREngine::canvas_signature* cs = (MREngine::canvas_signature*)el.first;
-
-			if (memcmp(cs->magic, CANVAS_MAGIC, 9)) {
-				ImGui::Text("Wrong canvas magic");
-				break;
-			}
-
-			MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-			int w = cfp->width, h = cfp->height;
-
-			ImGui::Text("Id: %d, x: %d, y: %d, w: %d, h: %d",
-				i, cfp->left, cfp->top, cfp->width, cfp->height);
-			ImGui::Image(el.second);
-		}
-	}
-	ImGui::End();
-}
-
 
 //MRE API
 
@@ -291,87 +330,21 @@ VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
 	return (VMUINT8*)get_current_app_graphic().get_layer_buf(handle);
 }
 
-VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
-	if (layer_handles == 0)
-		return -1;
+VMINT vm_graphic_clear_layer_bg(VMINT handle) {
+	auto& gr = get_current_app_graphic();
 
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	if (handle < 0 || handle >= gr.layers.size())
+		return VM_GDI_FAILED;
 
-	for (int i = 0; i < count; ++i)
-		if (layer_handles[i] < 0 || layer_handles[i] >= gr.layers.size())
-			return -1;
+	auto& layer = gr.layers[handle];
+	auto trans_color = layer.trans_color;
 
-	for (int sy = 0; sy < graphic->height; ++sy)
-		for (int sx = 0; sx < graphic->width; ++sx)
-			for (int lid = count - 1; lid >= 0; --lid) {
-				auto& layer = gr.layers[layer_handles[lid]];
-				int lx = sx - layer.x;
-				int ly = sy - layer.y;
-				uint16_t* buf = (uint16_t*)layer.buf;
+	if(trans_color == -1)
+		return VM_GDI_FAILED;
 
-				if (lx < 0 || lx >= layer.w || ly < 0 || ly >= layer.h)
-					continue;
-
-				uint16_t color = buf[ly * layer.w + lx];
-				if (int(color) == layer.trans_color)
-					continue;
-
-				graphic->screen[sy * graphic->width + sx] = color;
-				break;
-			}
-
-	graphic->screen_changed = true;
+	vm_graphic_fill_rect((VMUINT8*)layer.buf, 0, 0, layer.w, layer.h, trans_color, trans_color);
 	return VM_GDI_SUCCEED;
 }
-
-VM_GDI_RESULT vm_graphic_flatten_layer(VMINT* hhandle, VMINT count) {
-	if (hhandle == 0)
-		return -1;
-
-	MREngine::AppGraphic& gr = get_current_app_graphic();
-
-	for (int i = 0; i < count; ++i)
-		if (hhandle[i] < 0 || hhandle[i] >= gr.layers.size())
-			return -1;
-
-	for (int sy = 0; sy < graphic->height; ++sy)
-		for (int sx = 0; sx < graphic->width; ++sx) {
-			auto& act_layer = gr.layers[gr.active_layer];
-			int act_lx = sx - act_layer.x;
-			int act_ly = sy - act_layer.y;
-			uint16_t* act_buf = (uint16_t*)act_layer.buf;
-
-			if (act_lx < 0 || act_lx >= act_layer.w || act_ly < 0 || act_ly >= act_layer.h)
-				continue;
-
-			for (int lid = count - 1; lid >= 0; --lid) {
-				if (hhandle[lid] == gr.active_layer)
-					continue;
-				auto& layer = gr.layers[hhandle[lid]];
-				int lx = sx - layer.x;
-				int ly = sy - layer.y;
-				uint16_t* buf = (uint16_t*)layer.buf;
-
-				if (lx < 0 || lx >= layer.w || ly < 0 || ly >= layer.h)
-					continue;
-
-				uint16_t color = buf[ly * layer.w + lx];
-				if (int(color) == layer.trans_color)
-					continue;
-
-				act_buf[act_ly * act_layer.w + act_lx] = color;
-				break;
-			}
-		}
-
-	for (int i = 0; i < count; ++i)
-		if (hhandle[count - 1 - i] != gr.active_layer)
-			gr.delete_layer(hhandle[count - 1 - i]);
-
-	graphic->screen_changed = true;
-	return VM_GDI_SUCCEED;
-}
-
 
 VM_GDI_RESULT vm_graphic_translate_layer(VMINT handle, VMINT tx, VMINT ty) {
 	MREngine::AppGraphic& gr = get_current_app_graphic();
@@ -388,415 +361,17 @@ VMINT vm_graphic_get_bits_per_pixel(void) {
 	return 2;
 }
 
-MREngine::canvas_signature* find_canvas_signature(VMUINT8* buf) {
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)buf;
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9) == 0)
-		return cs;
-	cs = (MREngine::canvas_signature*)(buf - VM_CANVAS_DATA_OFFSET);
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9) == 0)
-		return cs;
-	return 0;
-}
-
-VMINT_CANVAS vm_graphic_create_canvas_FIX(VMINT width, VMINT height) {
-	int image_size = width * height * 2;
-	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-	if (canvas_buf == 0)
-		return 0;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-	*cs = MREngine::canvas_signature();
-	memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	*cfp = MREngine::canvas_frame_property();
-	cfp->width = width;
-	cfp->height = height;
-
-	cfp->offset = image_size;
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
-
-	return (VMINT_CANVAS)canvas_buf;
-}
-
-VMINT_CANVAS vm_graphic_create_canvas_cf_FIX(vm_graphic_color_famat cf, VMINT width, VMINT height) {
-	if (cf != VM_GRAPHIC_COLOR_FORMAT_16)
-		return (VMINT_CANVAS)0;
-
-	return vm_graphic_create_canvas_FIX(width, height);
-}
-
-void vm_graphic_release_canvas_FIX(VMINT_CANVAS hcanvas) {
-	void* hcanvas_adr = hcanvas;
-	auto& canvases_list = get_current_app_graphic().canvases_list;
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-
-	for (int i = 0; i < canvases_list.size(); ++i)
-		if (canvases_list[i].first == hcanvas_adr) {
-			canvases_list.erase(canvases_list.begin() + i);
-			break;
-		}
-
-	vm_free(hcanvas_adr);
-}
-
-void vm_graphic_release_canvas_ex_FIX(VMINT_CANVAS hcanvas) {
-	vm_graphic_release_canvas_FIX(hcanvas); // TODO
-}
-
-VMUINT8* vm_graphic_get_canvas_buffer_FIX(VMINT_CANVAS hcanvas) {
-	return (VMUINT8*)hcanvas;
-}
-
-VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len) {
-	sf::Image im;
-	if (!im.loadFromMemory(img, img_len))
-		return 0;
-
-	int image_size = im.getSize().x * im.getSize().y * 2;
-	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-	if (canvas_buf == 0)
-		return 0;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-	*cs = MREngine::canvas_signature();
-	memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	int t = sizeof(MREngine::canvas_frame_property);
-
-	*cfp = MREngine::canvas_frame_property();
-	cfp->width = im.getSize().x;
-	cfp->height = im.getSize().y;
-
-	cfp->offset = image_size;
-
-	uint16_t* image_buf = (uint16_t*)(cfp + 1);
-	sf::Color* rgb_buf = (sf::Color*)im.getPixelsPtr();
-
-	for (int i = 0; i < image_size / 2; ++i) {
-		sf::Color c = rgb_buf[i];
-		image_buf[i] = VM_COLOR_888_TO_565(c.r, c.g, c.b);
-	}
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
-
-	return (VMINT_CANVAS)canvas_buf;
-}
-
-VMINT_CANVAS vm_graphic_load_image_resized_FIX(VMUINT8* img, VMINT img_len, VMINT width, VMINT height) {
-	sf::Image im;
-	if (!im.loadFromMemory(img, img_len))
-		return 0;
-
-	int image_size = width * height * 2;
-	void* canvas_buf = vm_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-	if (canvas_buf == 0)
-		return 0;
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-	*cs = MREngine::canvas_signature();
-	memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-	MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-	int t = sizeof(MREngine::canvas_frame_property);
-
-	*cfp = MREngine::canvas_frame_property();
-	cfp->width = width;
-	cfp->height = height;
-
-	cfp->offset = image_size;
-
-	uint16_t* image_buf = (uint16_t*)(cfp + 1);
-	sf::Color* rgb_buf = (sf::Color*)im.getPixelsPtr();
-	int im_width = im.getSize().x;
-	int im_height = im.getSize().y;
-
-	for (int y = 0; y < height; ++y) {
-		int ny = y * im_height / height;
-
-		for (int x = 0; x < width; ++x) {
-			int nx = x * im_width / width;
-
-			sf::Color c = rgb_buf[nx + ny * im_width];
-			image_buf[x + y * width] = VM_COLOR_888_TO_565(c.r, c.g, c.b);
-		}
-	}
-
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
-
-	return (VMINT_CANVAS)canvas_buf;
-}
-
-struct frame_prop* vm_graphic_get_img_property_FIX(VMINT_CANVAS hcanvas, VMUINT8 frame_index) {
-	if (hcanvas == 0)
-		return 0;
-
-	static struct frame_prop* info = (frame_prop*)Memory::shared_malloc(sizeof(frame_prop));
-
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
-		return 0;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
-
-	//TODO frame index
-
-	info->flag = cfp_dst->flag;
-	info->left = cfp_dst->left;
-	info->top = cfp_dst->top;
-	info->width = cfp_dst->width;
-	info->height = cfp_dst->height;
-	info->delay_time = cfp_dst->delay * 10; //todo check this
-	info->trans_color_index = cfp_dst->trans_color_index;
-	info->trans_color = cfp_dst->trans_color;
-	info->offset = cfp_dst->offset;
-
-	return info;
-}
-
-VM_GDI_RESULT vm_graphic_get_img_property_ex(VMUINT8* img_data, VMINT img_len, vm_graphic_imgprop* img_prop) {
-	sf::Image im;
-	if (!img_prop || !im.loadFromMemory(img_data, img_len))
-		return VM_GDI_FAILED;
-
-	img_prop->width = im.getSize().x;
-	img_prop->height = im.getSize().y;
-
-	return VM_GDI_SUCCEED;
-}
-
-void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,
-	VMINT x_src, VMINT y_src, VMINT width, VMINT height, VMINT frame_index) {
-	if (dst_disp_buf == 0 || src_disp_buf == 0)
-		return;
-
-	MREngine::canvas_signature* cs_dst = find_canvas_signature(dst_disp_buf);
-	MREngine::canvas_signature* cs_src = find_canvas_signature(src_disp_buf);
-	if (!cs_dst || !cs_src)
-		return;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
-	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
-	unsigned short* buf16_src = (unsigned short*)(cfp_src + 1);
-
-	if (x_src + width > cfp_src->width)
-		width = cfp_src->width - x_src;
-	if (y_src + height > cfp_src->height)
-		height = cfp_src->height - y_src;
-
-	int st_x = std::max(0, x_dest);
-	int st_y = std::max(0, y_dest);
-
-	int end_x = std::min<int>(cfp_dst->width, x_dest + width);
-	int end_y = std::min<int>(cfp_dst->height, y_dest + height);
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	bool flag = cfp_src->flag;
-	unsigned short trans_color = cfp_src->trans_color;
-
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx) {
-			int im_x = sx - x_dest + x_src;
-			int im_y = sy - y_dest + y_src;
-			unsigned short scr_color = buf16_src[im_y * cfp_src->width + im_x];
-			if (!flag || scr_color != trans_color)
-				buf16_dst[sy * cfp_dst->width + sx] = scr_color;
-		}
-}
-
-void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,
-	VMINT x_src, VMINT y_src, VMINT width, VMINT height, VMINT frame_index, VMINT alpha) {
-	if (dst_disp_buf == 0 || src_disp_buf == 0)
-		return;
-
-	MREngine::canvas_signature* cs_dst = find_canvas_signature(dst_disp_buf);
-	MREngine::canvas_signature* cs_src = find_canvas_signature(src_disp_buf);
-	if (!cs_dst || !cs_src)
-		return;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
-	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
-	unsigned short* buf16_src = (unsigned short*)(cfp_src + 1);
-
-	if (x_src + width > cfp_src->width)
-		width = cfp_src->width - x_src;
-	if (y_src + height > cfp_src->height)
-		height = cfp_src->height - y_src;
-
-	int st_x = std::max(0, x_dest);
-	int st_y = std::max(0, y_dest);
-
-	int end_x = std::min<int>(cfp_dst->width, x_dest + width);
-	int end_y = std::min<int>(cfp_dst->height, y_dest + height);
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	bool flag = cfp_src->flag;
-	unsigned short trans_color = cfp_src->trans_color;
-
-	//TODO alpha blend
-
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx) {
-			int im_x = sx - x_dest + x_src;
-			int im_y = sy - y_dest + y_src;
-			unsigned short scr_color = buf16_src[im_y * cfp_src->width + im_x];
-			if (!flag || scr_color != trans_color)
-				buf16_dst[sy * cfp_dst->width + sx] = scr_color;
-		}
-}
-
-void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
-	VMBYTE* src_buf, VMINT frame_index, VMINT degrees) { //Need more testing
-	if (buf == 0 || src_buf == 0)
-		return;
-
+VMUINT16 vm_graphic_get_pixel(VMUINT8* buf, VMINT x, VMINT y) {
 	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
-	MREngine::canvas_signature* cs_src = find_canvas_signature(src_buf);
-	if (!cs_dst || !cs_src)
-		return;
+	if (!cs_dst)
+		return 0;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
-	unsigned short* buf16_src = (unsigned short*)(cfp_src + 1);
 
-	int width = cfp_src->width;
-	int height = cfp_src->height;
+	if (x < 0 || x >= 0 || y < cfp_dst->width || y >= cfp_dst->height)
+		return 0;
 
-	if (degrees == VM_ROTATE_DEGREE_90 || degrees == VM_ROTATE_DEGREE_270)
-		std::swap(width, height);
-
-	int st_x = std::max(0, x_des);
-	int st_y = std::max(0, y_des);
-
-	int end_x = std::min<int>(cfp_dst->width, x_des + width);
-	int end_y = std::min<int>(cfp_dst->height, y_des + height);
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	bool flag = cfp_src->flag;
-	unsigned short trans_color = cfp_src->trans_color;
-
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx) {
-			int im_x = sx - x_des;
-			int im_y = sy - y_des;
-
-			if (degrees == VM_ROTATE_DEGREE_90) {
-				std::swap(im_x, im_y);
-				im_y = width - im_y - 1;
-			}
-			else if (degrees == VM_ROTATE_DEGREE_270) {
-				std::swap(im_x, im_y);
-				im_x = height - im_x - 1;
-			}
-			else if (degrees == VM_ROTATE_DEGREE_180)
-				im_x = width - im_x - 1, im_y = height - im_y - 1;
-
-
-			unsigned short scr_color = buf16_src[im_y * cfp_src->width + im_x];
-			if (!flag || scr_color != trans_color)
-				buf16_dst[sy * cfp_dst->width + sx] = scr_color;
-		}
-}
-
-
-void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, VMINT frame_index, VMINT direction) {
-	if (buf == 0 || src_buf == 0)
-		return;
-
-	MREngine::canvas_signature* cs_dst = find_canvas_signature(buf);
-	MREngine::canvas_signature* cs_src = find_canvas_signature(src_buf);
-	if (!cs_dst || !cs_src)
-		return;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
-	MREngine::canvas_frame_property* cfp_src = (MREngine::canvas_frame_property*)(cs_src + 1);
-	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
-	unsigned short* buf16_src = (unsigned short*)(cfp_src + 1);
-
-	int width = cfp_src->width;
-	int height = cfp_src->height;
-
-	int st_x = std::max(0, x_des);
-	int st_y = std::max(0, y_des);
-
-	int end_x = std::min<int>(cfp_dst->width, x_des + width);
-	int end_y = std::min<int>(cfp_dst->height, y_des + height);
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	bool flag = cfp_src->flag;
-	unsigned short trans_color = cfp_src->trans_color;
-
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx) {
-			int im_x = sx - x_des;
-			int im_y = sy - y_des;
-
-			if (direction == VM_MIRROR_X)
-				im_x = width - im_x - 1;
-			else if (direction == VM_MIRROR_Y)
-				im_y = height - im_y - 1;
-
-			unsigned short scr_color = buf16_src[im_y * cfp_src->width + im_x];
-			if (!flag || scr_color != trans_color)
-				buf16_dst[sy * cfp_dst->width + sx] = scr_color;
-		}
+	return buf16_dst[y * cfp_dst->width + x];
 }
 
 void vm_graphic_set_pixel(VMUINT8* buf, VMINT x, VMINT y, VMUINT16 color) {
@@ -806,27 +381,13 @@ void vm_graphic_set_pixel(VMUINT8* buf, VMINT x, VMINT y, VMUINT16 color) {
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
 
-	int left = 0;
-	int top = 0;
-	int right = cfp_dst->width;
-	int bottom = cfp_dst->height;
+	MREngine::RenderBox b(*cfp_dst);
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (left < clip.left)
-			left = clip.left;
-		if (top < clip.top)
-			top = clip.top;
-		if (right > clip.right + 1)
-			right = clip.right + 1;
-		if (bottom > clip.bottom + 1)
-			bottom = clip.bottom + 1;
-	}
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
 
-	if (x < left || x >= right || y < top || y >= bottom)
-		return;
-
-	buf16_dst[y * cfp_dst->width + x] = color;
+	if (b.in(x, y))
+		buf16_dst[y * cfp_dst->width + x] = color;
 }
 
 void vm_graphic_set_pixel_ex(VMINT handle, VMINT x1, VMINT y1) {
@@ -852,36 +413,22 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 	if (x0 == x1 && y0 == y1)
 		return vm_graphic_set_pixel(buf, x0, y0, color);
 
-	int left = 0;
-	int top = 0;
-	int right = cfp_dst->width;
-	int bottom = cfp_dst->height;
+	MREngine::RenderBox b(*cfp_dst);
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (left < clip.left)
-			left = clip.left;
-		if (top < clip.top)
-			top = clip.top;
-		if (right > clip.right + 1)
-			right = clip.right + 1;
-		if (bottom > clip.bottom + 1)
-			bottom = clip.bottom + 1;
-	}
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+
 	if (abs(x1 - x0) >= abs(y1 - y0)) {
 		if (x0 > x1) {
 			std::swap(x0, x1);
 			std::swap(y0, y1);
 		}
-		int st_x = std::max(left, x0);
-		int end_x = std::min(right, x1 + 1);
+		b.clip(x0, std::min(y0, y1), x1 + 1, std::max(y0, y1) + 1);
 
-		for (int x = st_x; x < end_x; ++x) {
+		for (int x = b.st_x; x < b.end_x; ++x) {
 			int y = y1 - (x1 - x) * (y1 - y0) / (x1 - x0);
-			if (y < top || y >= bottom)
-				continue;
-
-			buf16_dst[y * cfp_dst->width + x] = color;
+			if (b.y_in(y))
+				buf16_dst[y * cfp_dst->width + x] = color;
 		}
 	}
 	else {
@@ -889,15 +436,12 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 			std::swap(x0, x1);
 			std::swap(y0, y1);
 		}
-		int st_y = std::max(top, y0);
-		int end_y = std::min(bottom, y1 + 1);
+		b.clip(std::min(x0, x1), y0, std::max(x0, x1) + 1, y1 + 1);
 
-		for (int y = st_y; y < end_y; ++y) {
+		for (int y = b.st_y; y < b.end_y; ++y) {
 			int x = x1 - (y1 - y) * (x1 - x0) / (y1 - y0);
-			if (x < left || x >= right)
-				continue;
-
-			buf16_dst[y * cfp_dst->width + x] = color;
+			if (b.x_in(x))
+				buf16_dst[y * cfp_dst->width + x] = color;
 		}
 	}
 }
@@ -922,38 +466,26 @@ void vm_graphic_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, 
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
 
-	int st_x = std::max(0, x);
-	int st_y = std::max(0, y);
+	MREngine::RenderBox b(x, y, x + width, y + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x + width);
-	int end_y = std::min<int>(cfp_dst->height, y + height);
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	if (st_x <= x && x < end_x)
-		for (int sy = st_y; sy < end_y; ++sy)
+	if (b.st_x <= x && x < b.end_x)
+		for (int sy = b.st_y; sy < b.end_y; ++sy)
 			buf16_dst[sy * cfp_dst->width + x] = color;
 
-	if (st_x <= x + width - 1 && x + width - 1 < end_x)
-		for (int sy = st_y; sy < end_y; ++sy)
+	if (b.st_x <= x + width - 1 && x + width - 1 < b.end_x)
+		for (int sy = b.st_y; sy < b.end_y; ++sy)
 			buf16_dst[sy * cfp_dst->width + x + width - 1] = color;
 
-	if (st_y <= y && y < end_y)
-		for (int sx = st_x; sx < end_x; ++sx)
+	if (b.st_y <= y && y < b.end_y)
+		for (int sx = b.st_x; sx < b.end_x; ++sx)
 			buf16_dst[y * cfp_dst->width + sx] = color;
 
-	if (st_y <= y + height - 1 && y + height - 1 < end_y)
-		for (int sx = st_x; sx < end_x; ++sx)
+	if (b.st_y <= y + height - 1 && y + height - 1 < b.end_y)
+		for (int sx = b.st_x; sx < b.end_x; ++sx)
 			buf16_dst[(y + height - 1) * cfp_dst->width + sx] = color;
 }
 
@@ -977,26 +509,14 @@ void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
 
-	int st_x = std::max(0, x);
-	int st_y = std::max(0, y);
+	MREngine::RenderBox b(x, y, x + width, y + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x + width);
-	int end_y = std::min<int>(cfp_dst->height, y + height);
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx)
+	for (int sy = b.st_y; sy < b.end_y; ++sy)
+		for (int sx = b.st_x; sx < b.end_x; ++sx)
 			if (x == sx || y == sy || sx == x + width - 1 || sy == y + height - 1)
 				buf16_dst[sy * cfp_dst->width + sx] = line_color;
 			else
@@ -1033,28 +553,16 @@ void vm_graphic_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
 
-	int st_x = std::max(0, x);
-	int st_y = std::max(0, y);
+	MREngine::RenderBox b(x, y, x + width , y + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x + width);
-	int end_y = std::min<int>(cfp_dst->height, y + height);
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
 
 	corner_width = std::min(corner_width, std::min(width / 2, height / 2));
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx) {
+	for (int sy = b.st_y; sy < b.end_y; ++sy)
+		for (int sx = b.st_x; sx < b.end_x; ++sx) {
 			int dx1 = sx - x, dx2 = x + width - 1 - sx;
 			int dy1 = sy - y, dy2 = y + height - 1 - sy;
 			if (on_round(dx1, dy1, corner_width)
@@ -1097,28 +605,16 @@ void vm_graphic_fill_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMIN
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
 
-	int st_x = std::max(0, x);
-	int st_y = std::max(0, y);
+	MREngine::RenderBox b(x, y, x + width, y + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x + width);
-	int end_y = std::min<int>(cfp_dst->height, y + height);
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
 
 	corner_width = std::min(corner_width, std::min(width / 2, height / 2));
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
-
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx) {
+	for (int sy = b.st_y; sy < b.end_y; ++sy)
+		for (int sx = b.st_x; sx < b.end_x; ++sx) {
 			int dx1 = sx - x, dx2 = x + width - 1 - sx;
 			int dy1 = sy - y, dy2 = y + height - 1 - sy;
 			if (in_round(dx1, dy1, corner_width)
@@ -1150,24 +646,16 @@ void vm_graphic_ellipse(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT heigh
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
 
-	int clip_left = 0;
-	int clip_top = 0;
-	int clip_right = cfp_dst->width - 1;
-	int clip_bottom = cfp_dst->height - 1;
+	MREngine::RenderBox rb(x, y, x + width, y + height);
 
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		clip_left = std::max(clip_left, (int)clip.left);
-		clip_top = std::max(clip_top, (int)clip.top);
-		clip_right = std::min(clip_right, (int)clip.right);
-		clip_bottom = std::min(clip_bottom, (int)clip.bottom);
-	}
+	rb.clip(*cfp_dst);
+	rb.clip(get_current_app_graphic().clip);
+	rb.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
 
 	auto draw_pixel = [&](int px, int py) {
-		if (px >= clip_left && px <= clip_right && py >= clip_top && py <= clip_bottom) {
+		if (rb.in(px, py)) {
 			buf16_dst[py * cfp_dst->width + px] = color;
-		}
-		};
+		}};
 
 	int x0 = x;
 	int y0 = y;
@@ -1226,23 +714,11 @@ void vm_graphic_fill_ellipse(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT 
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
 
-	int st_x = std::max(0, x);
-	int st_y = std::max(0, y);
+	MREngine::RenderBox b(x, y, x + width, y + height);
 
-	int end_x = std::min<int>(cfp_dst->width, x + width);
-	int end_y = std::min<int>(cfp_dst->height, y + height);
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
+	b.clip(*cfp_dst);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
 
 	long long RX = width;
 	long long RY = height;
@@ -1250,11 +726,11 @@ void vm_graphic_fill_ellipse(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT 
 	long long RY_sq = RY * RY;
 	long long RX_sq_RY_sq = RX_sq * RY_sq;
 
-	for (int sy = st_y; sy < end_y; ++sy) {
+	for (int sy = b.st_y; sy < b.end_y; ++sy) {
 		long long DY = 2LL * sy + 1LL - 2LL * y - height;
 		long long DY_sq_RX_sq = DY * DY * RX_sq;
 
-		for (int sx = st_x; sx < end_x; ++sx) {
+		for (int sx = b.st_x; sx < b.end_x; ++sx) {
 			long long DX = 2LL * sx + 1LL - 2LL * x - width;
 
 			if ((DX * DX * RY_sq) + DY_sq_RX_sq <= RX_sq_RY_sq) {
@@ -1294,70 +770,61 @@ void vm_graphic_fill_polygon(VMINT handle, vm_graphic_point* point, VMINT npoint
 
 	auto& layer = layers[handle];
 
-	int st_x = point[0].x, st_y = point[0].y;
-	int end_x = st_x, end_y = st_y;
+	MREngine::RenderBox b(point[0].x, point[0].y, point[0].x + 1, point[0].y +1);
 
-	for (int i = 1; i < npoints; ++i) {
-		if (st_x > point[i].x)
-			st_x = point[i].x;
-		if (st_y > point[i].y)
-			st_y = point[i].y;
-		if (end_x < point[i].x)
-			end_x = point[i].x;
-		if (end_y < point[i].y)
-			end_y = point[i].y;
-	}
-	++end_x, ++end_y;
+	for (int i = 1; i < npoints; ++i) 
+		b.include(point[i].x, point[i].y);
 
-	if (st_x < 0)
-		st_x = 0;
-	if (st_y < 0)
-		st_y = 0;
-	if (end_x > layer.w)
-		end_x = layer.w;
-	if (end_y > layer.h)
-		end_y = layer.h;
-
-
-	auto& clip = get_current_app_graphic().clip;
-	if (clip.flag) {
-		if (st_x < clip.left)
-			st_x = clip.left;
-		if (st_y < clip.top)
-			st_y = clip.top;
-		if (end_x > clip.right + 1)
-			end_x = clip.right + 1;
-		if (end_y > clip.bottom + 1)
-			end_y = clip.bottom + 1;
-	}
+	b.clip(layer);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(layer.clip);
 
 	unsigned short color = get_current_app_graphic().global_color.vm_color_565;
 	unsigned short* buf16_dst = (unsigned short*)layer.buf;
 
-	for (int sy = st_y; sy < end_y; ++sy)
-		for (int sx = st_x; sx < end_x; ++sx)
+	for (int sy = b.st_y; sy < b.end_y; ++sy)
+		for (int sx = b.st_x; sx < b.end_x; ++sx)
 			if (is_point_in_path(sx, sy, point, npoints))
 				buf16_dst[sy * layer.w + sx] = color;
 }
 
+VM_GDI_RESULT vm_graphic_get_layer_clip(VMINT handle, clip_rect* curcliprect) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size() || !curcliprect)
+		return VM_GDI_FAILED;
+
+	auto& layer = layers[handle];
+
+	*curcliprect = layer.clip;
+
+	return VM_GDI_SUCCEED;
+}
+
+VM_GDI_RESULT vm_graphic_set_layer_clip(VMINT handle, VMINT16 x1, VMINT16 y1, VMINT16 x2, VMINT16 y2) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return VM_GDI_FAILED;
+
+	auto& layer = layers[handle];
+
+	layer.clip = { x1, y1, x2, y2, 1 };
+
+	return VM_GDI_SUCCEED;
+}
+
+
 void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 	auto& clip = get_current_app_graphic().clip;
 
-	clip.left = x1;
-	clip.top = y1;
-	clip.right = x2;
-	clip.bottom = y2;
-	clip.flag = 1;
+	clip = { (short)x1, (short)y1, (short)x2, (short)y2, 1 };
 }
 
 void vm_graphic_reset_clip(void) {
 	auto& clip = get_current_app_graphic().clip;
 
-	clip.left = 0;
-	clip.top = 0;
-	clip.right = graphic->width;
-	clip.bottom = graphic->height;
-	clip.flag = 0;
+	clip = { 0, 0, (short)graphic->width, (short)graphic->height, 0 };
 }
 
 void vm_graphic_flush_screen(void) {
@@ -1371,17 +838,5 @@ VMINT vm_graphic_is_r2l_state(void) {
 
 VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {
 	get_current_app_graphic().global_color = *color;
-	return VM_GDI_SUCCEED;
-}
-
-VM_GDI_RESULT vm_graphic_canvas_set_trans_color_FIX(VMINT_CANVAS hcanvas, VMINT trans_color) {
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
-		return VM_GDI_FAILED;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
-
-	//TODO frame index
-	cfp_dst->flag = 1;
-	cfp_dst->trans_color = trans_color;
 	return VM_GDI_SUCCEED;
 }

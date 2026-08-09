@@ -5,22 +5,6 @@
 #include <SFML/Graphics/Texture.hpp>
 #include "../mutex_wrapper.h"
 
-const char* const CANVAS_MAGIC = "MTKCANVAS"; // Do we have an app that checks for this?
-
-typedef void* VMINT_CANVAS;
-
-VMINT_CANVAS vm_graphic_create_canvas_FIX(VMINT width, VMINT height);
-VMINT_CANVAS vm_graphic_create_canvas_cf_FIX(vm_graphic_color_famat cf, VMINT width, VMINT height);
-void vm_graphic_release_canvas_FIX(VMINT_CANVAS hcanvas);
-void vm_graphic_release_canvas_ex_FIX(VMINT_CANVAS hcanvas);
-VMUINT8* vm_graphic_get_canvas_buffer_FIX(VMINT_CANVAS hcanvas);
-
-VMINT_CANVAS vm_graphic_load_image_FIX(VMUINT8* img, VMINT img_len);
-VMINT_CANVAS vm_graphic_load_image_resized_FIX(VMUINT8* img_data, VMINT img_len, VMINT width, VMINT height);
-struct frame_prop* vm_graphic_get_img_property_FIX(VMINT_CANVAS hcanvas, VMUINT8 frame_index);
-
-VM_GDI_RESULT vm_graphic_canvas_set_trans_color_FIX(VMINT_CANVAS hcanvas, VMINT trans_color);
-
 namespace MREngine {
 	class Graphic {
 	public:
@@ -47,30 +31,29 @@ namespace MREngine {
 		void* buf = 0;
 		int x = 0, y = 0, w = 0, h = 0;
 		int trans_color = -1;
+		clip_rect clip = { 0, 0, 0, 0, 0 };
 		sf::Texture tex;
 	};
 
-#pragma pack (push, 1)
-	struct canvas_signature {
-		char magic[9];
-		uint8_t frame_count = 1;
-		uint8_t i_dont_know = 0xFF;
-		uint8_t color_format = 1;
-	};
+	class RenderBox {
+	public:
+		int st_x = 0, st_y = 0;
+		int end_x = 0, end_y = 0;
 
-	struct canvas_frame_property {
-		uint8_t flag = 0; //?
-		uint16_t left = 0;
-		uint16_t top = 0;
-		uint16_t width = 0;
-		uint16_t height = 0;
-		uint16_t delay = 0;
-		uint8_t trans_color_index = 0;
-		uint16_t trans_color = 0;
-		uint16_t reserved = 0; 
-		uint32_t offset = 0;
+		RenderBox(int st_x, int st_y, int end_x, int end_y);
+		RenderBox(const class canvas_frame_property& cfp);
+
+		void clip(const class canvas_frame_property& cfp);
+		void clip(const layer& layer);
+		void clip(const clip_rect& clip);
+		void clip(int x1, int y1, int x2, int y2);
+
+		void include(int x, int y);
+
+		bool in(int x, int y);
+		bool x_in(int x);
+		bool y_in(int y);
 	};
-#pragma pack(pop)
 
 	class AppGraphic {
 	public:
@@ -83,6 +66,13 @@ namespace MREngine {
 		vm_graphic_color global_color;
 
 		clip_rect clip = { 0, 0, 0, 0, 0 };
+
+		//old
+		int old_layer = -1;
+		bool old_layer_inited = false;
+
+		layer* find_layer_by_buf(void* buf);
+		clip_rect clip_by_buf(void* buf);
 
 		int create_layer(int x, int y, int w, int h, int trans_color);
 		int create_layer_ex(int x, int y, int w, int h, int trans_color, int mode, void*buf);

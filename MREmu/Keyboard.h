@@ -68,7 +68,7 @@ public:
 
 	//key_t keys[MREMU_FULL_KEY_COUNT];
 
-	bool keyboard_event(sf::Event& event);
+	bool event(sf::Event& event);
 
 	void update();
 

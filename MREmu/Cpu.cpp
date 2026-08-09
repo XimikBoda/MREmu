@@ -4,17 +4,33 @@
 #include <imgui.h>
 #include <imgui-SFML.h>
 #include <unicorn/unicorn.h>
+
+
+#ifdef CAPSTONE
 #include <capstone/capstone.h>
+Disassembler dism; //TODO
+#endif
 
 uc_engine* uc = 0;
 
-Disassembler dism; //TODO
 
 namespace Cpu {
 	void* stack_p = 0;
 	size_t stack_size = 128 * 1024;
 
-	uc_hook uc_hu;
+	std::vector<uc_engine*> ucs;
+	int cur_cpu_id = -1;
+
+	struct hook_t {
+		int type; 
+		void* callback; 
+		void* user_data; 
+		uint64_t begin; 
+		uint64_t end;
+	};
+
+	std::vector<hook_t> hooks;
+
 
 	static void write_reg(uc_engine* uc, int reg, unsigned int val) {
 		uc_reg_write(uc, reg, &val);
@@ -97,11 +113,14 @@ namespace Cpu {
 		unsigned char code[8];
 		uc_mem_read(uc, address, code, size);
 
+
+#ifdef CAPSTONE
 		cs_insn insn;
 		if (dism.disasm_one(&insn, code, size, address, is_thumb))
 			printf("0x%" PRIx64 ":\t%s\t%s\n", insn.address, insn.mnemonic, insn.op_str);
 		else
 			printf("Failed for disasm\n");
+#endif
 
 		print_code(code, size);
 	}
@@ -200,45 +219,97 @@ namespace Cpu {
 		return true;
 	}
 
+	static uc_err apply_hook(uc_engine* uc, const hook_t& hook) {
+		uc_hook dummy_handle;
+		return uc_hook_add(uc, &dummy_handle, hook.type, hook.callback, hook.user_data, hook.begin, hook.end);
+	}
+
 	void init() {
-		uc_err uc_er = uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &uc);
-		if (uc_er) {
-			printf("Failed on uc_open() with error returned: %u (%s)\n",
-				uc_er, uc_strerror(uc_er));
-			abort();
-		}
-
-		uc_er = uc_mem_map_ptr(uc, shared_memory_in_emu_start, shared_memory_size, UC_PROT_ALL, shared_memory_prt);
-		if (uc_er) {
-			printf("Failed on uc_mem_map_ptr() with error returned: %u (%s)\n",
-				uc_er, uc_strerror(uc_er));
-			abort();
-		}
-
 		stack_p = Memory::shared_malloc(stack_size);
 		if (stack_p == 0)
-			abort;
+			abort();
 
-		write_reg(uc, UC_ARM_REG_SP, ADDRESS_TO_EMU(stack_p) + stack_size);
+		add_hook(UC_HOOK_MEM_READ_UNMAPPED, (void*)hook_read_unmapped, 0, 1, 0);
+		add_hook(UC_HOOK_MEM_WRITE_UNMAPPED, (void*)hook_write_unmapped, 0, 1, 0);
 
-		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ_UNMAPPED, (void*)hook_read_unmapped, 0, 1, 0);
-		uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE_UNMAPPED, (void*)hook_write_unmapped, 0, 1, 0);
+		//add_hook(UC_HOOK_CODE, (void*)hook_stack, 0, 0, 0x100000000);
 
+		//add_hook(UC_HOOK_MEM_WRITE | UC_HOOK_MEM_READ, (void*)hook_unaligned_access, 0, 1, 0);
 
-		//uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_stack, 0, 0, 0x100000000);
-
-		//uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE | UC_HOOK_MEM_READ, (void*)hook_unaligned_access, 0, 1, 0);
-
-		//uc_mem_map(uc, 0, 0x1000, UC_PROT_ALL);
-
+		push_cpu();
 	}
+
+	void push_cpu() {
+		cur_cpu_id++;
+
+		if (cur_cpu_id >= ucs.size()) {
+			uc_engine* uc_l = 0;
+
+			uc_err uc_er = uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &uc_l);
+			if (uc_er) {
+				printf("Failed on uc_open() with error returned: %u (%s)\n",
+					uc_er, uc_strerror(uc_er));
+				abort();
+			}
+
+			uc_er = uc_mem_map_ptr(uc_l, shared_memory_in_emu_start, shared_memory_size, UC_PROT_ALL, shared_memory_prt);
+			if (uc_er) {
+				printf("Failed on uc_mem_map_ptr() with error returned: %u (%s)\n",
+					uc_er, uc_strerror(uc_er));
+				abort();
+			}
+
+			for (auto& hook : hooks)
+				apply_hook(uc_l, hook);
+
+			ucs.push_back(uc_l);
+			uc = uc_l;
+		}
+		else
+			uc = ucs[cur_cpu_id];
+
+		if (cur_cpu_id == 0) {
+			write_reg(uc, UC_ARM_REG_SP, ADDRESS_TO_EMU(stack_p) + stack_size);
+		}
+		else {
+			uc_engine* uc_prew = ucs[cur_cpu_id - 1];
+
+			uc_context* context;
+			uc_context_alloc(uc_prew, &context);
+			uc_context_save(uc_prew, context);
+
+			uc_context_restore(uc, context);
+			uc_context_free(context);
+		}
+	}
+
+	void pop_cpu() {
+		if (cur_cpu_id > 0)
+			--cur_cpu_id;
+
+		uc = ucs[cur_cpu_id];
+	}
+
+	void add_hook(int type, void* callback, void* user_data, uint64_t begin, uint64_t end) {
+		hook_t hook = { type, callback, user_data, begin, end };
+
+		for (auto& uc : ucs)
+			apply_hook(uc, hook);
+
+		hooks.push_back(hook);
+	}
+
 	void trace_on() {
 		static bool active = false;
 		if (!active) {
-			uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_WRITE, (void*)hook_write, 0, 1, 0);
-			uc_hook_add(uc, &uc_hu, UC_HOOK_MEM_READ, (void*)hook_read, 0, 1, 0);
-			uc_hook_add(uc, &uc_hu, UC_HOOK_CODE, (void*)hook_code, 0, 0, 0x100000000);
+			add_hook(UC_HOOK_MEM_WRITE, (void*)hook_write, 0, 1, 0);
+			add_hook(UC_HOOK_MEM_READ, (void*)hook_read, 0, 1, 0);
+			add_hook(UC_HOOK_CODE, (void*)hook_code, 0, 0, 0x100000000);
 			active = true;
 		}
+	}
+
+	void stop() {
+		uc_emu_stop(uc);
 	}
 };

@@ -48,7 +48,7 @@ vm_sim_state_t vm_get_sim_card_status(VMINT card_id) {
 VMINT vm_query_operator_code(VMCHAR* buffer, VMUINT buffer_size) {
 	if (buffer == 0 || buffer_size <= 3)
 		return -1;
-	strcpy(buffer, "+0");
+	strcpy(buffer, "00000");
 	return 0;
 }
 

@@ -6,9 +6,11 @@ add_subdirectory(imgui)
 
 add_subdirectory(libiconv-cmake) 
 
-set(CAPSTONE_ARCHITECTURE_DEFAULT FALSE) 
-set(CAPSTONE_ARM_SUPPORT TRUE) 
-add_subdirectory(capstone) 
+if(CAPSTONE)
+    set(CAPSTONE_ARCHITECTURE_DEFAULT FALSE) 
+    set(CAPSTONE_ARM_SUPPORT TRUE) 
+    add_subdirectory(capstone) 
+endif()
 
 add_subdirectory(libADLMIDI) 
 

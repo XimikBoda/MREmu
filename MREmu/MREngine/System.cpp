@@ -52,6 +52,10 @@ float vm_get_sys_time_zone(void) {
 #endif
 }
 
+VMINT vm_get_sys_scene(void) {
+	return 0; // standard mode
+}
+
 malloc_stat_t* vm_get_malloc_stat(void) {
 	return 0; //TODO: make this correct
 }
@@ -130,4 +134,8 @@ VMBOOL vm_appmgr_is_installed(VMWSTR path, vm_install_id install_id) {
 VMINT vm_appmgr_get_installed_list(VMINT flag, vm_install_id* install_id_list, VMUINT* num) {
 	*num = 0;
 	return 0; // tmp
+}
+
+void vm_app_log(char* str) {
+	printf("%s", str);
 }

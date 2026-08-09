@@ -27,7 +27,7 @@ public:
 
 	HMODULE dll = 0;
 
-	static bool check_format(fs::path path);
+	static bool check_format(fs::path path, bool local);
 
 	bool preparation() override;
 	void start() override;

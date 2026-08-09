@@ -115,7 +115,12 @@ MREngine::find_el::find_el(fs::path path_f) {
 	if (!fs::exists(path.parent_path()))
 		return;
 
-	di = fs::directory_iterator(path.parent_path());
+	std::error_code ec;
+
+	di = fs::directory_iterator(path.parent_path(), ec);
+
+	if(ec)
+		return;
 
 	first = true;
 }
@@ -139,6 +144,12 @@ void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 	MREngine::AppIO& io = get_current_app_io();
 
 	io.key_handler = handler;
+}
+
+void vm_reg_pen_callback(vm_pen_handler_t handler) {
+	MREngine::AppIO& io = get_current_app_io();
+
+	io.pen_handler = handler;
 }
 
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
@@ -309,13 +320,14 @@ VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 VMINT vm_file_delete(const VMWSTR filename) {
 	fs::path path = path_from_emu(filename);
 
-	try {
-		if (fs::remove(path))
-			return 0;
-	}
-	catch (...) {}
+	std::error_code ec;
 
-	return -1;
+	fs::remove(path);
+	
+	if (!ec)
+		return 0;
+	else 
+		return -1;
 }
 
 VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
@@ -325,19 +337,23 @@ VMINT vm_file_rename(const VMWSTR filename, const VMWSTR newname) {
 	if (!fs::exists(old_path))
 		return -1;
 
-	try {
-		fs::rename(old_path, new_path);
+	std::error_code ec;
+
+	fs::rename(old_path, new_path, ec);
+
+	if (!ec)
 		return 0;
-	}
-	catch (...) {
+	else
 		return -1;
-	}
 }
 
 VMINT vm_file_mkdir(const VMWSTR dirname) {
-	fs::path path = path_from_emu(dirname);
-	bool res = fs::create_directory(path);
-	if (res)
+	fs::path path = path_from_emu(dirname); 
+	std::error_code ec;
+
+	bool res = fs::create_directories(path, ec);
+
+	if (!ec)
 		return 0;
 	else
 		return -1;
@@ -519,6 +535,10 @@ VMINT vm_is_support_keyborad(void) {
 	return 1;
 }
 
+VMINT vm_is_support_pen_touch(void) {
+	return 1;
+}
+
 
 VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
 	if (filename[0] == '@') {
@@ -588,10 +608,9 @@ VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size
 	if (!tags)
 		return GET_TAG_ERROR;
 
-	if (tag_num < 0 || tag_num >= tags->raw_tags.size())
-		return GET_TAG_NOT_FOUND;
+	auto tag_data = tags->get_raw_tag(tag_num);
 
-	int tag_size = tags->raw_tags[tag_num].size();
+	int tag_size = tag_data.size();
 
 	if (tag_size == 0)
 		return GET_TAG_NOT_FOUND;
@@ -599,7 +618,7 @@ VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size
 	if (*buf_size < tag_size)
 		return GET_TAG_INSUFFICIENT_BUF;
 
-	memcpy(buf, tags->raw_tags[tag_num].data(), tag_size);
+	memcpy(buf, tag_data.data(), tag_size);
 
 	*buf_size = tag_size;
 

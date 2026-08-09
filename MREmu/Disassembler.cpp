@@ -1,5 +1,7 @@
 #include "Disassembler.h"
 
+#ifdef CAPSTONE
+
 Disassembler::Disassembler()
 {
 	cs_err cs_error;
@@ -38,3 +40,4 @@ bool Disassembler::disasm_one(cs_insn* ret_insn, unsigned char* code, size_t siz
 	cs_free(insn, count);
 	return ret;
 }
+#endif

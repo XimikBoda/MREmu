@@ -21,6 +21,13 @@ size_t shared_memory_in_emu_start = 0;
 uint32_t ADDRESS_TO_EMU(size_t x) {
 	if (x == 0)
 		return 0;
+#ifdef _DEBUG
+	auto nx = ((uint32_t)(uint64_t(x) - shared_memory_offset));
+	if (nx < shared_memory_in_emu_start || nx >= shared_memory_in_emu_start + shared_memory_size) {
+		printf("Warning: wrong address in ADDRESS_TO_EMU!!!\n");
+		return 0;
+	}
+#endif
 	return ((uint32_t)(uint64_t(x) - shared_memory_offset));
 }
 
@@ -31,6 +38,12 @@ uint32_t ADDRESS_TO_EMU(void* x) {
 void* ADDRESS_FROM_EMU(uint32_t x) {
 	if (x == 0)
 		return 0;
+#ifdef _DEBUG
+	if (x < shared_memory_in_emu_start || x >= shared_memory_in_emu_start + shared_memory_size) {
+		printf("Warning: wrong address in ADDRESS_FROM_EMU!!!\n");
+		return 0;
+	}
+#endif
 	return ((void*)((x)+shared_memory_offset));
 }
 
@@ -67,7 +80,7 @@ namespace Memory {
 
 	void* app_malloc(int size) {
 		MemoryManager& mm = get_current_app_memory();
-		return (void*)mm.malloc(size, 4);
+		return (void*)mm.malloc(size, false, 4);
 	}
 
 	void* app_realloc(void* p, int size) {
@@ -97,6 +110,9 @@ namespace Memory {
 
 	size_t MemoryManager::malloc(size_t size, bool allow_protected, size_t align)
 	{
+		if (!size)
+			return 0;
+
 		if (size > free_memory_size - (allow_protected ? 0 : protected_size))
 			return 0;
 
@@ -106,7 +122,7 @@ namespace Memory {
 			if (new_adr % align != 0)
 				new_adr = ((new_adr / align) + 1) * align;
 
-			if (new_adr + size < regions[i].adr) {
+			if (new_adr + size <= regions[i].adr) {
 				regions.insert(regions.begin() + i, { new_adr, size });
 				free_memory_size -= size;
 				return new_adr;
@@ -164,19 +180,25 @@ namespace Memory {
 			return regions[mem_ind].adr;
 		}
 
+		size_t old_adr = regions[mem_ind].adr;
+		size_t old_size = regions[mem_ind].size;
+
 		size_t new_adr = malloc(size);
 
 		if (new_adr == 0)
 			return 0;
 
-		memcpy((void*)new_adr, (void*)regions[mem_ind].adr, regions[mem_ind].size); //need to be careful
-		free(regions[mem_ind].adr);
+		memcpy((void*)new_adr, (void*)old_adr, old_size);
+		free(old_adr);
 
 		return new_adr;
 	}
 
 	void MemoryManager::free(size_t addr)
 	{
+		if (addr < start_adr + protected_size)
+			return;
+
 		for (int i = 0; i < regions.size(); ++i) {
 			if (regions[i].adr == addr) {
 				free_memory_size += regions[i].size;
