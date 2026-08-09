@@ -10,6 +10,12 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.util.Log
+import android.content.Context
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : NativeActivity() {
     companion object {
@@ -22,6 +28,7 @@ class MainActivity : NativeActivity() {
     }
 
     private external fun notifyPermissionState(granted: Boolean)
+    private external fun nativeLoadVxpFile(path: String)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,18 +105,60 @@ class MainActivity : NativeActivity() {
         if (intent?.action == Intent.ACTION_VIEW) {
             val uri = intent.data
             if (uri != null) {
-                try {
-                    val pfd = contentResolver.openFileDescriptor(uri, "r")
-                    if (pfd != null) {
-                        val fd = pfd.fd
-                        Log.d("MREmu", "File opened from file manager, FD: $fd")
+                Thread {
+                    try {
+                        val tempVxpFile = File(cacheDir, "opened_app.vxp")
 
-                        // onVxpFileOpened(fd)
+                        val inputStream = contentResolver.openInputStream(uri)
+                        val outputStream = FileOutputStream(tempVxpFile)
+
+                        inputStream?.use { input ->
+                            outputStream.use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+
+                        val realPosixPath = tempVxpFile.absolutePath
+                        Log.d("MREmu", "File copied to cache: $realPosixPath")
+
+                        runOnUiThread {
+                            nativeLoadVxpFile(realPosixPath)
+                        }
+
+                    } catch (e: Exception) {
+                        Log.e("MREmu", "Coping to cache error", e)
                     }
-                } catch (e: Exception) {
-                    Log.e("MREmu", "Error opening file", e)
-                }
+                }.start()
             }
         }
+    }
+
+    fun triggerVibration(durationMs: Long) {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(durationMs)
+        }
+    }
+
+    fun hasVibrator(): Boolean {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+
+        return vibrator.hasVibrator()
     }
 }

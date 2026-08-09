@@ -34,6 +34,12 @@ void KeyboardControl::press_key(int key_code, key_source source) {
 
 	int i = find_key(key_code);
 	if (i == -1) {
+#ifdef ANDROID
+        if(Touch0 <= source && source <= Touch9) {
+            vibration.vibrate(sf::milliseconds(50));
+        }
+#endif
+
 		pkey.push_back(pkey_t(key_code, source));
 		add_keyboard_event(VM_KEY_EVENT_DOWN, key_code);
 	}
@@ -50,6 +56,12 @@ void KeyboardControl::unpress_key(int key_code) {
 void KeyboardControl::unpress_by_source(key_source source) {
 	for (int i = 0; i < pkey.size(); ++i)
 		if (pkey[i].source == source) {
+#ifdef ANDROID
+            if(Touch0 <= source && source <= Touch9) {
+                vibration.vibrate(sf::milliseconds(40));
+            }
+#endif
+
 			add_keyboard_event(VM_KEY_EVENT_UP, pkey[i].key_code);
 			pkey.erase(pkey.begin() + i);
 			--i;

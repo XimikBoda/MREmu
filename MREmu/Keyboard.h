@@ -3,6 +3,10 @@
 #include <SFML/Graphics/RenderTexture.hpp>
 #include <vmio.h>
 
+#ifdef ANDROID
+#include "jni/Vibration.h"
+#endif
+
 #define MREMU_KEY_SEND (VM_KEY_QWERTY_MENU + 1)
 #define MREMU_KEY_POWER (MREMU_KEY_SEND + 1)
 #define MREMU_KEY_NONE (MREMU_KEY_POWER + 1)
@@ -41,6 +45,10 @@ public:
 
 	std::vector<pkey_t> pkey;
 
+#ifdef ANDROID
+    Vibration vibration;
+#endif
+
 	void update();
 
 	int find_key(int key_code);
@@ -63,8 +71,6 @@ public:
 	sf::RenderTexture frontend_layer;
 
 	int x, y, w, h;
-
-
 
 	//key_t keys[MREMU_FULL_KEY_COUNT];
 

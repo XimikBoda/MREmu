@@ -16,7 +16,9 @@ set(SOURCES
 						"AppManager.cpp" "AppManager.h"
 						"Keyboard.cpp" "Keyboard.h"
 						"Touch.cpp" "Touch.h"
-						"miniz.c" "miniz.h" "mutex_wrapper.h" )
+						"miniz.c" "miniz.h" "mutex_wrapper.h"
+						"jni/Vibration.cpp" "jni/Vibration.h"
+)
 
 if (ANDROID)
 	add_library(MREmu SHARED ${SOURCES})

@@ -32,6 +32,8 @@ bool work = true;
 std::string error_message = "";
 bool show_error = false;
 
+AppManager* g_appManager = 0;
+
 #ifdef ANDROID
 std::atomic<int> storage_permission_state{0};
 
@@ -39,9 +41,20 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_ximikboda_mremu_MainActivity_notifyPermissionState(JNIEnv *env, jobject thiz, jboolean granted) {
     storage_permission_state = granted ? 1 : -1;
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thiz, jstring j_path) {
+    const char *path_cstr = env->GetStringUTFChars(j_path, nullptr);
+
+    while(!g_appManager)
+        sf::sleep(sf::seconds(0.2));
+
+    g_appManager->add_app_for_launch(path_cstr, false);
+
+    env->ReleaseStringUTFChars(j_path, path_cstr);
+}
 #endif
 
-AppManager* g_appManager = 0;
 
 void mre_main(AppManager* appManager_p) {
 	AppManager& appManager = *appManager_p;
