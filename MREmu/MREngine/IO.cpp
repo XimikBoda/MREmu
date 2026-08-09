@@ -17,13 +17,17 @@ using namespace std::string_literals;
 namespace fs = std::filesystem;
 
 #ifdef ANDROID
-const fs::path base_path = "/sdcard/Android/data/com.ximikboda.mremu/files/";
+//const fs::path base_path = "/sdcard/Android/data/com.ximikboda.mremu/files/";
+const fs::path base_path = "/sdcard/MREmu/";
 #else
 const fs::path base_path = "./";
 #endif
 
 void MREngine::IO::init()
 {
+#ifdef ANDROID
+	fs::create_directory(base_path);
+#endif
 	fs::create_directory(base_path / fs::path("fs").make_preferred());
 	fs::create_directory(base_path / fs::path("fs/e").make_preferred());
 	fs::create_directory(base_path / fs::path("fs/c").make_preferred());
@@ -55,6 +59,10 @@ fs::path path_from_emu(fs::path path) { // TODO rewrite this
 	root_n = path.root_name().string();
 	path_relative = path.relative_path();
 #else
+    std::wstring str = path.wstring();
+    std::replace(str.begin(), str.end(), L'\\', L'/');
+    path = str;
+
 	auto it = path.begin();
 	if (it == path.end())
 		return "";

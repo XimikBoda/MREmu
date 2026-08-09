@@ -32,6 +32,15 @@ bool work = true;
 std::string error_message = "";
 bool show_error = false;
 
+#ifdef ANDROID
+std::atomic<int> storage_permission_state{0};
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ximikboda_mremu_MainActivity_notifyPermissionState(JNIEnv *env, jobject thiz, jboolean granted) {
+    storage_permission_state = granted ? 1 : -1;
+}
+#endif
+
 AppManager* g_appManager = 0;
 
 void mre_main(AppManager* appManager_p) {
@@ -70,6 +79,41 @@ int main(int argc, char** argv) {
 #else
 #endif
 
+    AppManager appManager;
+    g_appManager = &appManager;
+
+#ifndef ANDROID
+    sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
+	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
+	ImGui::SFML::Init(win_debug);
+	win_debug.setFramerateLimit(60);
+	win_device.setFramerateLimit(60);
+	//win_debug.setVerticalSyncEnabled(true);
+#else
+    sf::RenderWindow win_device(sf::VideoMode::getDesktopMode(), "MREmu");
+    win_device.setFramerateLimit(60);
+
+    while (win_device.isOpen()) {
+        sf::Event event;
+        while (win_device.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                win_device.close();
+            }
+        }
+
+        int perm_state = storage_permission_state.load();
+
+        if (perm_state == 1)
+            break;
+        else if(perm_state == 0)
+            win_device.clear(sf::Color::Black);
+        else if (perm_state == -1)
+            win_device.clear(sf::Color::Red);
+
+        win_device.display();
+    }
+#endif
+
 	if(GDB::gdb_mode)
 		GDB::wait();
 
@@ -83,25 +127,10 @@ int main(int argc, char** argv) {
 	MREngine::AppAudio::init();
 	MREngine::Graphic graphic;
 
-	AppManager appManager;
-	g_appManager = &appManager;
-
 	if (GDB::gdb_mode)
 		GDB::cpu_state = GDB::Stop;
 
 	std::thread second_thread(mre_main, &appManager);
-
-#ifndef ANDROID
-	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
-	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
-	ImGui::SFML::Init(win_debug);
-	win_debug.setFramerateLimit(60);
-	win_device.setFramerateLimit(60);
-	//win_debug.setVerticalSyncEnabled(true);
-#else
-    sf::RenderWindow win_device(sf::VideoMode::getDesktopMode(), "MREmu");
-    win_device.setFramerateLimit(60);
-#endif
 
 	Keyboard keyboard;
 	Touch touch;
