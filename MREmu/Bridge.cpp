@@ -7,6 +7,7 @@
 #include "MREngine/Graphic.h"
 #include "MREngine/Canvas.h"
 #include "MREngine/Image.h"
+#include "MREngine/Resources.h"
 
 #include "Cpu.h"
 #include "GDB.h"
@@ -1025,6 +1026,11 @@ namespace Bridge {
 					read_arg(uc, 0)
 				));
 		}},
+		{FUNCN(vm_reg_res_provider), [](uc_engine* uc) {
+			vm_reg_res_provider(
+				(res_provider_t)read_arg(uc, 0)
+			);
+		}},
 
 
 
@@ -1190,6 +1196,24 @@ namespace Bridge {
 		{FUNCN(vm_get_volume), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_get_volume());
+		}},
+		{FUNCN(vm_midi_play), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_midi_play(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					(void(*)(VMINT, VMINT))read_arg(uc, 2)
+				));
+		}},
+		{FUNCN(vm_midi_play_ex), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_midi_play_ex(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					read_arg(uc, 2),
+					read_arg(uc, 3),
+					(void(*)(VMINT, VMINT))read_arg(uc, 4)
+				));
 		}},
 		{FUNCN(vm_midi_play_by_bytes), [](uc_engine* uc) {
 			write_ret(uc,

@@ -1,6 +1,9 @@
 #include "Audio.h"
+#include "Resources.h"
+#include "../Memory.h"
 #include <SFML/Audio.hpp>
 #include <vmmm.h>
+#include <vm4res.h>
 
 Midi::Midi(const char* file) {
 	std::lock_guard lock(access_mutex);
@@ -58,6 +61,12 @@ void Midi::onSeek(sf::Time timeOffset) {
 Midi::~Midi() {
 	std::lock_guard lock(access_mutex);
 	adl_close(midi_player);
+}
+
+int* MREngine::AppAudio::tmp_int_p = 0;
+
+void MREngine::AppAudio::init() {
+	tmp_int_p = (int*)Memory::shared_malloc(sizeof(int));
 }
 
 MREngine::AppAudio::~AppAudio() {
@@ -138,6 +147,23 @@ VMINT vm_get_volume(void) {
 	static sf::SoundBuffer dummy_buffer;
 
 	return sf::Listener::getGlobalVolume() * 6 / 100;
+}
+
+VMINT vm_midi_play(VMINT resid, VMINT repeat, void (*f)(VMINT handle, VMINT event)) {
+	return vm_midi_play_ex(resid, 0, repeat, 0, f);
+}
+
+VMINT vm_midi_play_ex(VMINT resid, VMUINT start_time, VMINT repeat, VMUINT path, void (*f)(VMINT handle, VMINT event)) {
+	MREngine::Resources& resources = get_current_app_resources();
+	auto& audio = get_current_app_audio();
+
+	VMUINT8* buf = resources.call_res_provider(resid, audio.tmp_int_p);
+	int size = *audio.tmp_int_p;
+
+	if (!buf && !size)
+		return VM_MIDI_FAILED;
+
+	return vm_midi_play_by_bytes_ex(buf, size, start_time, repeat, path, f);
 }
 
 VMINT vm_midi_play_by_bytes(VMUINT8* midibuf, VMINT len, VMINT repeat, void (*f)(VMINT handle, VMINT event)) {

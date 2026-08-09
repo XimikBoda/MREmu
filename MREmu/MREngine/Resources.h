@@ -4,6 +4,8 @@
 #include <map>
 #include <cstdint>
 
+typedef uint8_t* (*res_provider_t)(int resid, int* len);
+
 namespace MREngine {
 	struct res_el {
 		size_t offset;
@@ -34,6 +36,10 @@ namespace MREngine {
 		res_el* find_by_id(uint32_t id);
 
 		unsigned char* get_file_context();
+
+		res_provider_t res_provider = 0;
+
+		uint8_t* call_res_provider(int resid, int* len);
 	};
 }
 

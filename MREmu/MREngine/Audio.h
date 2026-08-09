@@ -69,6 +69,10 @@ namespace MREngine {
 		ItemsMng<std::shared_ptr<Bitstream>> bitstreams;
 
 		sf::Music music;
+
+		static int* tmp_int_p;
+
+		static void init();
 		
 		~AppAudio();
 	};

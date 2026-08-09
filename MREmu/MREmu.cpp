@@ -80,6 +80,7 @@ int main(int argc, char** argv) {
 	MREngine::IO::init();
 	MREngine::SIM::init();
 	MREngine::CharSet::init();
+	MREngine::AppAudio::init();
 	MREngine::Graphic graphic;
 
 	AppManager appManager;

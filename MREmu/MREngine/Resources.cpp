@@ -1,7 +1,11 @@
 #include "Resources.h"
+#include "../Bridge.h"
+#include "../Cpu.h"
+#include "../AppManager.h"
 #include <cstring>
 #include <vmres.h>
 #include <vm4res.h>
+#include <vmgraph.h>
 #include <ranges>
 #include <algorithm>
 
@@ -101,6 +105,15 @@ MREngine::res_el* MREngine::Resources::find_by_id(uint32_t id)
 unsigned char* MREngine::Resources::get_file_context()
 {
 	return file_context->data();
+}
+
+extern AppManager* g_appManager;
+
+uint8_t* MREngine::Resources::call_res_provider(int resid, int* len)
+{
+	auto app = g_appManager->get_current_work_app_id();
+
+	return app->run<true>(res_provider, resid, len);
 }
 
 
@@ -279,4 +292,10 @@ VMINT32 vm_res_delete(VMUINT32 id) {
 
 	resources.allocated_res_map.erase(id);
 	return VM_RES_SUCCESS;
+}
+
+void vm_reg_res_provider(VMUINT8* (*fp)(VMINT resid, VMINT* len)) {
+	MREngine::Resources& resources = get_current_app_resources();
+
+	resources.res_provider = fp;
 }
