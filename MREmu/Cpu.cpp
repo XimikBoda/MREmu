@@ -229,8 +229,10 @@ namespace Cpu {
 		if (stack_p == 0)
 			abort();
 
+#ifdef _DEBUG
 		add_hook(UC_HOOK_MEM_READ_UNMAPPED, (void*)hook_read_unmapped, 0, 1, 0);
 		add_hook(UC_HOOK_MEM_WRITE_UNMAPPED, (void*)hook_write_unmapped, 0, 1, 0);
+#endif
 
 		//add_hook(UC_HOOK_CODE, (void*)hook_stack, 0, 0, 0x100000000);
 
