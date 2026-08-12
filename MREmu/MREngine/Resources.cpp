@@ -42,7 +42,7 @@ void MREngine::Resources::scan()
 			res_offset += offset, global = true;
 
 		if (res_offset < offset || res_offset + res_size > offset + size)
-			printf("Warning: resource outside the resource segment (%s)\n", name.c_str());
+			spdlog::warn("resource outside the resource segment ({})", name);
 
 		if (res_offset + res_size > file_context->size())
 			abort();
@@ -120,7 +120,7 @@ uint8_t* MREngine::Resources::call_res_provider(int resid, int* len)
 VMUINT8* vm_load_resource(char* res_name, VMINT* res_size) {
 	MREngine::Resources& resources = get_current_app_resources();
 
-	printf("vm_load_resource(%s)\n", res_name);
+	spdlog::debug("vm_load_resource({})", res_name);
 
 	MREngine::res_el* res = resources.find_by_name(to_lower(res_name));
 

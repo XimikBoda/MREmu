@@ -1,6 +1,7 @@
 #include "Audio.h"
 #include "Resources.h"
 #include "../Memory.h"
+#include "../Log.h"
 #include <SFML/Audio.hpp>
 #include <vmmm.h>
 #include <vm4res.h>
@@ -9,11 +10,11 @@ Midi::Midi(const char* file) {
 	std::lock_guard lock(access_mutex);
 	midi_player = adl_init(44100);
 	if (!midi_player) {
-		printf("Couldn't initialize ADLMIDI: %s\n", adl_errorString());
+		spdlog::error("Couldn't initialize ADLMIDI: {}", adl_errorString());
 		error = true;
 	}
 	if (!error && adl_openFile(midi_player, file) < 0) {
-		printf("Couldn't open music file: %s\n", adl_errorInfo(midi_player));
+		spdlog::error("Couldn't open music file: {}", adl_errorInfo(midi_player));
 		error = true;
 	}
 	initialize(2, 44100);
@@ -23,11 +24,11 @@ Midi::Midi(void* buf, size_t len) {
 	std::lock_guard lock(access_mutex);
 	midi_player = adl_init(44100);
 	if (!midi_player) {
-		printf("Couldn't initialize ADLMIDI: %s\n", adl_errorString());
+		spdlog::error("Couldn't initialize ADLMIDI: {}", adl_errorString());
 		error = true;
 	}
 	if (!error && adl_openData(midi_player, buf, len)) {
-		printf("Couldn't open buffer: %s\n", adl_errorInfo(midi_player));
+		spdlog::error("Couldn't open buffer: {}", adl_errorInfo(midi_player));
 		error = true;
 	}
 	initialize(2, 44100);

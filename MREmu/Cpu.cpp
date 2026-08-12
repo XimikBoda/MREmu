@@ -1,6 +1,7 @@
 #include "Cpu.h"
 #include "Memory.h"
 #include "Disassembler.h"
+#include "Log.h"
 #include <imgui.h>
 #include <imgui-SFML.h>
 #include <unicorn/unicorn.h>
@@ -137,7 +138,7 @@ namespace Cpu {
 
 		uint32_t used_stack = ADDRESS_TO_EMU(stack_p) + stack_size - sp;
 		if (used_stack > max_stack) {
-			printf("%1.1f kb, %d, 0x%08x\n", used_stack/1000.f, used_stack, pc);
+			spdlog::debug("{:1.1f} kb, {}, {:#010X}", used_stack / 1000.f, used_stack, pc);
 			max_stack = used_stack;
 		}
 		
@@ -147,7 +148,7 @@ namespace Cpu {
 	{
 		unsigned char code[8];
 		uc_mem_read(uc, address, code, size);
-		printf(">>> Read block at 0x%08X, block size = 0x%08X\n", (int)address, size);
+		spdlog::debug(">>> Read block at {:#010X}, block size = {:#010X}", (int)address, size);
 		print_code(code, size);
 	}
 
@@ -155,7 +156,7 @@ namespace Cpu {
 	{
 		unsigned char code[8];
 		uc_mem_read(uc, address, code, size);
-		printf(">>> Write block at 0x%08X, block size = 0x%08X, val = 0x%08llX\n", (int)address, size, value);
+		spdlog::debug(">>> Write block at {:#010X}, block size = {:#010X}, val = {:#010X}", (int)address, size, value);
 		print_code(code, size);
 	}
 
@@ -207,14 +208,14 @@ namespace Cpu {
 
 	static bool hook_read_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
-		printf(">>> Try to read block at 0x%08X, block size = 0x%08X                  ---- UNMAPPED\n", (int)address, size);
+		spdlog::error(">>> Try to read block at 0x%08X, block size = 0x%08X                  ---- UNMAPPED", (int)address, size);
 		uc_mem_map(uc, (address / 0x1000) * 0x1000, 0x1000, UC_PROT_ALL);
 		return true;
 	}
 
 	static bool hook_write_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
-		printf(">>> Try to write block at 0x%08X, block size = 0x%08X, value = 0x%08X  ---- UNMAPPED\n", (int)address, size, (int)value);
+		spdlog::error(">>> Try to write block at {:#010X}, block size = {:#010X}, val = {:#010X}  ---- UNMAPPED", (int)address, size, value);
 		uc_mem_map(uc, (address / 0x1000) * 0x1000, 0x1000, UC_PROT_ALL);
 		return true;
 	}
@@ -249,15 +250,15 @@ namespace Cpu {
 
 			uc_err uc_er = uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &uc_l);
 			if (uc_er) {
-				printf("Failed on uc_open() with error returned: %u (%s)\n",
-					uc_er, uc_strerror(uc_er));
+				spdlog::error("Failed on uc_open() with error returned: {} ({})", 
+					(int)uc_er, uc_strerror(uc_er));
 				abort();
 			}
 
 			uc_er = uc_mem_map_ptr(uc_l, shared_memory_in_emu_start, shared_memory_size, UC_PROT_ALL, shared_memory_prt);
 			if (uc_er) {
-				printf("Failed on uc_mem_map_ptr() with error returned: %u (%s)\n",
-					uc_er, uc_strerror(uc_er));
+				spdlog::error("Failed on uc_mem_map_ptr() with error returned: {} ({})",
+					(int)uc_er, uc_strerror(uc_er));
 				abort();
 			}
 

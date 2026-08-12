@@ -69,7 +69,7 @@ bool DLLApp::preparation()
 
 	if (!dll) {
 		DWORD errorCode = GetLastError();
-		printf("Can`t load DLL, error code: %d\n", errorCode);
+		spdlog::error("Can`t load DLL, error code: {}", errorCode);
 		return false;
 	}
 

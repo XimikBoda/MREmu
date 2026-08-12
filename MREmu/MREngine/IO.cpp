@@ -2,6 +2,7 @@
 #include "CharSet.h"
 #include "../Memory.h"
 #include "../MreTags.h"
+#include "../Log.h"
 #include <vmio.h>
 #include <vmgettag.h>
 #include <iostream>
@@ -116,7 +117,7 @@ MREngine::find_el::find_el(fs::path path_f) {
 			find_recv = true;
 		}
 		catch (...) {
-			printf("regex faild\n");
+			spdlog::error("regex faild ({})", find_line);
 		}
 	}
 

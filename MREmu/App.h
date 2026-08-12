@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <vector>
 #include "Bridge.h"
+#include "Log.h"
 
 namespace fs = std::filesystem;
 
@@ -49,6 +50,8 @@ public:
 
 	template <bool from_hook = false, typename Func, typename... Args>
 	auto run(Func func, Args... args) {
+		Log::set_module(app_name);
+
 		return Bridge::run<from_hook>(is_native(), func, std::forward<Args>(args)...);
 	}
 };

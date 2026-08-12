@@ -85,7 +85,7 @@ bool ArmApp::preparation()
 			std::stringstream ss;
 			ss.write((char*)file_context.data(), file_context.size());
 			if (!elf.load(ss)) {
-				printf("Failed to load ELF!\n");
+				spdlog::error("Failed to load ELF!");
 				return false;
 			}
 		}
@@ -98,7 +98,7 @@ bool ArmApp::preparation()
 				const ELFIO::segment* pseg = elf.segments[i];
 
 				if (pseg->get_virtual_address() + pseg->get_memory_size() > mem_size) {
-					printf("Segment loading error, %d bytes required, but %d allocated\n",
+					spdlog::error("Segment loading error, {} bytes required, but {} allocated",
 						pseg->get_virtual_address() + pseg->get_memory_size(), mem_size);
 					return false;
 				}
@@ -115,7 +115,7 @@ bool ArmApp::preparation()
 
 			if (psec->get_name() == "ER_RO" || psec->get_name() == "ER_RW") {
 				if (psec->get_address() + psec->get_size() > mem_size) {
-					printf("Segment loading error, %d bytes required, but %d allocated\n",
+					spdlog::error("Segment loading error, {} bytes required, but {} allocated",
 						psec->get_address() + psec->get_size(), mem_size);
 					return false;
 				}
@@ -130,9 +130,11 @@ bool ArmApp::preparation()
 				ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_offset()]; //TODO
 				for (int i = 0; i < psec->get_size() / sizeof(ELFIO::Elf32_Rel); ++i) {
 					if (sym[i].r_offset & 3) {
-						printf("[FATAL WARNING] Unaligned relocation pointer detected!\n");
-						printf("  -> Offset: 0x%08X\n", sym[i].r_offset);
-						printf("  -> MRE Loader will corrupt memory at this address on ARMv5TE!\n");
+						spdlog::critical("Unaligned relocation pointer detected!\n"
+							"  -> Offset: {:#010X}\n"
+							"  -> MRE Loader will corrupt memory at this address on ARMv5TE!",
+							sym[i].r_offset
+						);
 					}
 					switch (sym[i].r_info & 0xFF) {
 					case 0x17:
@@ -157,7 +159,7 @@ bool ArmApp::preparation()
 			uint32_t elf_info_size = *(uint32_t*)(file_context.data() + tags.tags_offset - 4);
 
 			if (elf_info_size != sizeof(compress_ads_elf_info)) {
-				printf("compress_ads_elf_info size error\n");
+				spdlog::error("compress_ads_elf_info size error");
 				return false;
 			}
 
@@ -166,14 +168,14 @@ bool ArmApp::preparation()
 			uLongf dL = info->org_ro_size;
 			if (uncompress((unsigned char*)mem_location,
 				&dL, file_context.data() + info->ro_offset, info->ro_size)) {
-				printf("uncompress error\n");
+				spdlog::error("uncompress error");
 				return false;
 			}
 
 			dL = info->org_rw_size;
 			if (uncompress((unsigned char*)mem_location + info->org_ro_size,
 				&dL, file_context.data() + info->rw_offset, info->rw_size)) {
-				printf("uncompress error\n");
+				spdlog::error("uncompress error");
 				return false;
 			}
 
@@ -186,7 +188,7 @@ bool ArmApp::preparation()
 
 		}
 		else {
-			printf("zipped no ads is not realized\n");
+			spdlog::error("zipped no ads is not realized");
 			return false;
 		}
 	}
@@ -210,6 +212,9 @@ bool ArmApp::preparation()
 void ArmApp::start()
 {
 	uint32_t vm_get_sym_entry_p = Bridge::vm_get_sym_entry("vm_get_sym_entry");
+
+	Log::set_module(app_name);
+
 	if (is_ads) {
 		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + mem_size + 0x100);
 	}

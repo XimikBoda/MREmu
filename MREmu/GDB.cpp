@@ -3,6 +3,7 @@
 #include <SFML/Network.hpp>
 #include <unicorn/unicorn.h>
 #include "AppManager.h"
+#include "Log.h"
 
 #include <iostream>
 #include <string_view>
@@ -353,7 +354,7 @@ namespace GDB {
 				return;
 			}
 
-		std::cout << "Path: " << path << '\n';
+		spdlog::info("GDB vRun path: {}", path);
 
 		g_appManager->add_app_for_launch(path, 0);
 		make_answer("S00");
@@ -488,7 +489,7 @@ namespace GDB {
 		if (packet.length() == 0)
 			return;
 
-		std::cout << "GDB: " << packet << '\n';
+		spdlog::info("GDB: {}", packet);
 
 		switch (packet[0]) {
 		case 'q':
@@ -528,7 +529,8 @@ namespace GDB {
 			make_answer("OK");
 			break;
 		default:
-			std::cout << "GDB: Unknow " << packet << '\n';
+
+			spdlog::warn("GDB: Unknow {}", packet);
 			make_answer("");
 			break;
 		}
@@ -553,7 +555,7 @@ namespace GDB {
 			uint8_t checksum = 0;
 			int scanf_ret = sscanf((char*)inbuf + sharp_pos + 1, "%02hhx", &checksum);
 			if (scanf_ret != 1 || checksum != c_checksum) {
-				printf("GDB: Fatal\n");
+				spdlog::critical("GDB: Fatal");
 				return 0;
 			}
 		}
@@ -576,13 +578,13 @@ namespace GDB {
 			break;
 		case '-':
 			packet_len = 1;
-			printf("GDB: Some went wrong\n");
+			spdlog::error("GDB: Some went wrong");
 			break;
 		case '$':
 			packet_len = check_packet(inbuf, inbuf_pos);
 			break;
 		default:
-			printf("GDB: Unknown packet %c\n", inbuf[0]);
+			spdlog::error("GDB: Unknown packet {:c}", inbuf[0]);
 			break;
 
 		}

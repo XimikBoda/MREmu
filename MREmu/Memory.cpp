@@ -1,4 +1,5 @@
 #include "Memory.h"
+#include "Log.h"
 #include <malloc.h>
 #include <stdlib.h>
 #include <cstring>
@@ -24,7 +25,8 @@ uint32_t ADDRESS_TO_EMU(size_t x) {
 #ifdef _DEBUG
 	auto nx = ((uint32_t)(uint64_t(x) - shared_memory_offset));
 	if (nx < shared_memory_in_emu_start || nx >= shared_memory_in_emu_start + shared_memory_size) {
-		printf("Warning: wrong address in ADDRESS_TO_EMU!!!\n");
+		spdlog::warn("Warning: wrong address in ADDRESS_TO_EMU!!!");
+
 		return 0;
 	}
 #endif
@@ -40,7 +42,7 @@ void* ADDRESS_FROM_EMU(uint32_t x) {
 		return 0;
 #ifdef _DEBUG
 	if (x < shared_memory_in_emu_start || x >= shared_memory_in_emu_start + shared_memory_size) {
-		printf("Warning: wrong address in ADDRESS_FROM_EMU!!!\n");
+		spdlog::warn("Warning: wrong address in ADDRESS_FROM_EMU!!!");
 		return 0;
 	}
 #endif

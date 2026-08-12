@@ -1,6 +1,7 @@
 #include "Bridge.h"
 #include "Memory.h"
 #include "ARModule.h"
+#include "Log.h"
 
 #include "MREngine/Sock.h"
 #include "MREngine/Audio.h"
@@ -8,6 +9,7 @@
 #include "MREngine/Canvas.h"
 #include "MREngine/Image.h"
 #include "MREngine/Resources.h"
+#include "MREngine/Log.h"
 
 #include "Cpu.h"
 #include "GDB.h"
@@ -34,7 +36,6 @@
 
 VMINT vm_get_res_header();//tmp
 VMWSTR vm_ucs2_string(VMSTR s);
-void vm_app_log(char* str);
 
 namespace Cpu {
 	void printREG(uc_engine* uc);
@@ -1464,7 +1465,8 @@ namespace Bridge {
 		if (ret == 0)
 			ret = armodule.vm_get_sym_entry(symbol);
 
-		printf("vm_get_sym_entry(%s) -> %08x\n", symbol, ret);
+		spdlog::log(ret ? spdlog::level::debug : spdlog::level::warn,
+			"vm_get_sym_entry({}) -> {:08x}", symbol, (uint32_t)ret);
 
 		return ret;
 	}
@@ -1488,7 +1490,8 @@ namespace Bridge {
 			else if(str == "vm_sscanf")
 				ret = (void*)sscanf;
 
-		printf("vm_get_sym_entry_native(%s) -> %08x\n", symbol, ret);
+		spdlog::log(ret ? spdlog::level::debug : spdlog::level::warn,
+			"vm_get_sym_entry_native({}) -> {:08x}", symbol, (uint32_t)ret);
 
 		return ret;
 	}
@@ -1575,7 +1578,7 @@ namespace Bridge {
 		if (!GDB::gdb_mode) {
 			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, 0);
 			if (err) {
-				printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+				spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
 				Cpu::printREG(uc);
 				while (1) {
 					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -1613,7 +1616,7 @@ namespace Bridge {
 				if (err) {
 					GDB::cpu_state = GDB::Stop;
 					GDB::make_answer("S05");
-					printf("uc_emu_start returned %d (%s)\n", err, uc_strerror(err));
+					spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
 				}
 			}
 		}
