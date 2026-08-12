@@ -13,3 +13,6 @@
 [submodule "libiconv-cmake"]
 	path = deps/libiconv-cmake
 	url = https://github.com/XimikBoda/libiconv-cmake
+[submodule "deps\\spdlog"]
+	path = deps\\spdlog
+	url = https://github.com/gabime/spdlog
