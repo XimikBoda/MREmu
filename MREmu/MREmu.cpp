@@ -15,13 +15,13 @@
 #include "AppManager.h"
 #include "Keyboard.h"
 #include "Touch.h"
+#include "Log.h"
 
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
 #include "MREngine/SIM.h"
 #include "MREngine/CharSet.h"
 #include <cmdparser.hpp>
-
 
 #include "NativeApps/Menu/AppSelector.h"
 
@@ -73,6 +73,10 @@ void mre_main(AppManager* appManager_p) {
 int main(int argc, char** argv) {
     std::string app_path = "";
     bool path_is_local = false;
+
+	Log::set_module("Main");
+	spdlog::set_level(spdlog::level::debug);
+
 #ifndef ANDROID
 	cli::Parser parser(argc, argv);
 	{
@@ -84,6 +88,9 @@ int main(int argc, char** argv) {
 	parser.run_and_exit_if_error();
 	app_path = parser.get<std::string>("");
 	path_is_local = parser.get<bool>("l");
+
+	if (app_path.size())
+		spdlog::info("Vxp path from args: {} {}", app_path, path_is_local ? "(local path)" : "");
 
 	GDB::gdb_mode = parser.get<bool>("g");
 	GDB::gdb_port = parser.get<int>("p");

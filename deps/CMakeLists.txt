@@ -14,5 +14,7 @@ endif()
 
 add_subdirectory(libADLMIDI) 
 
+add_subdirectory(spdlog) 
+
 set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures") 
 add_subdirectory(unicorn) 

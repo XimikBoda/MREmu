@@ -16,6 +16,7 @@ set(SOURCES
 						"AppManager.cpp" "AppManager.h"
 						"Keyboard.cpp" "Keyboard.h"
 						"Touch.cpp" "Touch.h"
+						"Log.cpp" "Log.h" 
 						"miniz.c" "miniz.h" "mutex_wrapper.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
 )
@@ -39,6 +40,7 @@ target_link_libraries(MREmu ADLMIDI_static)
 target_link_libraries(MREmu MREngine)
 target_link_libraries(MREmu NativeApps)
 target_link_libraries(MREmu libiconv)
+target_link_libraries(MREmu spdlog)
 
 if(CAPSTONE)
 	target_link_libraries(MREmu capstone)

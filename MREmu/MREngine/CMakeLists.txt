@@ -13,6 +13,7 @@ add_library (MREngine
 						"ProgramManager.cpp" "ProgramManager.h"
 						"IO.cpp" "IO.h"
 						"SIM.cpp" "SIM.h"
+						"Log.cpp" "Log.h"
 						"Sock.cpp" "Sock.h"
 						"Sensor.cpp" "Sensor.h"
 						"Audio.cpp" "Audio.h" "AudioBitstream.cpp" "AudioBitstreamRec.cpp"
@@ -30,5 +31,6 @@ target_link_libraries(MREngine sfml-audio)
 target_link_libraries(MREngine imgui)
 target_link_libraries(MREngine ADLMIDI_static)
 target_link_libraries(MREngine libiconv)
+target_link_libraries(MREngine spdlog)
 
 target_include_directories(MREngine PUBLIC "$ENV{MRE_SDK}/include")
