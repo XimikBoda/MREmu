@@ -7,6 +7,8 @@
 class MreTags
 {
 public:
+	typedef std::vector<std::pair<int, std::u8string>> mstring;
+
 	std::map<uint32_t, std::vector<uint8_t>> raw_tags;
 
 	uint32_t tags_offset;
@@ -22,11 +24,15 @@ public:
 	uint32_t get_ram();
 
 	std::u8string get_dev_name();
+	std::u8string get_app_name();
+
+	std::u8string raw_to_u8(void* data, int size);
 
 	bool is_tag_exist(int id);
 	bool read_bool(int id);
 	uint32_t read_uint32(int id);
 	std::u8string read_string(int id);
+	mstring read_mstring(int id);
 
 	std::vector<uint8_t> get_raw_tag(int id);
 };

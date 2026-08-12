@@ -37,6 +37,10 @@ bool DLLApp::preparation()
 	if (!tags.load(file_context))
 		return false;
 
+	app_name = (const char*)tags.get_app_name().c_str();
+	if (!app_name.size())
+		app_name = real_path.stem().string();
+
 	resources.file_context = &file_context;
 
 	{

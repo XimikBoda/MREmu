@@ -77,6 +77,27 @@ std::u8string MreTags::get_dev_name() {
 	return read_string(VM_CE_INFO_DEV);
 }
 
+std::u8string MreTags::get_app_name() {
+	if(is_tag_exist(VM_CE_INFO_NAME))
+		return read_string(VM_CE_INFO_NAME);
+	else if(is_tag_exist(VM_CE_INFO_NAME_LIST)) {
+		auto strs = read_mstring(VM_CE_INFO_NAME_LIST);
+		if (strs.size())
+			return strs[0].second;
+	}
+	return u8"";
+}
+
+std::u8string MreTags::raw_to_u8(void* data, int size) {
+	if (is_tags_ucs2()) {
+		auto str16 = std::u16string((char16_t*)data, size / 2);
+		return ucs2_to_utf8(str16);
+	}
+	else
+		return std::u8string((char8_t*)data, size);
+}
+
+
 bool MreTags::read_bool(int id) {
 	return read_uint32(id);
 }
@@ -96,15 +117,27 @@ uint32_t MreTags::read_uint32(int id) {
 
 std::u8string MreTags::read_string(int id) {
 	auto it = raw_tags.find(id);
-	if (it != raw_tags.end()) {
-		if (is_tags_ucs2()) {
-			auto str16 = std::u16string((char16_t*)it->second.data(), it->second.size());
-			return ucs2_to_utf8(str16);
-		}
-		else
-			return std::u8string((char8_t*)it->second.data(), it->second.size());
-	}
+	if (it != raw_tags.end())
+		return raw_to_u8(it->second.data(), it->second.size());
+
 	return u8"";
+}
+
+MreTags::mstring MreTags::read_mstring(int id) {
+	mstring res;
+	size_t offset = 0;
+	auto it = raw_tags.find(id);
+	if (it != raw_tags.end()) {
+		uint8_t* data = it->second.data();
+		size_t size = it->second.size();
+		while (offset < size) {
+			uint32_t id = *(uint32_t*)(data + offset);
+			uint32_t str_size = *(uint32_t*)(data + offset + 4);
+			res.push_back({ id, raw_to_u8(data + offset + 8, str_size)});
+		}
+	}
+
+	return res;
 }
 
 std::vector<uint8_t> MreTags::get_raw_tag(int id) {

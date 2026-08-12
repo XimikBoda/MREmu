@@ -28,6 +28,8 @@ public:
 	size_t mem_size;
 	size_t segments_size;
 
+	std::string app_name;
+
 	MreTags tags;
 
 	Memory::MemoryManager app_memory;

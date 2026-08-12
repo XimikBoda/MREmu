@@ -9,6 +9,7 @@
 using namespace std::string_literals;
 
 bool NativeApp::preparation() {
+	app_name = "Native";
 	return true;
 }
 
