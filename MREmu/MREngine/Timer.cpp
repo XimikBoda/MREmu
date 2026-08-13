@@ -15,7 +15,7 @@ void MREngine::Timer::update(size_t delta_ms, App* cur_app)
 			el.cur_val += delta_ms;
 			if (el.cur_val >= el.time) {
 				el.cur_val = 0;
-				cur_app->run(el.adr, i);
+				cur_app->run(el.adr, i + 1);
 			}
 		}
 	for (int i = 0; i < timers.size(); ++i)
@@ -24,7 +24,7 @@ void MREngine::Timer::update(size_t delta_ms, App* cur_app)
 			el.cur_val += delta_ms;
 			if (el.cur_val >= el.time) {
 				el.cur_val = 0;
-				cur_app->run(el.adr, i);
+				cur_app->run(el.adr, i + 1);
 			}
 		}
 }
@@ -33,11 +33,13 @@ int MREngine::Timer::create(size_t time, VM_TIMERPROC_T adr, bool gui)
 {
 	auto& tim = gui ? gui_timers : timers;
 	int i = tim.push({ time, 0, adr });
-	return i;
+	return i + 1;
 }
 
 int MREngine::Timer::destroy(int id, bool gui)
 {
+	--id;
+
 	auto& tim = gui ? gui_timers : timers;
 
 	if (!tim.is_active(id))
