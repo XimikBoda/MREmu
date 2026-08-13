@@ -831,6 +831,16 @@ namespace Bridge {
 		{FUNCN(vm_dd_initialize_clip_rect), [](uc_engine* uc) {
 			vm_dd_initialize_clip_rect();
 		}},
+		{FUNCN(vm_dd_set_clip), [](uc_engine* uc) {
+			vm_dd_set_clip(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3));
+		}},
+		{FUNCN(vm_dd_reset_clip), [](uc_engine* uc) {
+			vm_dd_reset_clip();
+		}},
 		{FUNCN(vm_dd_load_image), [](uc_engine* uc) {
 			write_ret(uc,
 				ADDRESS_TO_EMU(vm_dd_load_image(

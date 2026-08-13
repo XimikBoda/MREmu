@@ -95,6 +95,14 @@ void vm_dd_initialize_clip_rect(void) {
 	vm_graphic_set_clip(0, 0, w, h);
 }
 
+void vm_dd_set_clip(VMINT x, VMINT y, VMINT width, VMINT height) {
+	vm_graphic_set_clip(x, y, x + width - 1, y + height - 1);
+}
+
+void vm_dd_reset_clip(void) {
+	vm_dd_initialize_clip_rect();
+}
+
 VMUINT8* vm_dd_load_image(VMUINT8* img, VMINT img_len) {
 	return (VMUINT8*)vm_graphic_load_image_FIX(img, img_len);
 }
