@@ -35,6 +35,8 @@ bool show_error = false;
 AppManager* g_appManager = 0;
 
 #ifdef ANDROID
+#include <spdlog/sinks/android_sink.h>
+
 std::atomic<int> storage_permission_state{0};
 
 extern "C" JNIEXPORT void JNICALL
@@ -97,6 +99,9 @@ int main(int argc, char** argv) {
 
 	fs::current_path(fs::path(argv[0]).parent_path());
 #else
+    auto android_logger = spdlog::android_logger_mt("android_logger", "MREmu");
+
+    spdlog::set_default_logger(android_logger);
 #endif
 
     AppManager appManager;

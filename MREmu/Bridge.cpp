@@ -1491,7 +1491,7 @@ namespace Bridge {
 				ret = (void*)sscanf;
 
 		spdlog::log(ret ? spdlog::level::debug : spdlog::level::warn,
-			"vm_get_sym_entry_native({}) -> {:08x}", symbol, (uint32_t)ret);
+			"vm_get_sym_entry_native({}) -> {:08x}", symbol, (size_t)ret);
 
 		return ret;
 	}
