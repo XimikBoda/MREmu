@@ -16,6 +16,13 @@ namespace NativeApps::Menu::AppSelector {
 	int c_h = 0, b_h = 0;
 	int img_wh = 0;
 
+	int scroll_pos = 0;
+	int touch_start_y = 0;
+	int touch_last_y = 0;
+	bool touched = false;
+	int touch_time = 0;
+	
+
 	VMUINT16 gray = VM_COLOR_888_TO_565(50, 50, 50);
 
 	int m_i = 0;
@@ -30,6 +37,7 @@ namespace NativeApps::Menu::AppSelector {
 
 	void draw();
 	void key_handler(VMINT event, VMINT keycode);
+	void pen_handler(VMINT event, VMINT x, VMINT y);
 
 	void entry() {
 		w = vm_graphic_get_screen_width();
@@ -84,18 +92,19 @@ namespace NativeApps::Menu::AppSelector {
 		draw();
 
 		vm_reg_keyboard_callback(key_handler);
+		vm_reg_pen_callback(pen_handler);
 	}
 
 	void draw() {
 		vm_graphic_fill_rect(layer_buf, 0, 0, w, h, 0x0000, 0x0000);
 
 		for (int i = 0; i < vxps.size(); ++i) {
-			int y = b_h * i;
+			int y = b_h * i - scroll_pos;
 
 			if (i == m_i)
 				vm_graphic_fill_rect(layer_buf, 0, y, w, b_h, gray, gray);
 
-			if(vxps[i].img)
+			if (vxps[i].img)
 				vm_graphic_blt(layer_buf, 1, y, (VMBYTE*)vxps[i].img, 0, 0, img_wh, img_wh, 1);
 
 			vm_graphic_textout(layer_buf, 2 + b_h, y + (b_h - c_h) / 2, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
@@ -125,6 +134,55 @@ namespace NativeApps::Menu::AppSelector {
 				break;
 			}
 		}
+
+		if (vxps.size() * b_h > h) {
+			if (b_h * m_i - scroll_pos + b_h > h)
+				scroll_pos = b_h * m_i + b_h - h;
+
+			if (b_h * m_i - scroll_pos < 0)
+				scroll_pos = b_h * m_i;
+		}
+
+		draw();
+	}
+
+	void pen_handler(VMINT event, VMINT x, VMINT y) {
+		switch (event) {
+			case VM_PEN_EVENT_TAP:
+				m_i = (y + scroll_pos) / b_h;
+				touch_start_y = y;
+				touch_last_y = y;
+				touched = true;
+				touch_time = vm_get_tick_count();
+				break;
+			case VM_PEN_EVENT_MOVE:
+			case VM_PEN_EVENT_REPEAT:
+			case VM_PEN_EVENT_LONG_TAP:
+			case VM_PEN_EVENT_DOUBLE_CLICK:
+				if (touched) {
+					scroll_pos += touch_last_y - y;
+					touch_last_y = y;
+
+					if (scroll_pos < 0)
+						scroll_pos = 0;
+
+					if (scroll_pos > vxps.size() * b_h - h)
+						scroll_pos = vxps.size() * b_h - h;
+				}
+				break;
+			case VM_PEN_EVENT_RELEASE:
+			case VM_PEN_EVENT_ABORT:
+				touched = false;
+				if (std::abs(touch_start_y - y) < b_h / 2 && vm_get_tick_count() - touch_time < 150)
+					vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
+				break;
+		}
+
+		if (m_i < 0)
+			m_i = vxps.size() - 1;
+
+		if (m_i >= vxps.size())
+			m_i = 0;
 
 		draw();
 	}
