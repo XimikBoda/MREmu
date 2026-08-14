@@ -10,6 +10,9 @@ using namespace std::string_literals;
 
 bool NativeApp::preparation() {
 	app_name = "Native";
+	mem_size = 512 * 1024;
+	mem_location = Memory::shared_malloc(mem_size, false);
+	app_memory.setup((size_t)mem_location, mem_size);
 	return true;
 }
 

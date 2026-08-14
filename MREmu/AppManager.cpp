@@ -46,6 +46,8 @@ void AppManager::launch_apps()
 		app = std::make_shared<NativeApp>();
 
 		((NativeApp*)app.get())->conf = *launch_data.conf;
+
+		app->preparation();
 	}
 	else {
 		if (ArmApp::check_format(launch_data.path, launch_data.local))

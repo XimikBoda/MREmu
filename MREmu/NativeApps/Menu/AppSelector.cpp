@@ -1,5 +1,7 @@
 #include "AppSelector.h"
+#include "../../MREngine/Image.h"
 #include <vector>
+#include <string>
 #include <vmgraph.h>
 #include <vmio.h>
 #include <vmpromng.h>
@@ -12,12 +14,19 @@ namespace NativeApps::Menu::AppSelector {
 	VMUINT8* layer_buf = 0;
 	int w = 0, h = 0;
 	int c_h = 0, b_h = 0;
+	int img_wh = 0;
 
 	VMUINT16 gray = VM_COLOR_888_TO_565(50, 50, 50);
 
 	int m_i = 0;
-	
-	std::vector<vm_fileinfo_ext> vxps;
+
+	struct vxp {
+		std::u16string name;
+		std::u16string path;
+		VMINT_CANVAS img;
+	};
+
+	std::vector<vxp> vxps;
 
 	void draw();
 	void key_handler(VMINT event, VMINT keycode);
@@ -26,20 +35,51 @@ namespace NativeApps::Menu::AppSelector {
 		w = vm_graphic_get_screen_width();
 		h = vm_graphic_get_screen_height();
 
-		layer_h = vm_graphic_create_layer(0, 0, w, h, -1);
-		layer_buf = vm_graphic_get_layer_buffer(layer_h);
-		
-		vm_fileinfo_ext direntry;
-
-		for (int ret = 0, find_h = vm_find_first_ext(vm_ucs2_string((VMSTR)"e:\\mre\\*.vxp"), &direntry);
-			find_h >= 0 && !ret; 
-			ret = vm_find_next_ext(find_h, &direntry)) 
-		{
-			vxps.push_back(direntry);
-		}
-
 		c_h = vm_graphic_get_character_height();
 		b_h = c_h * 2;
+		img_wh = b_h - 2;
+
+		layer_h = vm_graphic_create_layer(0, 0, w, h, -1);
+		layer_buf = vm_graphic_get_layer_buffer(layer_h);
+
+		vm_fileinfo_ext direntry;
+
+		for (int ret = 0, find_h = vm_find_first_ext((VMWSTR)u"e:\\mre\\*.vxp", &direntry);
+			find_h >= 0 && !ret;
+			ret = vm_find_next_ext(find_h, &direntry))
+		{
+			std::u16string path = u"e:\\mre\\";
+			std::u16string name = (char16_t*)direntry.filefullname;
+			path += name;
+
+			VMINT_CANVAS img = 0;
+
+			int f = vm_file_open((VMWSTR)path.c_str(), MODE_READ, 1);
+			if (f >= 0) {
+				VMUINT size = 0, rsize = 0;
+				vm_file_getfilesize(f, &size);
+
+				std::vector<uint8_t> data(size);
+				vm_file_read(f, data.data(), size, &rsize);
+
+				vm_file_close(f);
+
+				std::string_view data_view(reinterpret_cast<const char*>(data.data()), data.size());
+				size_t pos = data_view.find("VREAPPLOGO09BVRE");
+
+				if (pos != std::string_view::npos) {
+					int img_size = *(int*)(data.data() + pos + 16 + 3);
+					VMUINT8* img_data = (data.data() + pos + 16 + 3 + 4);
+					if (data_view.substr(pos + 16, 3) == "PNG")
+						img_data += 8;
+
+					img = vm_graphic_load_image_resized_FIX(img_data, img_size, img_wh, img_wh);
+				}
+			}
+
+			vxps.push_back({ name, path, img });
+		}
+
 
 		draw();
 
@@ -55,20 +95,21 @@ namespace NativeApps::Menu::AppSelector {
 			if (i == m_i)
 				vm_graphic_fill_rect(layer_buf, 0, y, w, b_h, gray, gray);
 
-			vm_graphic_textout(layer_buf, 2, y + (b_h - c_h) / 2, vxps[i].filefullname, 100, 0xFFFF);
+			if(vxps[i].img)
+				vm_graphic_blt(layer_buf, 1, y, (VMBYTE*)vxps[i].img, 0, 0, img_wh, img_wh, 1);
+
+			vm_graphic_textout(layer_buf, 2 + b_h, y + (b_h - c_h) / 2, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
 
 			vm_graphic_line(layer_buf, 0, y + b_h - 1, w, y + b_h - 1, 0xFFFF);
 		}
 
-		if(!vxps.size())
+		if (!vxps.size())
 			vm_graphic_textout(layer_buf, 0, 0, vm_ucs2_string((VMSTR)"No files in mre folder"), 100, 0xFFFF);
 
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
 
 	void key_handler(VMINT event, VMINT keycode) {
-		VMWCHAR str[260] = { 0 };
-
 		if (vxps.size() && event == VM_KEY_EVENT_UP) {
 			switch (keycode) {
 			case VM_KEY_UP:
@@ -80,9 +121,7 @@ namespace NativeApps::Menu::AppSelector {
 					m_i = 0;
 				break;
 			case VM_KEY_OK:
-				vm_wstrcat(str, vm_ucs2_string((VMSTR)"e:\\mre\\"));
-				vm_wstrcat(str, vxps[m_i].filefullname);
-				vm_start_app(str, 0, 0);
+				vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
 				break;
 			}
 		}
