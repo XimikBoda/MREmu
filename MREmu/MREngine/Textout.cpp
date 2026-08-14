@@ -6,8 +6,60 @@
 #include "unifont.h"
 #include <iostream>
 #include <cstring>
+#include <string>
+#include <SFML/Graphics/Texture.hpp>
+#include <SFML/Graphics/Image.hpp>
 
 extern MREngine::Graphic* graphic;
+
+sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
+	sf::Image im;
+	int w = vm_graphic_get_string_width((VMWSTR)str.c_str());
+	im.create(w, 16, sf::Color::Transparent);
+
+	sf::Color* buf32_dst = (sf::Color*)im.getPixelsPtr();
+
+	int st_y = 0;
+	int end_y = 16;
+
+	int x_off = 0;
+	for (int i = 0; i < str.length(); ++i) {
+		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)str[i]];
+
+		int ch_d = unifont_15_1_04_bin[data_offset];
+		int ch_w = ch_d & 0xF;
+		bool sho = ch_w >= 8;
+
+		if (x_off >= w)
+			break;
+
+		int st_x = 0;
+		int end_x = std::min<int>(w, x_off + ch_w + 1);
+
+		for (int sy = st_y; sy < end_y; ++sy) {
+			int tex_ty = sy;
+			unsigned short line = 0;
+			if (sho)
+				line = (unifont_15_1_04_bin[data_offset + 2 + tex_ty * 2] << 8) |
+				unifont_15_1_04_bin[data_offset + 2 + tex_ty * 2 + 1];
+			else
+				line = unifont_15_1_04_bin[data_offset + 2 + tex_ty] << 8;
+
+			for (int sx = st_x; sx < end_x; ++sx) {
+				int im_x = sx - x_off;
+
+				if ((line >> (15 - im_x)) & 1)
+					buf32_dst[sy * w + sx] = c;
+			}
+		}
+
+		x_off += ch_w + 1;
+	}
+
+	sf::Texture tex;
+	tex.loadFromImage(im);
+	return tex;
+}
 
 static bool is_skip_symbol(VMWCHAR c) {
 	return c < 0x20 || c == 0x7F;

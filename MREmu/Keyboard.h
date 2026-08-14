@@ -1,6 +1,7 @@
 #pragma once
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/RenderTexture.hpp>
+#include <SFML/Graphics/Sprite.hpp>
 #include <vmio.h>
 
 #ifdef ANDROID
@@ -66,13 +67,15 @@ public:
 	};
 	key_t keys_nav[5];
 
-	KeyboardControl kc;
+	KeyboardControl kc; // I don't remember why I separate this
 
-	sf::RenderTexture frontend_layer;
+	sf::RenderTexture frontend_layer_left; // numpad
+	sf::RenderTexture frontend_layer_right; // dpad
 
-	int x, y, w, h;
+	sf::Sprite sp_left;
+	sf::Sprite sp_right;
 
-	//key_t keys[MREMU_FULL_KEY_COUNT];
+	sf::Sprite *screen;
 
 	bool event(sf::Event& event);
 
@@ -86,5 +89,5 @@ public:
 
 	int find_key_by_pos(int px, int py);
 
-	void update_pos_and_size(int x, int y, int w, int h);
+	void update_resize(int w, int h);
 };

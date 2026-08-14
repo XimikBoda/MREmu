@@ -115,6 +115,7 @@ void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 MREngine::Graphic::Graphic()
 {
 	activate();
+	screen_tex.create(width, height);
 	screen.resize(width * height);
 	{
 		int image_size = width * height * 2;

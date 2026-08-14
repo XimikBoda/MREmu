@@ -176,6 +176,7 @@ int main(int argc, char** argv) {
 	int scale = 1;
 	sf::Sprite screen_sp(graphic.screen_tex);
 	touch.screen = &screen_sp;
+	keyboard.screen = &screen_sp;
 
 	auto update_screen_size = [&] {
 		int scale_x = win_device.getSize().x / graphic.width;
@@ -188,19 +189,7 @@ int main(int argc, char** argv) {
 		screen_sp.setScale(scale, scale);
 		screen_sp.setPosition((win_device.getSize().x - graphic.width * scale) / 2, 0);
 
-		int keyboard_y = graphic.height * scale; // 15x13
-
-		int keyboard_h = win_device.getSize().y - keyboard_y;
-		int keyboard_w = (float)(keyboard_h) / 13.f * 15.f;
-
-		if (keyboard_w > win_device.getSize().x) {
-			keyboard_w = win_device.getSize().x;
-			keyboard_h = (float)(keyboard_w) / 15.f * 13.f;
-		}
-
-		int keyboard_x = (win_device.getSize().x - keyboard_w) / 2;
-
-		keyboard.update_pos_and_size(keyboard_x, keyboard_y, keyboard_w, keyboard_h);
+		keyboard.update_resize(win_device.getSize().x, win_device.getSize().y);
 	};
 
 	update_screen_size();

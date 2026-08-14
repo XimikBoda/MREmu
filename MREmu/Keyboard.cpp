@@ -29,15 +29,15 @@ int KeyboardControl::find_key(int key_code) {
 }
 
 void KeyboardControl::press_key(int key_code, key_source source) {
-    if (key_code == MREMU_KEY_NONE)
-        return;
+	if (key_code == MREMU_KEY_NONE)
+		return;
 
 	int i = find_key(key_code);
 	if (i == -1) {
 #ifdef ANDROID
-        if(Touch0 <= source && source <= Touch9) {
-            vibration.vibrate(sf::milliseconds(50));
-        }
+		if (Touch0 <= source && source <= Touch9) {
+			vibration.vibrate(sf::milliseconds(50));
+		}
 #endif
 
 		pkey.push_back(pkey_t(key_code, source));
@@ -57,9 +57,9 @@ void KeyboardControl::unpress_by_source(key_source source) {
 	for (int i = 0; i < pkey.size(); ++i)
 		if (pkey[i].source == source) {
 #ifdef ANDROID
-            if(Touch0 <= source && source <= Touch9) {
-                vibration.vibrate(sf::milliseconds(40));
-            }
+			if (Touch0 <= source && source <= Touch9) {
+				vibration.vibrate(sf::milliseconds(40));
+			}
 #endif
 
 			add_keyboard_event(VM_KEY_EVENT_UP, pkey[i].key_code);
@@ -80,9 +80,9 @@ const Keys keys_imgui[3 * 7] =
 	{"LEFT",VM_KEY_LEFT},
 	{"OK",VM_KEY_OK},
 	{"RIGHT",VM_KEY_RIGHT},
-	{" ",MREMU_KEY_SEND},
+	{"C",VM_KEY_CLEAR},
 	{"Down",VM_KEY_DOWN},
-	{" ",MREMU_KEY_POWER},
+	{"Back",VM_KEY_BACK},
 	{"1.,",VM_KEY_NUM1},
 	{"2abc",VM_KEY_NUM2},
 	{"3def",VM_KEY_NUM3},
@@ -97,7 +97,7 @@ const Keys keys_imgui[3 * 7] =
 	{"#",VM_KEY_POUND},
 };
 
-const std::map<sf::Keyboard::Key, int> key_to_key = 
+const std::map<sf::Keyboard::Key, int> key_to_key =
 {
 	{sf::Keyboard::Up, VM_KEY_UP},
 	{sf::Keyboard::Down, VM_KEY_DOWN},
@@ -106,6 +106,8 @@ const std::map<sf::Keyboard::Key, int> key_to_key =
 	{sf::Keyboard::Slash, VM_KEY_LEFT_SOFTKEY},
 	{sf::Keyboard::RShift, VM_KEY_RIGHT_SOFTKEY},
 	{sf::Keyboard::Enter, VM_KEY_OK},
+	{sf::Keyboard::BackSpace, VM_KEY_CLEAR},
+	{sf::Keyboard::Escape, VM_KEY_BACK},
 	{sf::Keyboard::Numpad7, VM_KEY_NUM1},
 	{sf::Keyboard::Numpad8, VM_KEY_NUM2},
 	{sf::Keyboard::Numpad9, VM_KEY_NUM3},
@@ -120,35 +122,35 @@ const std::map<sf::Keyboard::Key, int> key_to_key =
 	{sf::Keyboard::Multiply, VM_KEY_POUND},
 };
 
-bool Keyboard::event(sf::Event &event) {
+bool Keyboard::event(sf::Event& event) {
 	switch (event.type) {
-		case sf::Event::KeyPressed:
-		case sf::Event::KeyReleased: {
-			const auto& el = key_to_key.find(event.key.code);
+	case sf::Event::KeyPressed:
+	case sf::Event::KeyReleased: {
+		const auto& el = key_to_key.find(event.key.code);
 
-			if (el != key_to_key.end()) {
-				if (event.type == sf::Event::KeyPressed)
-					kc.press_key(el->second, KeyboardControl::Keyboard);
-				else
-					kc.unpress_key(el->second);
-			}
-			return true;
+		if (el != key_to_key.end()) {
+			if (event.type == sf::Event::KeyPressed)
+				kc.press_key(el->second, KeyboardControl::Keyboard);
+			else
+				kc.unpress_key(el->second);
 		}
-		case sf::Event::MouseButtonPressed:
-			if (event.mouseButton.button == sf::Mouse::Button::Left) 
-				kc.press_key(find_key_by_pos(event.mouseButton.x - x, event.mouseButton.y - y), kc.Mouse);
-			return true;
-		case sf::Event::MouseButtonReleased:
-			if (event.mouseButton.button == sf::Mouse::Button::Left)
-				kc.unpress_by_source(kc.Mouse);
-			return true;
-		case sf::Event::TouchBegan:
-			kc.press_key(find_key_by_pos(event.touch.x - x, event.touch.y - y), 
-				(KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
-			return true;
-		case sf::Event::TouchEnded:
-			kc.unpress_by_source((KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
-			return true;
+		return true;
+	}
+	case sf::Event::MouseButtonPressed:
+		if (event.mouseButton.button == sf::Mouse::Button::Left)
+			kc.press_key(find_key_by_pos(event.mouseButton.x, event.mouseButton.y), kc.Mouse);
+		return true;
+	case sf::Event::MouseButtonReleased:
+		if (event.mouseButton.button == sf::Mouse::Button::Left)
+			kc.unpress_by_source(kc.Mouse);
+		return true;
+	case sf::Event::TouchBegan:
+		kc.press_key(find_key_by_pos(event.touch.x, event.touch.y),
+			(KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
+		return true;
+	case sf::Event::TouchEnded:
+		kc.unpress_by_source((KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
+		return true;
 	}
 	return false;
 }
@@ -173,273 +175,290 @@ void Keyboard::imgui_keyboard() {
 		if (ImGui::IsItemClicked())
 			kc.press_key(keys_imgui[i].code, KeyboardControl::ImGui);
 
-		if(presed)
+		if (presed)
 			ImGui::PopStyleColor(3);
 	}
 	ImGui::End();
-}
-
-float sign(sf::Vector2f p1, sf::Vector2f p2, sf::Vector2f p3) {
-	return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
-}
-
-bool point_in_triangle(sf::Vector2f pt, sf::Vector2f v1, sf::Vector2f v2, sf::Vector2f v3) {
-	float d1, d2, d3;
-	bool has_neg, has_pos;
-
-	d1 = sign(pt, v1, v2);
-	d2 = sign(pt, v2, v3);
-	d3 = sign(pt, v3, v1);
-
-	has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-	has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-
-	return !(has_neg && has_pos);
-}
-
-bool point_in_quads(sf::Vector2f pt, sf::Vector2f v1, sf::Vector2f v2, sf::Vector2f v3, sf::Vector2f v4) {
-	return point_in_triangle(pt, v1, v2, v3) || point_in_triangle(pt, v1, v2, v4);
-}
-
-void draw_roundline(sf::RenderTarget* rt, int x, int y, int w, int h, sf::Color c) {
-	sf::CircleShape circle(int(h / 2));
-	circle.setFillColor(c);
-	circle.setPosition(x, y);
-	rt->draw(circle);
-	circle.setPosition(x + w - h, y);
-	rt->draw(circle);
-
-	sf::RectangleShape rect(sf::Vector2f(w - h, h));
-	rect.setFillColor(c);
-	rect.setPosition(x + h / 2, y);
-	rt->draw(rect);
-}
-
-void draw_handset(sf::RenderTarget* rt, int x, int y, int w, int h, sf::Color c, sf::Color b) {
-	int r = h / 3 / 2;
-	int R1 = h - r;
-	int R2 = h - r - r * 2;
-	sf::CircleShape circle(R1);
-	circle.setFillColor(c);
-	circle.setPosition(x, y);
-	rt->draw(circle);
-	circle.setPosition(x + w - R1 * 2, y);
-	rt->draw(circle);
-
-	sf::RenderStates states;
-
-	states.blendMode = sf::BlendMode(sf::BlendMode::One, sf::BlendMode::Zero);
-
-	sf::RectangleShape rect(sf::Vector2f(w, h));
-	rect.setFillColor(b);
-	rect.setPosition(x, y + h - r);
-	rt->draw(rect, states);
-	rect.setPosition(x + R1, y + r * 2);
-	rect.setSize(sf::Vector2f(w - R1 * 2, h - r * 2));
-	rt->draw(rect, states);
-
-	rect.setFillColor(c);
-	rect.setPosition(x + R1, y);
-	rect.setSize(sf::Vector2f(w - R1 * 2, r * 2));
-	rt->draw(rect);
-
-	circle.setFillColor(c);
-	circle.setRadius(r);
-	circle.setPosition(x, y + h - r * 2);
-	rt->draw(circle);
-	circle.setPosition(x + w - r * 2, y + h - r * 2);
-	rt->draw(circle);
-
-
-	circle.setFillColor(b);
-	circle.setRadius(R2);
-	circle.setPosition(x + r * 2, y + r * 2);
-	rt->draw(circle, states);
-	circle.setPosition(x + w - R2 * 2 - r * 2, y + r * 2);
-	rt->draw(circle, states);
-}
-
-void draw_soft_button(sf::RenderTarget* rt, float x, float y, float w, float h) {
-	draw_roundline(rt, x + w / 3, y + (h - h / 10) / 2, w / 3, h / 10, sf::Color::White);
-}
-
-void draw_handset_button(sf::RenderTarget* rt, float x, float y, float w, float h, sf::Color c, sf::Color b) {
-	draw_handset(rt, x + w / 3, y + (h - h * 3 / 10) / 2, w / 3, h * 3 / 10, c, b);
 }
 
 void Keyboard::draw(sf::RenderTarget* rt) {
 	for (int i = 0; i < kc.pkey.size(); ++i)
 		draw_press_key(rt, kc.pkey[i].key_code);
 
-	sf::Sprite sp(frontend_layer.getTexture());;
-	sp.setPosition(x, y);
-
-	rt->draw(sp);
+	rt->draw(sp_left);
+	rt->draw(sp_right);
 }
+
+const int key_map_left[4][3] =
+{
+	{VM_KEY_NUM1, VM_KEY_NUM2, VM_KEY_NUM3},
+	{VM_KEY_NUM4, VM_KEY_NUM5, VM_KEY_NUM6},
+	{VM_KEY_NUM7, VM_KEY_NUM8, VM_KEY_NUM9},
+	{VM_KEY_STAR, VM_KEY_NUM0, VM_KEY_POUND}
+};
+
+const int key_map_right[4][3] =
+{
+	{VM_KEY_LEFT_SOFTKEY,	   VM_KEY_UP, VM_KEY_RIGHT_SOFTKEY},
+	{		 VM_KEY_LEFT,	   VM_KEY_OK,		  VM_KEY_RIGHT},
+	{		VM_KEY_CLEAR,	 VM_KEY_DOWN,		   VM_KEY_BACK},
+	{		VM_KEY_CLEAR, MREMU_KEY_NONE,		   VM_KEY_BACK}
+};
 
 void Keyboard::draw_press_key(sf::RenderTarget* rt, int key) {
 	sf::Color c(160, 75, 160);
 
 	int x = -1, y = 0;
+	sf::Vector2f offset_vec;
+	float kw, kh;
 
 	if (VM_KEY_NUM1 <= key && key <= VM_KEY_NUM9) {
 		x = (key - VM_KEY_NUM1) % 3;
-		y = (key - VM_KEY_NUM1) / 3 + 2;
+		y = (key - VM_KEY_NUM1) / 3;
 	}
 	else
 		switch (key) {
-		case VM_KEY_LEFT_SOFTKEY:
-			x = 0, y = 0;
-			break;
-		case VM_KEY_RIGHT_SOFTKEY:
-			x = 2, y = 0;
-			break;
-		case MREMU_KEY_SEND:
-			x = 0, y = 1;
-			break;
-		case MREMU_KEY_POWER:
-			x = 2, y = 1;
-			break;
 		case VM_KEY_STAR:
-			x = 0, y = 5;
+			x = 0, y = 3;
 			break;
 		case VM_KEY_NUM0:
-			x = 1, y = 5;
+			x = 1, y = 3;
 			break;
 		case VM_KEY_POUND:
-			x = 2, y = 5;
+			x = 2, y = 3;
 			break;
 		}
 
-	sf::Vertex v[4];
 
-	float kw = (float)w / 3;
-	float kh = (float)h / 6;
+	if (x != -1) {
+		offset_vec = sp_left.getPosition();
+		kw = (float)sp_left.getTextureRect().width / 3.f;
+		kh = (float)sp_left.getTextureRect().height / 4.f;
+	}
+	else {
+		offset_vec = sp_right.getPosition();
+		kw = (float)sp_right.getTextureRect().width / 3.f;
+		kh = (float)sp_right.getTextureRect().height / 4.f;
+
+		for (int i = 0; i < 3; ++i)
+			for (int j = 0; j < 3; ++j)
+				if (key_map_right[i][j] == key) {
+					x = j, y = i;
+
+					if (!(std::abs(j - 1) == 1 && std::abs(i - 1)) == 1)
+						offset_vec.y += kh / 2.f;
+					else if (i == 2)
+						offset_vec.y += kh;
+
+					break;
+				}
+	}
+
+	sf::Vertex v[4];
 
 	if (x != -1) {
 		v[0].position = sf::Vector2f(x * kw, y * kh);
 		v[1].position = sf::Vector2f((x + 1) * kw, y * kh);
 		v[2].position = sf::Vector2f((x + 1) * kw, (y + 1) * kh);
 		v[3].position = sf::Vector2f(x * kw, (y + 1) * kh);
-	}
-	else {
-		for (int i = 0; i < 5; ++i)
-			if (keys_nav[i].key_code == key) {
-				for (int j = 0; j < 4; ++j)
-					v[j].position = keys_nav[i].v[j];
-				x = 0;
-				break;
-			}
-	}
 
-	if (x != -1) {
 		for (int j = 0; j < 4; ++j) {
-			v[j].position += sf::Vector2f(this->x, this->y);
+			v[j].position += offset_vec;
 			v[j].color = c;
 		}
 		rt->draw(v, 4, sf::TriangleFan);
 	}
 }
 
-int Keyboard::find_key_by_pos(int px, int py) {
-    if(px < 0 || py < 0 || px >= w || py >= h)
-        return MREMU_KEY_NONE;
-
-	float kw = (float)w / 3;
-	float kh = (float)h / 6;
-
-	int kpx = px / kw, kpy = py / kh;
-
-	if (kpy >= 2 && kpy < 5)
-		return VM_KEY_NUM1 + kpx + (kpy - 2) * 3;
-	else if (kpy == 5)
-		if (kpx == 0) return VM_KEY_STAR;
-		else if (kpx == 1) return VM_KEY_NUM0;
-		else return VM_KEY_POUND;
-	else if (kpx == 0)
-		if (kpy == 0) return VM_KEY_LEFT_SOFTKEY;
-		else return MREMU_KEY_SEND;
-	else if (kpx == 2)
-		if (kpy == 0) return VM_KEY_RIGHT_SOFTKEY;
-		else return MREMU_KEY_POWER;
-	else {
-		for (int i = 0; i < 4; ++i)
-			if (point_in_quads(sf::Vector2f(px, py),
-				keys_nav[i].v[0], keys_nav[i].v[1],
-				keys_nav[i].v[2], keys_nav[i].v[3]))
-				return keys_nav[i].key_code;
-		return VM_KEY_OK;
-	}
+static bool in_box(int x, int y, int bx, int by, int bw, int bh) {
+	return x >= bx && y >= by && x < bx + bw && y < by + bh;
 }
 
-void Keyboard::update_pos_and_size(int x, int y, int w, int h) {
-	this->x = x, this->y = y, this->w = w, this->h = h;
+static bool in_box(int x, int y, sf::Sprite sp) {
+	return in_box(x, y, sp.getPosition().x, sp.getPosition().y, sp.getTextureRect().width, sp.getTextureRect().height);
+}
 
-	frontend_layer.create(w, h);
-	frontend_layer.clear(sf::Color::Transparent);
+int Keyboard::find_key_by_pos(int px, int py) {
+	if (in_box(px, py, sp_left)) {
+		int x = sp_left.getPosition().x;
+		int y = sp_left.getPosition().y;
+		int w = sp_left.getTextureRect().width;
+		int h = sp_left.getTextureRect().height;
 
-	float kw = (float)w / 3;
-	float kh = (float)h / 6;
+		float kw = (float)w / 3;
+		float kh = (float)h / 4;
 
-	std::vector<sf::Vertex> lines;
+		int kpx = (px - x) / kw, kpy = (py - y) / kh;
 
-	int it = 0;
-	for (int i = 0; i < 6; ++i)
-		if (i == 1) {
-			lines.push_back(sf::Vertex(sf::Vector2f(0, i * kh)));
-			lines.push_back(sf::Vertex(sf::Vector2f(kw, i * kh)));
-			lines.push_back(sf::Vertex(sf::Vector2f(kw * 2, i * kh)));
-			lines.push_back(sf::Vertex(sf::Vector2f(kw * 3, i * kh)));
+		return key_map_left[kpy][kpx];
+	}
+	if (in_box(px, py, sp_right)) {
+		int x = sp_right.getPosition().x;
+		int y = sp_right.getPosition().y;
+		int w = sp_right.getTextureRect().width;
+		int h = sp_right.getTextureRect().height;
+
+		float kw = (float)w / 3;
+		float kh = (float)h / 4;
+
+		int kpx = (px - x) / kw, kpy = (py - y) / kh;
+
+		if ((kpx == 0 || kpx == 2) && (kpy == 0 || kpy == 3))
+			return key_map_right[kpy][kpx];
+		
+
+		{
+			kpy = std::floor((float(py - y) - kh / 2.f) / kh);
+
+			if (kpy >= 0 && kpy < 3 && !(std::abs(kpx - 1) == 1 && std::abs(kpy - 1) == 1))
+				return key_map_right[kpy][kpx];
 		}
-		else {
-			lines.push_back(sf::Vertex(sf::Vector2f(0, i * kh)));
-			lines.push_back(sf::Vertex(sf::Vector2f(kw * 3, i * kh)));
+	}
+	
+	return MREMU_KEY_NONE;
+}
+
+static sf::Vector2i size_by_aspect_ratio(int bw, int bh, float ratio) {
+	int h = bh;
+	int w = (float)(h) * ratio;
+
+	if (w > bw) {
+		w = bw;
+		h = (float)(w) / ratio;
+	}
+
+	return { w, h };
+}
+
+sf::Texture u16text_to_texture(std::u16string str, sf::Color c);
+
+const char16_t* keys_marks_left[4][3] = {
+	{u"1", u"2", u"3"},
+	{u"4", u"5", u"6"},
+	{u"7", u"8", u"9"},
+	{u"*", u"0", u"#"},
+};
+
+const char16_t* keys_marks_right[3][3] = {
+	{u"\u2014", u"\u2B06", u"\u2014"},
+	{u"\u2B05", u"OK", u"\u2B95"},
+	{u"\u232B", u"\u2B07", u"\u21A9"},
+};
+
+void Keyboard::update_resize(int win_w, int win_h) {
+	int screen_x = screen->getPosition().x;
+	int screen_y = screen->getPosition().y;
+	int screen_w = screen->getScale().x * screen->getTextureRect().width;
+	int screen_h = screen->getScale().y * screen->getTextureRect().height;
+
+	sf::IntRect left, right;
+	if (win_h - screen_h > win_w - screen_w) { //bottom
+		auto size = size_by_aspect_ratio(win_w, win_h - screen_h, 6.f / 4.f);
+		int x = (win_w - size.x) / 2, y = screen_y + screen_h;
+		left = { x, y, size.x / 2 + 1, size.y };
+		right = { x + size.x / 2, y, size.x / 2, size.y };
+	}
+	else {
+		auto size = size_by_aspect_ratio((win_w - screen_w) / 2, win_h, 3.f / 4.f);
+		int y = win_h - size.y;
+		left = { (screen_x - size.x) / 2, y, size.x, size.y };
+		right = { screen_x + screen_w, y, size.x, size.y };
+	}
+
+	{
+		int w = left.width, h = left.height;
+
+		frontend_layer_left.create(w, h);
+		frontend_layer_left.clear(sf::Color::Transparent);
+
+		sp_left = sf::Sprite(frontend_layer_left.getTexture());
+		sp_left.setPosition(left.left, left.top);
+
+		float kw = (float)(w - 1) / 3.f;
+		float kh = (float)(h - 1) / 4.f;
+
+		int font_scale = std::max<int>(kw / 16, 1);
+
+		std::vector<sf::Vertex> lines;
+
+		for (int ix = 0; ix < 4; ++ix) {
+			int x = ix * kw;
+			lines.push_back(sf::Vertex(sf::Vector2f(x + 1, 0)));
+			lines.push_back(sf::Vertex(sf::Vector2f(x + 1, h)));
 		}
 
-	for (int i = 0; i < 2; ++i) {
-		lines.push_back(sf::Vertex(sf::Vector2f(kw * (i + 1), 0)));
-		lines.push_back(sf::Vertex(sf::Vector2f(kw * (i + 1), h)));
+		for (int iy = 0; iy < 5; ++iy) {
+			int y = iy * kh;
+			lines.push_back(sf::Vertex(sf::Vector2f(0, y)));
+			lines.push_back(sf::Vertex(sf::Vector2f(w, y)));
+		}
+
+		for (int iy = 0; iy < 4; ++iy)
+			for (int ix = 0; ix < 3; ++ix) {
+				auto tex = u16text_to_texture(keys_marks_left[iy][ix], sf::Color::White);
+				sf::Sprite sp(tex);
+				sp.setOrigin(sp.getTextureRect().width / 2, sp.getTextureRect().height / 2);
+				sp.setPosition(ix * kw + kw / 2.f, iy * kh + kh / 2.f);
+				sp.setScale(font_scale, font_scale);
+				frontend_layer_left.draw(sp);
+			}
+
+		for (int i = 0; i < lines.size(); ++i)
+			lines[i].color = sf::Color::White;
+
+		frontend_layer_left.draw(lines.data(), lines.size(), sf::Lines);
+		frontend_layer_left.display();
 	}
 
-	float ik = kh * 5 / 8;
-	float ocords[4][2] = { {0, 0}, {kw, 0}, {kw, kh * 2}, {0, kh * 2} };
-	float icords[4][2] = { {ik, ik}, {-ik, ik}, {-ik, -ik}, {ik, -ik} };
+	{
+		int w = right.width, h = right.height;
 
-	for (int i = 0; i < 4; ++i) {
-		ocords[i][0] += kw;
-		icords[i][0] += ocords[i][0];
-		icords[i][1] += ocords[i][1];
+		frontend_layer_right.create(w, h);
+		frontend_layer_right.clear(sf::Color::Transparent);
+
+		sp_right = sf::Sprite(frontend_layer_right.getTexture());
+		sp_right.setPosition(right.left, right.top);
+
+		float kw = (float)(w - 1) / 3.f;
+		float kh = (float)(h - 1) / 4.f;
+
+		int font_scale = std::max<int>(kw / 16, 1);
+
+		std::vector<sf::Vertex> lines;
+
+		for (int iy = 0; iy < 3; ++iy)
+			for (int ix = 0; ix < 3; ++ix) {
+				float x = ix * kw + 1;
+				float y = iy * kh;
+				if (!(std::abs(ix - 1) == 1 && std::abs(iy - 1)) == 1)
+					y += kh / 2.f;
+				else if (iy == 2)
+					y += kh;
+
+				lines.push_back(sf::Vertex(sf::Vector2f(x, y)));
+				lines.push_back(sf::Vertex(sf::Vector2f(x + kw, y)));
+
+				lines.push_back(sf::Vertex(sf::Vector2f(x + kw, y)));
+				lines.push_back(sf::Vertex(sf::Vector2f(x + kw, y + kh)));
+
+				lines.push_back(sf::Vertex(sf::Vector2f(x + kw, y + kh)));
+				lines.push_back(sf::Vertex(sf::Vector2f(x, y + kh)));
+
+				lines.push_back(sf::Vertex(sf::Vector2f(x, y + kh)));
+				lines.push_back(sf::Vertex(sf::Vector2f(x, y)));
+
+				auto tex = u16text_to_texture(keys_marks_right[iy][ix], sf::Color::White);
+				sf::Sprite sp(tex);
+				sp.setOrigin(sp.getTextureRect().width / 2, sp.getTextureRect().height / 2);
+				sp.setPosition(x + kw / 2.f, y + kh / 2.f);
+				sp.setScale(font_scale, font_scale);
+				frontend_layer_right.draw(sp);
+			}
+
+		for (int i = 0; i < lines.size(); ++i)
+			lines[i].color = sf::Color::White;
+
+		frontend_layer_right.draw(lines.data(), lines.size(), sf::Lines);
+		frontend_layer_right.display();
 	}
-
-	for (int i = 0; i < 4; ++i) {
-		int ni = i < 3 ? i + 1 : 0;
-		lines.push_back(sf::Vertex(sf::Vector2f(icords[i][0], icords[i][1])));
-		lines.push_back(sf::Vertex(sf::Vector2f(icords[ni][0], icords[ni][1])));
-		lines.push_back(sf::Vertex(sf::Vector2f(ocords[i][0], ocords[i][1])));
-		lines.push_back(sf::Vertex(sf::Vector2f(icords[i][0], icords[i][1])));
-
-		keys_nav[i].v[0] = sf::Vector2f(ocords[i][0], ocords[i][1]);
-		keys_nav[i].v[1] = sf::Vector2f(ocords[ni][0], ocords[ni][1]);
-		keys_nav[i].v[2] = sf::Vector2f(icords[ni][0], icords[ni][1]);
-		keys_nav[i].v[3] = sf::Vector2f(icords[i][0], icords[i][1]);
-
-		keys_nav[4].v[i] = sf::Vector2f(icords[i][0], icords[i][1]);
-	}
-
-	keys_nav[0].key_code = VM_KEY_UP;
-	keys_nav[1].key_code = VM_KEY_RIGHT;
-	keys_nav[2].key_code = VM_KEY_DOWN;
-	keys_nav[3].key_code = VM_KEY_LEFT;
-	keys_nav[4].key_code = VM_KEY_OK;
-
-	for (int i = 0; i < lines.size(); ++i)
-		lines[i].color = sf::Color::White;
-
-	draw_handset_button(&frontend_layer, 0, kh, kw, kh, sf::Color::Green, sf::Color::Transparent);
-	draw_handset_button(&frontend_layer, kw * 2, kh, kw, kh, sf::Color::Red, sf::Color::Transparent);
-	draw_soft_button(&frontend_layer, 0, 0, kw, kh);
-	draw_soft_button(&frontend_layer, kw * 2, 0, kw, kh);
-
-	frontend_layer.draw(lines.data(), lines.size(), sf::Lines);
-	frontend_layer.display();
 }
