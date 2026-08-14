@@ -175,8 +175,10 @@ VMINT_CANVAS vm_graphic_create_canvas_cf_FIX(vm_graphic_color_famat cf, VMINT wi
 
 	cfp->offset = image_size;
 
+#ifndef ANDROID
 	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
+#endif // !ANDROID
 
 	return (VMINT_CANVAS)canvas_buf;
 }

@@ -277,8 +277,10 @@ VMINT_CANVAS vm_graphic_load_image_cf_FIX(vm_graphic_color_famat cf, VMUINT8* im
 		offset += canvas_frame_property_size + cfp->offset;
 	}
 
+#ifndef ANDROID
 	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
+#endif // !ANDROID
 
 	return (VMINT_CANVAS)canvas_buf;
 }
@@ -335,8 +337,10 @@ VMINT_CANVAS vm_graphic_load_image_resized_cf_FIX(vm_graphic_color_famat cf, VMU
 		}
 	}
 
+#ifndef ANDROID
 	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
 	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
+#endif // !ANDROID
 
 	return (VMINT_CANVAS)canvas_buf;
 }
