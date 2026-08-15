@@ -115,6 +115,7 @@ int main(int argc, char** argv) {
 	Bridge::init();
 
 	MREngine::SIM::init();
+	MREngine::System::init();
 	MREngine::CharSet::init();
 	MREngine::AppAudio::init();
 	MREngine::Graphic graphic;

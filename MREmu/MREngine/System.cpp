@@ -12,6 +12,13 @@
 
 namespace fs = std::filesystem;
 
+static void* malloc_stat_ptr = 0;
+
+void MREngine::System::init()
+{
+	malloc_stat_ptr = Memory::shared_malloc(sizeof(malloc_stat_t));
+}
+
 //MRE API
 
 VMINT vm_get_time(vm_time_t* time) {
@@ -57,7 +64,18 @@ VMINT vm_get_sys_scene(void) {
 }
 
 malloc_stat_t* vm_get_malloc_stat(void) {
-	return 0; //TODO: make this correct
+	malloc_stat_t* stat = (malloc_stat_t*)malloc_stat_ptr;
+	Memory::MemoryManager& mm = get_current_app_memory();
+
+	stat->avail_heap_size = mm.get_free_memory_size();
+	stat->current = mm.get_memory_size() - mm.get_free_memory_size();
+	stat->fail_times = 0;
+	stat->free_count = 0;
+	stat->malloc_count = 0;
+	stat->max_fail_size = 0;
+	stat->peak = 0;
+	
+	return stat;
 }
 
 void* vm_malloc(int size) {

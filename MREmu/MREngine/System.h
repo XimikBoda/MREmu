@@ -3,6 +3,10 @@
 #include <vmpromng.h>
 
 namespace MREngine {
+	namespace System {
+		void init();
+	}
+
 	class SystemCallbacks {
 	public:
 		void (*sysevt)(VMINT message, VMINT param) = 0;
