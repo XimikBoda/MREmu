@@ -193,6 +193,7 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 #endif
 
 	if (!f) {
+		spdlog::warn("vm_file_open({}, {}) = -1", path.string(), mode);
 		return -1;
 	}
 
