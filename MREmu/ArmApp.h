@@ -25,6 +25,9 @@ public:
 	bool is_ads;
 	bool is_zipped;
 
+	uint32_t rw_size = 0;
+	uint32_t zi_size = 0;
+
 	static bool check_format(fs::path path, bool local);
 
 	bool preparation() override;

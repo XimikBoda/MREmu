@@ -1535,7 +1535,7 @@ namespace Bridge {
 			vm_get_sym_entry("armodule_free"));
 	}
 
-	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base) {
+	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base, uint32_t stack_top, uint32_t heap_limit, uint32_t stack_size) {
 		uint32_t base_it = data_base - 0x80;
 
 		write_reg(uc, UC_ARM_REG_R9, data_base);
@@ -1555,9 +1555,9 @@ namespace Bridge {
 
 		uint32_t args[4] = {
 			vm_get_sym_entry_p,
-			data_base + 1024,
-			data_base + 1024 + 2 * 1024,
-			3 * 1024
+			stack_top,
+			heap_limit,
+			stack_size
 		};
 
 		for (int i = 0; i < 4; i++) {

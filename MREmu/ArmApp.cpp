@@ -58,7 +58,7 @@ bool ArmApp::preparation()
 		return false;
 
 	app_name = (const char*)tags.get_app_name().c_str();
-	if(!app_name.size())
+	if (!app_name.size())
 		app_name = real_path.stem().string();
 
 	resources.file_context = &file_context;
@@ -67,7 +67,7 @@ bool ArmApp::preparation()
 	is_zipped = tags.is_zipped();
 
 	mem_size = tags.get_ram() * 1024;
-	mem_size = std::max<size_t>(512 * 1024 * 4, mem_size);
+	mem_size = std::max<size_t>(512 * 1024, mem_size);
 
 	mem_location = Memory::shared_malloc(mem_size, true, 0x100000);
 	memset(mem_location, 0, mem_size);
@@ -90,10 +90,46 @@ bool ArmApp::preparation()
 			}
 		}
 
-		entry_point = (elf.get_entry() + offset_mem);
-
 		segments_size = 0;
-		if (!is_ads)
+
+		if (is_ads) {
+			uint32_t current_offset = 0x8000; // for debug
+			uint32_t er_ro_vaddr = 0;
+
+			for (int i = 0; i < elf.sections.size(); ++i) {
+				ELFIO::section* psec = elf.sections[i];
+
+				if (psec->get_name() == "ER_ZI" || psec->get_name() == ".bss") {
+					zi_size = psec->get_size();
+				}
+				if (psec->get_name() == "ER_RO" || psec->get_name() == "ER_RW") {
+					if (current_offset + psec->get_size() > mem_size) {
+						spdlog::error("Segment loading error, {} bytes required, but {} allocated",
+							current_offset + psec->get_size(), mem_size);
+						return false;
+					}
+
+					memcpy((unsigned char*)mem_location + current_offset,
+						file_context.data() + psec->get_offset(), psec->get_size());
+
+					current_offset += psec->get_size();
+
+					if (psec->get_name() == "ER_RO") {
+						er_ro_vaddr = psec->get_address();
+					}
+					if (psec->get_name() == "ER_RW") {
+						rw_size = psec->get_size();
+					}
+				}
+			}
+
+			entry_point = offset_mem + (elf.get_entry() - er_ro_vaddr);
+
+			segments_size = current_offset;
+		}
+		else {
+			entry_point = (elf.get_entry() + offset_mem);
+
 			for (int i = 0; i < elf.segments.size(); ++i) {
 				const ELFIO::segment* pseg = elf.segments[i];
 
@@ -110,51 +146,46 @@ bool ArmApp::preparation()
 					pseg->get_virtual_address() + pseg->get_memory_size());
 			}
 
+			for (int i = 0; i < elf.sections.size(); ++i) {
+				ELFIO::section* psec = elf.sections[i];
+
+				if (psec->get_name() == std::string(".rel.dyn") || psec->get_name() == std::string(".rel.plt")) {
+					ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_offset()]; //TODO
+					for (int i = 0; i < psec->get_size() / sizeof(ELFIO::Elf32_Rel); ++i) {
+						if (sym[i].r_offset & 3) {
+							spdlog::critical("Unaligned relocation pointer detected!\n"
+								"  -> Offset: {:#010X}\n"
+								"  -> MRE Loader will corrupt memory at this address on ARMv5TE!",
+								sym[i].r_offset
+							);
+						}
+						switch (sym[i].r_info & 0xFF) {
+						case 0x17:
+							*(uint32_t*)((unsigned char*)mem_location + sym[i].r_offset) += offset_mem;
+							break;
+						case 0x02:
+						case 0x16:
+							*(uint32_t*)((unsigned char*)mem_location + sym[i].r_offset) = 0;
+							break;
+						}
+					}
+				}
+			}
+		}
+
 		for (int i = 0; i < elf.sections.size(); ++i) {
 			ELFIO::section* psec = elf.sections[i];
 
-			if (psec->get_name() == "ER_RO" || psec->get_name() == "ER_RW") {
-				if (psec->get_address() + psec->get_size() > mem_size) {
-					spdlog::error("Segment loading error, {} bytes required, but {} allocated",
-						psec->get_address() + psec->get_size(), mem_size);
-					return false;
-				}
-
-				memcpy((unsigned char*)mem_location + psec->get_address(),
-					file_context.data() + psec->get_offset(), psec->get_size());
-
-				segments_size = std::max<size_t>(segments_size,
-					psec->get_address() + psec->get_size());
-			}
-			if (psec->get_name() == std::string(".rel.dyn") || psec->get_name() == std::string(".rel.plt")) {
-				ELFIO::Elf32_Rel* sym = (ELFIO::Elf32_Rel*)&file_context[psec->get_offset()]; //TODO
-				for (int i = 0; i < psec->get_size() / sizeof(ELFIO::Elf32_Rel); ++i) {
-					if (sym[i].r_offset & 3) {
-						spdlog::critical("Unaligned relocation pointer detected!\n"
-							"  -> Offset: {:#010X}\n"
-							"  -> MRE Loader will corrupt memory at this address on ARMv5TE!",
-							sym[i].r_offset
-						);
-					}
-					switch (sym[i].r_info & 0xFF) {
-					case 0x17:
-						*(uint32_t*)((unsigned char*)mem_location + sym[i].r_offset) += offset_mem;
-						break;
-					case 0x02:
-					case 0x16:
-						*(uint32_t*)((unsigned char*)mem_location + sym[i].r_offset) = 0;
-						break;
-					}
-				}
-			}
 			if (psec->get_name() == std::string(".vm_res")) {
-				resources.offset = psec->get_offset();
-				resources.size = psec->get_size();
+				resources.vm_res_offset = psec->get_offset();
+				resources.vm_res_size = psec->get_size();
 			}
 		}
 	}
 	else
 	{
+		resources.local_offsets = true;
+
 		if (is_ads) {
 			uint32_t elf_info_size = *(uint32_t*)(file_context.data() + tags.tags_offset - 4);
 
@@ -179,10 +210,12 @@ bool ArmApp::preparation()
 				return false;
 			}
 
-			resources.offset = info->res_offset;
-			resources.size = info->res_size;
+			resources.vm_res_offset = info->res_offset;
+			resources.vm_res_size = info->res_size;
 
-			segments_size = info->org_ro_size + info->org_rw_size + info->zi_size;
+			segments_size = info->org_ro_size + info->org_rw_size;
+			rw_size = info->org_rw_size;
+			zi_size = info->zi_size;
 
 			entry_point = offset_mem;
 
@@ -201,10 +234,15 @@ bool ArmApp::preparation()
 		}
 	}
 
-	app_memory.setup((size_t)mem_location, mem_size, segments_size);
-	app_memory.malloc(segments_size, true); // for "protect" code
+	uint32_t reserved_size = segments_size;
+	if (is_ads) {
+		reserved_size += 0x80 + rw_size + zi_size;
+	}
 
-	if (resources.size)
+	app_memory.setup((size_t)mem_location, mem_size, reserved_size);
+	app_memory.malloc(reserved_size, true); // for "protect" code
+
+	if (resources.vm_res_size)
 		resources.scan();
 	return true;
 }
@@ -216,7 +254,15 @@ void ArmApp::start()
 	Log::set_module(app_name);
 
 	if (is_ads) {
-		Bridge::ads_start(entry_point, vm_get_sym_entry_p, offset_mem + mem_size + 0x100);
+		uint32_t data_base = offset_mem + segments_size + 0x80;
+		uint32_t app_memory_end = data_base + rw_size + zi_size;
+		uint32_t heap_limit = offset_mem + mem_size;
+		uint32_t MACRO_STACK_SIZE = 3 * 1024;
+		uint32_t MACRO_HEAP_SIZE = 2 * 1024;
+		uint32_t init_param_2 = heap_limit - MACRO_STACK_SIZE - MACRO_HEAP_SIZE;
+		uint32_t init_param_3 = init_param_2 + MACRO_HEAP_SIZE;
+
+		Bridge::ads_start(entry_point, vm_get_sym_entry_p, data_base, init_param_2, init_param_3, MACRO_STACK_SIZE);
 	}
 	else {
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);
