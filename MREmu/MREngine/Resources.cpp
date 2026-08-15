@@ -18,12 +18,10 @@ static std::string to_lower(std::string str) {
 
 void MREngine::Resources::scan()
 {
-	size_t pos = offset;
-
-	global = false;
+	size_t pos = vm_res_offset;
 
 	while (1) {
-		if (pos > offset + size)
+		if (pos > vm_res_offset + vm_res_size)
 			abort();
 
 		if (!(*file_context)[pos])
@@ -38,14 +36,16 @@ void MREngine::Resources::scan()
 		uint32_t res_size = *(uint32_t*)(file_context->data() + pos);
 		pos += 4;
 
-		if (res_offset < offset || global)
-			res_offset += offset, global = true;
+		if (local_offsets)
+			res_offset += vm_res_offset;
 
-		if (res_offset < offset || res_offset + res_size > offset + size)
+		if (res_offset < vm_res_offset || res_offset + res_size > vm_res_offset + vm_res_size)
 			spdlog::warn("resource outside the resource segment ({})", name);
 
-		if (res_offset + res_size > file_context->size())
-			abort();
+		if (res_offset + res_size > file_context->size()) {
+			spdlog::error("resource offset out of file");
+			break;
+		}
 
 		res_map[to_lower(name)] = {res_offset, res_size};
 
@@ -74,11 +74,18 @@ void MREngine::Resources::scan_mre2_0(uint32_t offset, uint32_t size)
 		uint32_t res_next_offset = *(uint32_t*)(file_context->data() + pos + 4);
 
 		uint32_t res_size = res_next_offset - res_offset;
-		if (res_offset > res_next_offset)
-			abort();
 
-		if (res_offset < this->offset || res_offset + res_size > this->offset + this->size)
-			abort();
+		if (local_offsets)
+			res_offset += vm_res_offset, res_next_offset += vm_res_offset;
+
+
+		if (res_offset > res_next_offset) {
+			spdlog::error("resource mre 2.0	parse problem, next offset smaller");
+			break;
+		}
+
+		if (res_offset < vm_res_offset || res_offset + res_size > vm_res_offset + vm_res_size)
+			spdlog::warn("resource mre 2.0 parse problem, out of vm_res");
 
 		res2_map[id] = { res_offset, res_size };
 	}

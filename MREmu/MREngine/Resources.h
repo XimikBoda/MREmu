@@ -15,10 +15,10 @@ namespace MREngine {
 	class Resources {
 	public:
 		std::vector<unsigned char> *file_context;
-		uint32_t offset = 0;
-		uint32_t size = 0;
+		uint32_t vm_res_offset = 0;
+		uint32_t vm_res_size = 0;
 
-		bool global = false;
+		bool local_offsets = false;
 
 		std::map<std::string, res_el> res_map;
 		std::map<uint32_t, res_el> res2_map;

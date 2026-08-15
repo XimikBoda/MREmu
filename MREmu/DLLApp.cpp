@@ -54,15 +54,15 @@ bool DLLApp::preparation()
 			return 0;
 
 
-		resources.offset = resources_start;
-		resources.size = resources_end - resources_start;
+		resources.vm_res_offset = resources_start;
+		resources.vm_res_size = resources_end - resources_start;
 	}
 
 	if (file_context.size() > 512 * 1024 * 1024) {
-		memmove(file_context.data(), file_context.data() + resources.offset, resources.size);
-		file_context.resize(resources.size);
+		memmove(file_context.data(), file_context.data() + resources.vm_res_offset, resources.vm_res_size);
+		file_context.resize(resources.vm_res_size);
 		file_context = std::vector<unsigned char>(file_context);
-		resources.offset = 0;
+		resources.vm_res_offset = 0;
 	}
 
 	dll = LoadLibraryW(real_path.wstring().c_str());
@@ -93,7 +93,7 @@ bool DLLApp::preparation()
 
 	app_memory.setup((size_t)mem_location, mem_size);
 
-	if (resources.offset && resources.size)
+	if (resources.vm_res_offset && resources.vm_res_size)
 		resources.scan();
 	return true;
 }
