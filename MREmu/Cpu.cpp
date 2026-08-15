@@ -148,7 +148,7 @@ namespace Cpu {
 	{
 		unsigned char code[8];
 		uc_mem_read(uc, address, code, size);
-		spdlog::debug(">>> Read block at {:#010X}, block size = {:#010X}", (int)address, size);
+		spdlog::debug(">>> Read block at {:#010X}, block size = {:#010X}", (uint32_t)address, size);
 		print_code(code, size);
 	}
 
@@ -156,7 +156,7 @@ namespace Cpu {
 	{
 		unsigned char code[8];
 		uc_mem_read(uc, address, code, size);
-		spdlog::debug(">>> Write block at {:#010X}, block size = {:#010X}, val = {:#010X}", (int)address, size, value);
+		spdlog::debug(">>> Write block at {:#010X}, block size = {:#010X}, val = {:#010X}", (uint32_t)address, size, value);
 		print_code(code, size);
 	}
 
@@ -208,14 +208,14 @@ namespace Cpu {
 
 	static bool hook_read_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
-		spdlog::error(">>> Try to read block at 0x%08X, block size = 0x%08X                  ---- UNMAPPED", (int)address, size);
+		spdlog::error(">>> Try to read block at {:#010X}, block size = {:#010X}                  ---- UNMAPPED", (uint32_t)address, size);
 		uc_mem_map(uc, (address / 0x1000) * 0x1000, 0x1000, UC_PROT_ALL);
 		return true;
 	}
 
 	static bool hook_write_unmapped(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data)
 	{
-		spdlog::error(">>> Try to write block at {:#010X}, block size = {:#010X}, val = {:#010X}  ---- UNMAPPED", (int)address, size, value);
+		spdlog::error(">>> Try to write block at {:#010X}, block size = {:#010X}, val = {:#010X}  ---- UNMAPPED", (uint32_t)address, size, value);
 		uc_mem_map(uc, (address / 0x1000) * 0x1000, 0x1000, UC_PROT_ALL);
 		return true;
 	}
