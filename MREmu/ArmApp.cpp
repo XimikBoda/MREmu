@@ -8,6 +8,9 @@
 
 using namespace std::string_literals;
 
+const uint32_t ADS_HEAP_SIZE = 2 * 1024;
+const uint32_t ADS_STACK_SIZE = 3 * 1024;
+
 typedef struct
 {
 	uint32_t ro_offset;
@@ -236,8 +239,10 @@ bool ArmApp::preparation()
 
 	uint32_t reserved_size = segments_size;
 	if (is_ads) {
-		reserved_size += 0x80 + rw_size + zi_size;
+		reserved_size += 0x80 + rw_size + zi_size + ADS_HEAP_SIZE;
 	}
+	
+	reserved_size = (reserved_size + 7) & ~7;
 
 	app_memory.setup((size_t)mem_location, mem_size, reserved_size);
 	app_memory.malloc(reserved_size, true); // for "protect" code
@@ -255,14 +260,12 @@ void ArmApp::start()
 
 	if (is_ads) {
 		uint32_t data_base = offset_mem + segments_size + 0x80;
-		uint32_t app_memory_end = data_base + rw_size + zi_size;
-		uint32_t heap_limit = offset_mem + mem_size;
-		uint32_t MACRO_STACK_SIZE = 3 * 1024;
-		uint32_t MACRO_HEAP_SIZE = 2 * 1024;
-		uint32_t init_param_2 = heap_limit - MACRO_STACK_SIZE - MACRO_HEAP_SIZE;
-		uint32_t init_param_3 = init_param_2 + MACRO_HEAP_SIZE;
 
-		Bridge::ads_start(entry_point, vm_get_sym_entry_p, data_base, init_param_2, init_param_3, MACRO_STACK_SIZE);
+		uint32_t heap_base = data_base + rw_size + zi_size;
+		uint32_t heap_limit = heap_base + ADS_HEAP_SIZE;
+
+
+		Bridge::ads_start(entry_point, vm_get_sym_entry_p, data_base, heap_base, heap_limit, ADS_STACK_SIZE);
 	}
 	else {
 		Bridge::run_cpu(entry_point, 3, vm_get_sym_entry_p, 0, 0);

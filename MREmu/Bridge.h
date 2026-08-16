@@ -8,7 +8,7 @@ namespace Bridge {
 	int vm_get_sym_entry(const char* symbol);
 	void* vm_get_sym_entry_native(const char* symbol);
 	int run_cpu(uint32_t adr, int n, ...);
-	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base, uint32_t stack_top, uint32_t heap_limit, uint32_t stack_size);
+	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base, uint32_t heap_base, uint32_t heap_limit, uint32_t stack_size);
 
 	template <typename T>
 	uint32_t prepare_emu_arg(T arg) {

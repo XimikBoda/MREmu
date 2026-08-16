@@ -1535,36 +1535,27 @@ namespace Bridge {
 			vm_get_sym_entry("armodule_free"));
 	}
 
-	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base, uint32_t stack_top, uint32_t heap_limit, uint32_t stack_size) {
-		uint32_t base_it = data_base - 0x80;
-
+	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base, uint32_t heap_base, uint32_t heap_limit, uint32_t stack_size) {
 		write_reg(uc, UC_ARM_REG_R9, data_base);
 
-		uint32_t current_sp = read_reg(uc, UC_ARM_REG_SP);
-		current_sp -= 56;
-		write_reg(uc, UC_ARM_REG_SP, current_sp);
-
-		uint32_t lr_stack_address = current_sp + 52;
-		*(uint32_t*)ADDRESS_FROM_EMU(lr_stack_address) = (uint32_t)idle_p;
+		uint32_t base_it = data_base - 0x80;
 
 		put_to_reg(uc, (uint32_t)idle_p);
 		put_to_reg(uc, 0);
-		
-		*(uint32_t*)ADDRESS_FROM_EMU(base_it) = read_reg(uc, UC_ARM_REG_SP);
-		base_it += 4;
 
-		uint32_t args[4] = {
+		uint32_t current_sp = read_reg(uc, UC_ARM_REG_SP);
+
+		uint32_t args[5] = {
+			current_sp,
 			vm_get_sym_entry_p,
-			stack_top,
+			heap_base,
 			heap_limit,
 			stack_size
 		};
 
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < 5; i++) {
 			*(uint32_t*)ADDRESS_FROM_EMU(base_it) = args[i];
 			base_it += 4;
-
-			put_to_reg(uc, args[i]);
 		}
 
 		return run_cpu(entry, 0);
