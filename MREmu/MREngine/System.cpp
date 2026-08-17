@@ -41,7 +41,7 @@ VMINT vm_get_curr_utc(VMUINT* utc) {
 }
 
 float vm_get_sys_time_zone(void) {
-#ifdef ANDROID
+#ifndef WIN32
     time_t t = time(nullptr);
     struct tm lt = {0};
 
