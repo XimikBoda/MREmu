@@ -82,3 +82,6 @@ After a successful build, the executable will be placed in the `bin` directory a
 cd ../bin
 ./MREmu
 ```
+
+## Support
+Any questions? Join the official Discord server of MREmu: https://discord.gg/vMEtkpnMU4
