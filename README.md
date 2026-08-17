@@ -101,6 +101,7 @@ cd ../bin
 
 > These links might be relevant and handy for MRE development. (Also just add them to [Wayback Machine](https://web.archive.org/) if you're visiting them since we dont wan't these resources to be lost)
 
+- https://github.com/raspiduino/mre-sdk
 - https://mobileuniverse.miraheze.org/wiki/MediaTek_MRE
 - https://emulation.gametechwiki.com/index.php/Cellphone_emulators#MAUI_Runtime_Environment
 
