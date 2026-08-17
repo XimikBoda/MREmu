@@ -87,9 +87,15 @@ cd ../bin
 - [QEMU](https://github.com/qemu/qemu)
 - [Unicorn](https://github.com/unicorn-engine/unicorn)
 - [SFML](https://github.com/SFML/SFML)
+- [Dear ImGui](https://github.com/ocornut/imgui)
+- [ImGui-SFML](https://github.com/SFML/imgui-sfml)
 - [Capstone](https://github.com/capstone-engine/capstone)
+- [ELFIO](https://github.com/serge1/ELFIO)
+- [CmdParser](https://github.com/FlorianRappl/CmdParser)
 - [libADLMIDI](https://github.com/Wohlstand/libADLMIDI)
 - [libiconv-cmake](https://github.com/winlibs/libiconv-cmake)
+- [TurboStitchGIF](https://github.com/Ferki-git-creator/TurboStitchGIF-HeaderOnly-Fast-ZeroAllocation-PlatformIndependent-Embedded-C-GIF-Decoder)
+- [miniz](https://github.com/richgel999/miniz)
 
 ## Documentation and References
 
