@@ -13,7 +13,7 @@ The project relies on several third-party libraries. Most dependencies are inclu
 
 ### Prerequisites on Linux
 
-Before building, you must install the necessary development packages for your Linux distribution.
+Before building on Linux, you must install the necessary development packages for your Linux distribution.
 
 #### Fedora
 ```bash
@@ -31,6 +31,13 @@ sudo apt install build-essential cmake libopenal-dev libfreetype-dev libx11-dev 
 sudo pacman -S base-devel cmake openal freetype2 libx11 libxrandr libxcursor libxi systemd libgl flac libvorbis libogg
 ```
 
+### Prerequisites on Windows
+
+- Visual Studio 2019 or newer with the "Desktop development with C++" workload
+- [CMake](https://cmake.org/download/)
+- [OpenAL 1.1 Windows Installer](https://www.openal.org/downloads/)
+- [MediaTek MRE SDK 3.0](https://github.com/raspiduino/mre-sdk/releases/download/1.0.0/MRE_SDK_3.0.00.20_Normal_Eng.zip)
+
 ## Build Instructions
 
 **1. Clone the repository and initialize submodules**
@@ -46,11 +53,16 @@ If you have already cloned the repository without submodules, initialize them no
 git submodule update --init --recursive
 ```
 
-**2. Download the Mediatek SDK**
+**2. Download the MediaTek SDK**
 
-The emulator engine requires the Mediatek MRE SDK headers (`vm*.h`) to compile. You must download the SDK and set the `MRE_SDK` environment variable.
+The emulator engine requires the MediaTek MRE SDK headers (`vm*.h`) to compile. You must download the SDK and set the `MRE_SDK` environment variable.
 
-For Linux, you must download the official SDK installer and extract it using `innoextract`:
+#### Windows
+1. Download and install or extract [MRE SDK 3.0](https://github.com/raspiduino/mre-sdk/releases/download/1.0.0/MRE_SDK_3.0.00.20_Normal_Eng.zip).
+2. Set the `MRE_SDK` environment variable pointing to the SDK directory (containing the `include` folder).
+
+#### Linux
+Download the official SDK installer and extract it using `innoextract`:
 ```bash
 # Install innoextract (e.g. on Fedora use dnf, on Ubuntu use apt)
 sudo dnf install innoextract 
@@ -67,6 +79,25 @@ cd -
 
 **3. Configure and build the project**
 
+#### Windows
+
+Using CMake GUI:
+1. Open CMake GUI.
+2. Set the source code path to the repository directory.
+3. Set the build binaries path to the `build` directory inside the repository.
+4. Click **Configure**, select your Visual Studio version, and choose `Win32` as the platform.
+5. Click **Generate**, then click **Open Project** to open the solution in Visual Studio.
+6. Build the solution in Visual Studio (Release or Debug).
+
+Using command line:
+```cmd
+mkdir build
+cd build
+cmake .. -A Win32
+cmake --build . --config Release
+```
+
+#### Linux
 Make sure the `MRE_SDK` environment variable is set in your current terminal session. Then, use CMake to configure the build environment and compile the project:
 ```bash
 mkdir build
@@ -78,6 +109,13 @@ cmake --build . -j$(nproc)
 **4. Run the emulator**
 
 After a successful build, the executable will be placed in the `bin` directory at the project root.
+
+Windows:
+```cmd
+bin\MREmu.exe
+```
+
+Linux:
 ```bash
 cd ../bin
 ./MREmu
