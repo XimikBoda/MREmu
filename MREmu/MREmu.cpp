@@ -25,22 +25,192 @@
 
 #include "NativeApps/Menu/AppSelector.h"
 #include "NativeApp.h"
+#include "ArmApp.h"
+#include "DLLApp.h"
 
 AppManager* g_appManager = 0;
+
+sf::Texture u16text_to_texture(std::u16string str, sf::Color c);
+
+std::u16string warning_text_u16;
+sf::Clock warning_clock;
+bool show_warning = false;
 
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#include <dwmapi.h>
+#include <functional>
 
 static WNDPROC old_wndproc_debug = NULL;
 static WNDPROC old_wndproc_device = NULL;
 
-static void handle_drop(HDROP hDrop) {
-	UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
-	fs::path dest_dir = fs::path("fs/e/mre").make_preferred();
-	fs::create_directories(dest_dir);
+static int dev_base_w = 240;
+static int dev_base_h = 528;
 
-	bool imported = false;
+static HWND g_hwnd_debug = NULL;
+static HWND g_hwnd_device = NULL;
+
+static std::function<void(unsigned int, unsigned int)> g_on_device_resize;
+static std::function<void()> g_repaint_device;
+
+static int g_dev_grab_x = 0;
+static int g_dev_grab_y = 0;
+static bool g_dev_is_moving = false;
+
+static int g_dbg_last_x = 0;
+static int g_dbg_last_y = 0;
+static bool g_device_was_docked_to_debug = false;
+
+static bool get_visual_rect(HWND hwnd, RECT* out_rect) {
+	if (!hwnd || !IsWindow(hwnd))
+		return false;
+	if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, out_rect, sizeof(RECT))))
+		return true;
+	return GetWindowRect(hwnd, out_rect) != 0;
+}
+
+static void get_shadow_margins(HWND hwnd, int& m_left, int& m_top, int& m_right, int& m_bottom) {
+	RECT win_rect, vis_rect;
+	GetWindowRect(hwnd, &win_rect);
+	if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &vis_rect, sizeof(RECT)))) {
+		m_left = vis_rect.left - win_rect.left;
+		m_top = vis_rect.top - win_rect.top;
+		m_right = win_rect.right - vis_rect.right;
+		m_bottom = win_rect.bottom - vis_rect.bottom;
+	} else {
+		m_left = m_top = m_right = m_bottom = 0;
+	}
+}
+
+static bool is_device_docked_to_debug() {
+	if (!g_hwnd_debug || !g_hwnd_device || !IsWindow(g_hwnd_debug) || !IsWindow(g_hwnd_device))
+		return false;
+	RECT dbg_vis, dev_vis;
+	if (!get_visual_rect(g_hwnd_debug, &dbg_vis) || !get_visual_rect(g_hwnd_device, &dev_vis))
+		return false;
+
+	const int tol = 4;
+	bool touching_right = (std::abs(dev_vis.left - dbg_vis.right) <= tol) &&
+		(dev_vis.bottom >= dbg_vis.top - tol) && (dev_vis.top <= dbg_vis.bottom + tol);
+	bool touching_left = (std::abs(dev_vis.right - dbg_vis.left) <= tol) &&
+		(dev_vis.bottom >= dbg_vis.top - tol) && (dev_vis.top <= dbg_vis.bottom + tol);
+	bool touching_bottom = (std::abs(dev_vis.top - dbg_vis.bottom) <= tol) &&
+		(dev_vis.right >= dbg_vis.left - tol) && (dev_vis.left <= dbg_vis.right + tol);
+	bool touching_top = (std::abs(dev_vis.bottom - dbg_vis.top) <= tol) &&
+		(dev_vis.right >= dbg_vis.left - tol) && (dev_vis.left <= dbg_vis.right + tol);
+
+	return touching_right || touching_left || touching_bottom || touching_top;
+}
+
+static void snap_device_to_debug(HWND hwnd, RECT* r) {
+	if (!g_hwnd_debug || !IsWindow(g_hwnd_debug) || !IsWindowVisible(g_hwnd_debug))
+		return;
+
+	RECT dbg_vis;
+	if (!get_visual_rect(g_hwnd_debug, &dbg_vis))
+		return;
+
+	int w = r->right - r->left;
+	int h = r->bottom - r->top;
+
+	int ideal_left = r->left;
+	int ideal_top = r->top;
+	if (g_dev_is_moving) {
+		POINT pt;
+		GetCursorPos(&pt);
+		ideal_left = pt.x - g_dev_grab_x;
+		ideal_top = pt.y - g_dev_grab_y;
+	}
+
+	int m_l, m_t, m_r, m_b;
+	get_shadow_margins(hwnd, m_l, m_t, m_r, m_b);
+
+	RECT ideal_vis;
+	ideal_vis.left = ideal_left + m_l;
+	ideal_vis.top = ideal_top + m_t;
+	ideal_vis.right = ideal_left + w - m_r;
+	ideal_vis.bottom = ideal_top + h - m_b;
+
+	int vis_w = ideal_vis.right - ideal_vis.left;
+	int vis_h = ideal_vis.bottom - ideal_vis.top;
+
+	int overlap_l = std::max(ideal_vis.left, dbg_vis.left);
+	int overlap_r = std::min(ideal_vis.right, dbg_vis.right);
+	int overlap_t = std::max(ideal_vis.top, dbg_vis.top);
+	int overlap_b = std::min(ideal_vis.bottom, dbg_vis.bottom);
+
+	if (overlap_l < overlap_r && overlap_t < overlap_b) {
+		int overlap_area = (overlap_r - overlap_l) * (overlap_b - overlap_t);
+		int dev_area = vis_w * vis_h;
+		if (overlap_area > dev_area * 0.35f) {
+			r->left = ideal_left;
+			r->top = ideal_top;
+			r->right = ideal_left + w;
+			r->bottom = ideal_top + h;
+			return;
+		}
+	}
+
+	const int threshold = 16;
+	RECT snapped_vis = ideal_vis;
+
+	bool v_near = (ideal_vis.bottom >= dbg_vis.top - threshold) && (ideal_vis.top <= dbg_vis.bottom + threshold);
+	if (v_near) {
+		if (std::abs(ideal_vis.left - dbg_vis.right) <= threshold) {
+			snapped_vis.left = dbg_vis.right;
+			snapped_vis.right = snapped_vis.left + vis_w;
+		}
+		else if (std::abs(ideal_vis.right - dbg_vis.left) <= threshold) {
+			snapped_vis.right = dbg_vis.left;
+			snapped_vis.left = snapped_vis.right - vis_w;
+		}
+		else if (std::abs(ideal_vis.left - dbg_vis.left) <= threshold) {
+			snapped_vis.left = dbg_vis.left;
+			snapped_vis.right = snapped_vis.left + vis_w;
+		}
+		else if (std::abs(ideal_vis.right - dbg_vis.right) <= threshold) {
+			snapped_vis.right = dbg_vis.right;
+			snapped_vis.left = snapped_vis.right - vis_w;
+		}
+	}
+
+	bool h_near = (ideal_vis.right >= dbg_vis.left - threshold) && (ideal_vis.left <= dbg_vis.right + threshold);
+	if (h_near) {
+		if (std::abs(ideal_vis.top - dbg_vis.bottom) <= threshold) {
+			snapped_vis.top = dbg_vis.bottom;
+			snapped_vis.bottom = snapped_vis.top + vis_h;
+		}
+		else if (std::abs(ideal_vis.bottom - dbg_vis.top) <= threshold) {
+			snapped_vis.bottom = dbg_vis.top;
+			snapped_vis.top = snapped_vis.bottom - vis_h;
+		}
+		else if (std::abs(ideal_vis.top - dbg_vis.top) <= threshold) {
+			snapped_vis.top = dbg_vis.top;
+			snapped_vis.bottom = snapped_vis.top + vis_h;
+		}
+		else if (std::abs(ideal_vis.bottom - dbg_vis.bottom) <= threshold) {
+			snapped_vis.bottom = dbg_vis.bottom;
+			snapped_vis.top = snapped_vis.bottom - vis_h;
+		}
+	}
+
+	r->left = snapped_vis.left - m_l;
+	r->top = snapped_vis.top - m_t;
+	r->right = r->left + w;
+	r->bottom = r->top + h;
+}
+
+static void handle_drop(HDROP hDrop, HWND hwnd) {
+	bool is_shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+
+	UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+	if (count == 0) {
+		DragFinish(hDrop);
+		return;
+	}
+
+	std::vector<fs::path> valid_files;
 	for (UINT i = 0; i < count; ++i) {
 		UINT len = DragQueryFileW(hDrop, i, NULL, 0);
 		std::wstring path(len, L'\0');
@@ -49,12 +219,57 @@ static void handle_drop(HDROP hDrop) {
 		fs::path src(path);
 		std::string ext = src.extension().string();
 		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+		bool valid = false;
 		if (ext == ".vxp" && fs::is_regular_file(src)) {
-			std::error_code ec;
-			fs::copy_file(src, dest_dir / src.filename(), fs::copy_options::overwrite_existing, ec);
-			if (!ec)
-				imported = true;
+			if (ArmApp::check_format(src, false))
+				valid = true;
+#ifdef WIN32
+			else if (DLLApp::check_format(src, false))
+				valid = true;
+#endif
 		}
+
+		if (valid) {
+			valid_files.push_back(src);
+		} else {
+			warning_clock.restart();
+			show_warning = true;
+		}
+	}
+
+	if (valid_files.empty()) {
+		DragFinish(hDrop);
+		return;
+	}
+
+	bool should_move = false;
+	if (is_shift) {
+		int result = MessageBoxW(hwnd, L"Do you want to move the VXP file(s) to fs/e/mre instead of copying?", L"Move VXP", MB_YESNO | MB_ICONQUESTION);
+		if (result == IDYES)
+			should_move = true;
+	}
+
+	fs::path dest_dir = fs::path("fs/e/mre").make_preferred();
+	fs::create_directories(dest_dir);
+
+	bool imported = false;
+	for (const auto& src : valid_files) {
+		std::error_code ec;
+		fs::path target = dest_dir / src.filename();
+		if (should_move) {
+			fs::rename(src, target, ec);
+			if (ec) {
+				ec.clear();
+				fs::copy_file(src, target, fs::copy_options::overwrite_existing, ec);
+				if (!ec)
+					fs::remove(src, ec);
+			}
+		} else {
+			fs::copy_file(src, target, fs::copy_options::overwrite_existing, ec);
+		}
+		if (!ec)
+			imported = true;
 	}
 	DragFinish(hDrop);
 
@@ -67,16 +282,117 @@ static void handle_drop(HDROP hDrop) {
 
 static LRESULT CALLBACK drop_wndproc_debug(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	if (msg == WM_DROPFILES) {
-		handle_drop((HDROP)wParam);
+		handle_drop((HDROP)wParam, hwnd);
 		return 0;
+	}
+	if (msg == WM_ENTERSIZEMOVE) {
+		RECT dbg_rect;
+		GetWindowRect(hwnd, &dbg_rect);
+		g_dbg_last_x = dbg_rect.left;
+		g_dbg_last_y = dbg_rect.top;
+		g_device_was_docked_to_debug = is_device_docked_to_debug();
+	}
+	if (msg == WM_MOVING) {
+		RECT* r = (RECT*)lParam;
+		int dx = r->left - g_dbg_last_x;
+		int dy = r->top - g_dbg_last_y;
+		g_dbg_last_x = r->left;
+		g_dbg_last_y = r->top;
+
+		if (g_device_was_docked_to_debug && g_hwnd_device && IsWindow(g_hwnd_device) && (dx != 0 || dy != 0)) {
+			RECT dev_rect;
+			GetWindowRect(g_hwnd_device, &dev_rect);
+			SetWindowPos(g_hwnd_device, NULL,
+				dev_rect.left + dx, dev_rect.top + dy,
+				0, 0,
+				SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+		return CallWindowProcW(old_wndproc_debug, hwnd, msg, wParam, lParam);
+	}
+	if (msg == WM_EXITSIZEMOVE) {
+		g_device_was_docked_to_debug = false;
 	}
 	return CallWindowProcW(old_wndproc_debug, hwnd, msg, wParam, lParam);
 }
 
 static LRESULT CALLBACK drop_wndproc_device(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	if (msg == WM_DROPFILES) {
-		handle_drop((HDROP)wParam);
+		handle_drop((HDROP)wParam, hwnd);
 		return 0;
+	}
+	if (msg == WM_ENTERSIZEMOVE) {
+		POINT pt;
+		GetCursorPos(&pt);
+		RECT win_rect;
+		GetWindowRect(hwnd, &win_rect);
+		g_dev_grab_x = pt.x - win_rect.left;
+		g_dev_grab_y = pt.y - win_rect.top;
+		g_dev_is_moving = true;
+	}
+	if (msg == WM_MOVING) {
+		RECT* r = (RECT*)lParam;
+		snap_device_to_debug(hwnd, r);
+		return TRUE;
+	}
+	if (msg == WM_EXITSIZEMOVE) {
+		g_dev_is_moving = false;
+	}
+	if (msg == WM_SIZING) {
+		RECT* r = (RECT*)lParam;
+		RECT cr = { 0, 0, 100, 100 };
+		RECT wr = cr;
+		AdjustWindowRect(&wr, GetWindowLong(hwnd, GWL_STYLE), FALSE);
+		int bw = (wr.right - wr.left) - 100;
+		int bh = (wr.bottom - wr.top) - 100;
+
+		int cur_w = (r->right - r->left) - bw;
+		int cur_h = (r->bottom - r->top) - bh;
+
+		constexpr float scale_step = 0.05f;
+		float scale_val = std::max((float)cur_w / (float)dev_base_w, (float)cur_h / (float)dev_base_h);
+		scale_val = std::round(scale_val / scale_step) * scale_step;
+		if (scale_val < 1.0f)
+			scale_val = 1.0f;
+
+		int new_w = (int)std::round((float)dev_base_w * scale_val) + bw;
+		int new_h = (int)std::round((float)dev_base_h * scale_val) + bh;
+
+		switch (wParam) {
+		case WMSZ_LEFT:
+		case WMSZ_TOPLEFT:
+		case WMSZ_BOTTOMLEFT:
+			r->left = r->right - new_w;
+			break;
+		default:
+			r->right = r->left + new_w;
+			break;
+		}
+
+		switch (wParam) {
+		case WMSZ_TOP:
+		case WMSZ_TOPLEFT:
+		case WMSZ_TOPRIGHT:
+			r->top = r->bottom - new_h;
+			break;
+		default:
+			r->bottom = r->top + new_h;
+			break;
+		}
+
+		return TRUE;
+	}
+	if (msg == WM_SIZE) {
+		LRESULT res = CallWindowProcW(old_wndproc_device, hwnd, msg, wParam, lParam);
+		if (g_on_device_resize && wParam != SIZE_MINIMIZED) {
+			g_on_device_resize(LOWORD(lParam), HIWORD(lParam));
+		}
+		return res;
+	}
+	if (msg == WM_PAINT) {
+		LRESULT res = CallWindowProcW(old_wndproc_device, hwnd, msg, wParam, lParam);
+		if (g_repaint_device)
+			g_repaint_device();
+		return res;
 	}
 	return CallWindowProcW(old_wndproc_device, hwnd, msg, wParam, lParam);
 }
@@ -223,11 +539,13 @@ int main(int argc, char** argv) {
 
 #ifdef _WIN32
 #ifndef ANDROID
-	DragAcceptFiles((HWND)win_debug.getSystemHandle(), TRUE);
-	old_wndproc_debug = (WNDPROC)SetWindowLongPtrW((HWND)win_debug.getSystemHandle(), GWLP_WNDPROC, (LONG_PTR)drop_wndproc_debug);
+	g_hwnd_debug = (HWND)win_debug.getSystemHandle();
+	DragAcceptFiles(g_hwnd_debug, TRUE);
+	old_wndproc_debug = (WNDPROC)SetWindowLongPtrW(g_hwnd_debug, GWLP_WNDPROC, (LONG_PTR)drop_wndproc_debug);
 #endif
-	DragAcceptFiles((HWND)win_device.getSystemHandle(), TRUE);
-	old_wndproc_device = (WNDPROC)SetWindowLongPtrW((HWND)win_device.getSystemHandle(), GWLP_WNDPROC, (LONG_PTR)drop_wndproc_device);
+	g_hwnd_device = (HWND)win_device.getSystemHandle();
+	DragAcceptFiles(g_hwnd_device, TRUE);
+	old_wndproc_device = (WNDPROC)SetWindowLongPtrW(g_hwnd_device, GWLP_WNDPROC, (LONG_PTR)drop_wndproc_device);
 #endif
 
 	MREngine::IO::init();
@@ -252,26 +570,98 @@ int main(int argc, char** argv) {
 		appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
 
 
-	int scale = 1;
+	dev_base_w = graphic.width;
+	dev_base_h = graphic.height + 208;
+
+	float scale = 1.f;
 	sf::Sprite screen_sp(graphic.screen_tex);
 	touch.screen = &screen_sp;
 	keyboard.screen = &screen_sp;
 
-	auto update_screen_size = [&] {
-		int scale_x = win_device.getSize().x / graphic.width;
-		int scale_y = win_device.getSize().y / (graphic.height + graphic.height / 2);
+	auto repaint_device = [&]() {
+		win_device.clear(sf::Color::Black);
+		screen_sp.setTexture(graphic.screen_tex, true);
+		win_device.draw(screen_sp);
 
-		scale = std::min(scale_x, scale_y);
-		if (scale < 1)
-			scale = 1;
+		if (show_warning) {
+			float elapsed = warning_clock.getElapsedTime().asSeconds();
+			if (elapsed < 4.f) {
+				if (int(elapsed * 4.f) % 2 == 0) {
+					sf::Texture warn_text_texture = u16text_to_texture(u"Invalid VXP file!", sf::Color(255, 64, 64));
+					sf::Sprite warn_text_sprite(warn_text_texture);
+					float tw = (float)warn_text_texture.getSize().x;
+					float th = (float)warn_text_texture.getSize().y;
+					float box_size_h = warn_text_texture.getSize().y;
+					float box_size_w = warn_text_texture.getSize().x;
+					float padding = 4.0f;
 
-		screen_sp.setScale(scale, scale);
-		screen_sp.setPosition((win_device.getSize().x - graphic.width * scale) / 2, 0);
+					float px = std::floor((win_device.getSize().x - box_size_w - 2 * padding) / 2.f);
+					float py = std::floor((graphic.height * scale - box_size_h - 2 * padding) / 2.f);
 
-		keyboard.update_resize(win_device.getSize().x, win_device.getSize().y);
+					sf::RectangleShape bg(sf::Vector2f(box_size_w + 2 * padding, box_size_h + 2 * padding));
+					bg.setFillColor(sf::Color(0, 0, 0, 0));
+					bg.setOutlineColor(sf::Color(255, 64, 64, 230));
+					bg.setOutlineThickness(1.f);
+					bg.setPosition(px, py);
+
+					warn_text_sprite.setOrigin(std::floor(tw / 2.f), std::floor(th / 2.f));
+					warn_text_sprite.setPosition(px + std::floor(box_size_w / 2.f) + padding, py + std::floor(box_size_h / 2.f) + padding);
+
+					win_device.draw(bg);
+					win_device.draw(warn_text_sprite);
+				}
+			}
+			else {
+				show_warning = false;
+			}
+		}
+
+		keyboard.draw(&win_device);
+		win_device.display();
 	};
 
-	update_screen_size();
+	auto update_screen_size = [&](unsigned int new_w, unsigned int new_h) {
+		static bool resizing = false;
+		if (resizing)
+			return;
+		resizing = true;
+
+		constexpr float scale_step = 0.05f;
+		float scale_x = (float)new_w / (float)dev_base_w;
+		float scale_y = (float)new_h / (float)dev_base_h;
+
+		scale = std::round(std::max(scale_x, scale_y) / scale_step) * scale_step;
+		if (scale < 1.0f)
+			scale = 1.0f;
+
+		unsigned int target_w = (unsigned int)std::round((float)dev_base_w * scale);
+		unsigned int target_h = (unsigned int)std::round((float)dev_base_h * scale);
+
+		if (win_device.getSize().x != target_w || win_device.getSize().y != target_h)
+			win_device.setSize(sf::Vector2u(target_w, target_h));
+
+		win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)target_w, (float)target_h)));
+
+		screen_sp.setScale(scale, scale);
+		screen_sp.setPosition(0.f, 0.f);
+
+		keyboard.update_resize(target_w, target_h);
+
+		repaint_device();
+
+		resizing = false;
+	};
+
+#ifdef _WIN32
+	g_repaint_device = [&]() {
+		repaint_device();
+	};
+	g_on_device_resize = [&](unsigned int w, unsigned int h) {
+		update_screen_size(w, h);
+	};
+#endif
+
+	update_screen_size(win_device.getSize().x, win_device.getSize().y);
 
 	sf::Clock fps;
 
@@ -308,10 +698,9 @@ int main(int argc, char** argv) {
 				win_debug.close();
 #endif
 				break;
-            case sf::Event::Resized:
-                win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
-				update_screen_size();
-                break;
+			case sf::Event::Resized:
+				update_screen_size(event.size.width, event.size.height);
+				break;
 			}
 		}
 #ifndef ANDROID
@@ -370,29 +759,35 @@ int main(int argc, char** argv) {
 				open_folder("fs/e/mre");
 		}
 		ImGui::End();
+
+		if (show_warning && warning_clock.getElapsedTime().asSeconds() < 4.f) {
+			ImGui::SetNextWindowPos(ImVec2(win_debug.getSize().x / 2.f, win_debug.getSize().y / 2.f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+			if (ImGui::Begin("Warning##VXP", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav)) {
+				ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.25f, 1.0f), "Imported file is not a valid VXP!");
+			}
+			ImGui::End();
+		}
 #endif
 
-		{
-			screen_sp.setTexture(graphic.screen_tex, true);
-			win_device.draw(screen_sp);
-		}
+		repaint_device();
 
 #ifndef ANDROID
 		Cpu::imgui_REG();
 
 		keyboard.imgui_keyboard();
 #endif
-		keyboard.draw(&win_device);
 
 #ifndef ANDROID
 		ImGui::SFML::Render(win_debug);
 		win_debug.display();
 		win_debug.clear();
 #endif
-
-		win_device.display();
-		win_device.clear(sf::Color::Black);
 	}
+
+#ifdef _WIN32
+	g_repaint_device = nullptr;
+	g_on_device_resize = nullptr;
+#endif
 
 	work = false;
 	second_thread.join();

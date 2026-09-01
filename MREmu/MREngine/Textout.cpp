@@ -15,6 +15,7 @@ extern MREngine::Graphic* graphic;
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 	sf::Image im;
 	int w = vm_graphic_get_string_width((VMWSTR)str.c_str());
+	if (w <= 0) w = 1;
 	im.create(w, 16, sf::Color::Transparent);
 
 	sf::Color* buf32_dst = (sf::Color*)im.getPixelsPtr();
@@ -29,12 +30,13 @@ sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 		int ch_d = unifont_15_1_04_bin[data_offset];
 		int ch_w = ch_d & 0xF;
 		bool sho = ch_w >= 8;
+		int char_w = sho ? 16 : 8;
 
 		if (x_off >= w)
 			break;
 
-		int st_x = 0;
-		int end_x = std::min<int>(w, x_off + ch_w + 1);
+		int st_x = std::max(0, x_off);
+		int end_x = std::min<int>(w, x_off + char_w);
 
 		for (int sy = st_y; sy < end_y; ++sy) {
 			int tex_ty = sy;
@@ -53,7 +55,7 @@ sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 			}
 		}
 
-		x_off += ch_w + 1;
+		x_off += char_w;
 	}
 
 	sf::Texture tex;
@@ -77,7 +79,7 @@ VMINT vm_graphic_get_character_width(VMWCHAR c) {
 
 	int ch_d = unifont_15_1_04_bin[data_offset];
 	int ch_w = ch_d & 0xF;
-	return ch_w + 1;
+	return (ch_w >= 8) ? 16 : 8;
 }
 
 VMINT vm_graphic_get_string_width(VMWSTR str) {
@@ -93,9 +95,9 @@ VMINT vm_graphic_get_string_width(VMWSTR str) {
 		int ch_d = unifont_15_1_04_bin[data_offset];
 		int ch_w = ch_d & 0xF;
 
-		w += ch_w + 1;
+		w += (ch_w >= 8) ? 16 : 8;
 	}
-	return w+1;
+	return w;
 }
 
 VMINT vm_graphic_get_string_height(VMWSTR str) {
@@ -176,17 +178,18 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 		int ch_d = unifont_15_1_04_bin[data_offset];
 		int ch_w = ch_d & 0xF;
 		bool sho = ch_w >= 8;
+		int char_w = sho ? 16 : 8;
 
 		if (x_off >= right)
 			break;
 
-		if (x_off + ch_w < left) {
-			x_off += ch_w + 1;
+		if (x_off + char_w < left) {
+			x_off += char_w;
 			continue;
 		}
 
 		int st_x = std::max(left, x_off);
-		int end_x = std::min<int>(right, x_off + ch_w + 1);
+		int end_x = std::min<int>(right, x_off + char_w);
 
 		for (int sy = st_y; sy < end_y; ++sy) {
 			int tex_ty = sy - y;
@@ -205,7 +208,7 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 			}
 		}
 
-		x_off += ch_w + 1;
+		x_off += char_w;
 	}
 }
 

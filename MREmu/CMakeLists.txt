@@ -47,7 +47,7 @@ if(CAPSTONE)
 endif()
 
 if(WIN32)
-	target_link_libraries(MREmu shell32)
+	target_link_libraries(MREmu shell32 dwmapi)
 endif()
 
 if (ANDROID)

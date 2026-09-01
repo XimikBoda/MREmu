@@ -66,3 +66,9 @@ If the build succeeds, you'll see the executable inside `bin` directory located 
 ```cmd
 bin\MREmu.exe
 ```
+
+## Troubleshooting
+
+### "Unable to start program ... ALL_BUILD" Error
+If pressing <kbd>F5</kbd> or clicking **Run** shows an error about `ALL_BUILD` not being found:
+- In the Visual Studio **Solution Explorer**, right-click the **`MREmu`** project and select **"Set as Startup Project"** (or choose `MREmu` from the debug target dropdown on the top toolbar).
