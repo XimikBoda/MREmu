@@ -113,7 +113,8 @@ namespace NativeApps::Menu::AppSelector {
 		}
 
 		if (!vxps.size())
-			vm_graphic_textout(layer_buf, 0, 0, vm_ucs2_string((VMSTR)"No files in mre folder"), 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, 0, 0, vm_ucs2_string((VMSTR)"No files in mre folder."), 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, 0, c_h + 2, vm_ucs2_string((VMSTR)"Put them in fs/e/mre"), 100, 0xFFFF);
 
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
