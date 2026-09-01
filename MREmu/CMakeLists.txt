@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.8)
 
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
@@ -44,6 +44,10 @@ target_link_libraries(MREmu spdlog)
 
 if(CAPSTONE)
 	target_link_libraries(MREmu capstone)
+endif()
+
+if(WIN32)
+	target_link_libraries(MREmu shell32)
 endif()
 
 if (ANDROID)

@@ -33,6 +33,7 @@ void MREngine::IO::init()
 	fs::create_directory(base_path / fs::path("fs/e").make_preferred());
 	fs::create_directory(base_path / fs::path("fs/c").make_preferred());
 	fs::create_directory(base_path / fs::path("fs/d").make_preferred());
+	fs::create_directory(base_path / fs::path("fs/e/mre").make_preferred());
 }
 
 

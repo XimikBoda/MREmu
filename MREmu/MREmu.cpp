@@ -24,6 +24,77 @@
 #include <cmdparser.hpp>
 
 #include "NativeApps/Menu/AppSelector.h"
+#include "NativeApp.h"
+
+AppManager* g_appManager = 0;
+
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+
+static WNDPROC old_wndproc_debug = NULL;
+static WNDPROC old_wndproc_device = NULL;
+
+static void handle_drop(HDROP hDrop) {
+	UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+	fs::path dest_dir = fs::path("fs/e/mre").make_preferred();
+	fs::create_directories(dest_dir);
+
+	bool imported = false;
+	for (UINT i = 0; i < count; ++i) {
+		UINT len = DragQueryFileW(hDrop, i, NULL, 0);
+		std::wstring path(len, L'\0');
+		DragQueryFileW(hDrop, i, &path[0], len + 1);
+
+		fs::path src(path);
+		std::string ext = src.extension().string();
+		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+		if (ext == ".vxp" && fs::is_regular_file(src)) {
+			std::error_code ec;
+			fs::copy_file(src, dest_dir / src.filename(), fs::copy_options::overwrite_existing, ec);
+			if (!ec)
+				imported = true;
+		}
+	}
+	DragFinish(hDrop);
+
+	if (imported && g_appManager) {
+		NativeApp* native_app = dynamic_cast<NativeApp*>(g_appManager->get_active_app());
+		if (native_app && native_app->conf.entry == NativeApps::Menu::AppSelector::entry)
+			NativeApps::Menu::AppSelector::rescan();
+	}
+}
+
+static LRESULT CALLBACK drop_wndproc_debug(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+	if (msg == WM_DROPFILES) {
+		handle_drop((HDROP)wParam);
+		return 0;
+	}
+	return CallWindowProcW(old_wndproc_debug, hwnd, msg, wParam, lParam);
+}
+
+static LRESULT CALLBACK drop_wndproc_device(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+	if (msg == WM_DROPFILES) {
+		handle_drop((HDROP)wParam);
+		return 0;
+	}
+	return CallWindowProcW(old_wndproc_device, hwnd, msg, wParam, lParam);
+}
+#endif
+
+static void open_folder(const fs::path& p) {
+	fs::create_directories(p);
+	fs::path abs_p = fs::absolute(p);
+#ifdef _WIN32
+	ShellExecuteW(NULL, L"open", abs_p.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+	std::string cmd = "open \"" + abs_p.string() + "\" &";
+	system(cmd.c_str());
+#else
+	std::string cmd = "xdg-open \"" + abs_p.string() + "\" &";
+	system(cmd.c_str());
+#endif
+}
 
 sf::Clock global_clock;
 
@@ -31,8 +102,6 @@ bool work = true;
 
 std::string error_message = "";
 bool show_error = false;
-
-AppManager* g_appManager = 0;
 
 #ifdef ANDROID
 #include <spdlog/sinks/android_sink.h>
@@ -150,6 +219,15 @@ int main(int argc, char** argv) {
 
 		win_device.display();
 	}
+#endif
+
+#ifdef _WIN32
+#ifndef ANDROID
+	DragAcceptFiles((HWND)win_debug.getSystemHandle(), TRUE);
+	old_wndproc_debug = (WNDPROC)SetWindowLongPtrW((HWND)win_debug.getSystemHandle(), GWLP_WNDPROC, (LONG_PTR)drop_wndproc_debug);
+#endif
+	DragAcceptFiles((HWND)win_device.getSystemHandle(), TRUE);
+	old_wndproc_device = (WNDPROC)SetWindowLongPtrW((HWND)win_device.getSystemHandle(), GWLP_WNDPROC, (LONG_PTR)drop_wndproc_device);
 #endif
 
 	MREngine::IO::init();
@@ -278,6 +356,18 @@ int main(int argc, char** argv) {
 
 		if (ImGui::Begin("Fps")) {
 			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
+		}
+		ImGui::End();
+
+		if (ImGui::Begin("Control")) {
+			if (ImGui::Button("Open c:/ (fs/c)"))
+				open_folder("fs/c");
+			if (ImGui::Button("Open d:/ (fs/d)"))
+				open_folder("fs/d");
+			if (ImGui::Button("Open e:/ (fs/e)"))
+				open_folder("fs/e");
+			if (ImGui::Button("Open e:/mre (fs/e/mre)"))
+				open_folder("fs/e/mre");
 		}
 		ImGui::End();
 #endif

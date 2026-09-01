@@ -35,6 +35,7 @@ namespace NativeApps::Menu::AppSelector {
 
 	std::vector<vxp> vxps;
 
+	void scan();
 	void draw();
 	void key_handler(VMINT event, VMINT keycode);
 	void pen_handler(VMINT event, VMINT x, VMINT y);
@@ -49,6 +50,19 @@ namespace NativeApps::Menu::AppSelector {
 
 		layer_h = vm_graphic_create_layer(0, 0, w, h, -1);
 		layer_buf = vm_graphic_get_layer_buffer(layer_h);
+
+		scan();
+		draw();
+
+		vm_reg_keyboard_callback(key_handler);
+		vm_reg_pen_callback(pen_handler);
+	}
+
+	void scan() {
+		for (auto& v : vxps)
+			if (v.img)
+				vm_graphic_release_canvas_FIX(v.img);
+		vxps.clear();
 
 		vm_fileinfo_ext direntry;
 
@@ -87,12 +101,15 @@ namespace NativeApps::Menu::AppSelector {
 
 			vxps.push_back({ name, path, img });
 		}
+	}
 
-
-		draw();
-
-		vm_reg_keyboard_callback(key_handler);
-		vm_reg_pen_callback(pen_handler);
+	void rescan() {
+		if (layer_buf) {
+			scan();
+			if (m_i >= (int)vxps.size())
+				m_i = vxps.empty() ? 0 : vxps.size() - 1;
+			draw();
+		}
 	}
 
 	void draw() {
@@ -112,9 +129,11 @@ namespace NativeApps::Menu::AppSelector {
 			vm_graphic_line(layer_buf, 0, y + b_h - 1, w, y + b_h - 1, 0xFFFF);
 		}
 
-		if (!vxps.size())
-			vm_graphic_textout(layer_buf, 0, 0, vm_ucs2_string((VMSTR)"No files in mre folder."), 100, 0xFFFF);
-			vm_graphic_textout(layer_buf, 0, c_h + 2, vm_ucs2_string((VMSTR)"Put them in fs/e/mre"), 100, 0xFFFF);
+		if (!vxps.size()) {
+			vm_graphic_textout(layer_buf, 0, 0, vm_ucs2_string((VMSTR)"No files in MRE folder."), 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, 0, c_h + 2, vm_ucs2_string((VMSTR)"Put them in fs/e/mre."), 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, 0, c_h*2 + 2, vm_ucs2_string((VMSTR)"Or drag them here to import..."), 100, 0xFFFF);
+		}
 
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
