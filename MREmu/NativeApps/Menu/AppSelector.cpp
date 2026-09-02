@@ -31,6 +31,9 @@ namespace NativeApps::Menu::AppSelector {
 	int marquee_pause_ticks = 28;
 	int last_selected = 0;
 
+	VMUINT last_scroll_time = 0;
+	bool scrollbar_visible = false;
+
 	VMUINT16 gray = VM_COLOR_888_TO_565(50, 50, 50);
 
 	int m_i = 0;
@@ -49,6 +52,10 @@ namespace NativeApps::Menu::AppSelector {
 	void pen_handler(VMINT event, VMINT x, VMINT y);
 	void timer_cb(VMINT tid);
 
+	void trigger_scrollbar() {
+		last_scroll_time = vm_get_tick_count();
+	}
+
 	void reset_marquee() {
 		marquee_offset = 0;
 		marquee_state = 0;
@@ -61,6 +68,7 @@ namespace NativeApps::Menu::AppSelector {
 		scroll_pos = 0;
 		touched = false;
 		reset_marquee();
+		trigger_scrollbar();
 
 		w = vm_graphic_get_screen_width();
 		h = vm_graphic_get_screen_height();
@@ -134,6 +142,7 @@ namespace NativeApps::Menu::AppSelector {
 			if (m_i >= (int)vxps.size())
 				m_i = vxps.empty() ? 0 : vxps.size() - 1;
 			reset_marquee();
+			trigger_scrollbar();
 			draw();
 		}
 	}
@@ -178,6 +187,30 @@ namespace NativeApps::Menu::AppSelector {
 			vm_graphic_line(layer_buf, 0, y + b_h - 1, w, y + b_h - 1, 0xFFFF);
 		}
 
+		int total_h = (int)vxps.size() * b_h;
+		if (total_h > h && (vm_get_tick_count() - last_scroll_time < 2000)) {
+			scrollbar_visible = true;
+			int max_scroll = total_h - h;
+			int thumb_h = (h * h) / total_h;
+			if (thumb_h < 16) thumb_h = 16;
+			if (thumb_h > h) thumb_h = h;
+			int thumb_y = (max_scroll > 0) ? (scroll_pos * (h - thumb_h)) / max_scroll : 0;
+			if (thumb_y < 0) thumb_y = 0;
+			if (thumb_y + thumb_h > h) thumb_y = h - thumb_h;
+
+			VMUINT16 sb_col = VM_COLOR_888_TO_565(190, 190, 190);
+			int sb_w = 3;
+			for (int sy = thumb_y; sy < thumb_y + thumb_h; ++sy) {
+				for (int sx = w - sb_w; sx < w; ++sx) {
+					VMUINT16* ptr = (VMUINT16*)layer_buf + sy * w + sx;
+					*ptr = ((*ptr & 0xF7DE) >> 1) + ((sb_col & 0xF7DE) >> 1);
+				}
+			}
+		}
+		else {
+			scrollbar_visible = false;
+		}
+
 		if (!vxps.size()) {
 			vm_graphic_textout(layer_buf, 0, 0, vm_ucs2_string((VMSTR)"No files in MRE folder."), 100, 0xFFFF);
 			vm_graphic_textout(layer_buf, 0, c_h + 2, vm_ucs2_string((VMSTR)"Put them in fs/e/mre."), 100, 0xFFFF);
@@ -195,6 +228,12 @@ namespace NativeApps::Menu::AppSelector {
 			App* act = g_appManager->get_active_app();
 			if (act && act->system_callbacks.ph_app_id != vm_pmng_get_current_handle())
 				return;
+		}
+
+		if (scrollbar_visible && vm_get_tick_count() - last_scroll_time >= 2000) {
+			scrollbar_visible = false;
+			draw();
+			return;
 		}
 
 		if (m_i < 0 || m_i >= (int)vxps.size())
@@ -240,6 +279,7 @@ namespace NativeApps::Menu::AppSelector {
 	void key_handler(VMINT event, VMINT keycode) {
 		int old_m_i = m_i;
 		if (vxps.size() && event == VM_KEY_EVENT_UP) {
+			trigger_scrollbar();
 			switch (keycode) {
 			case VM_KEY_UP:
 				if (--m_i < 0)
@@ -258,7 +298,7 @@ namespace NativeApps::Menu::AppSelector {
 		if (m_i != old_m_i)
 			reset_marquee();
 
-		if (vxps.size() * b_h > h) {
+		if ((int)vxps.size() * b_h > h) {
 			if (b_h * m_i - scroll_pos + b_h > h)
 				scroll_pos = b_h * m_i + b_h - h;
 
@@ -271,6 +311,7 @@ namespace NativeApps::Menu::AppSelector {
 
 	void pen_handler(VMINT event, VMINT x, VMINT y) {
 		int old_m_i = m_i;
+		trigger_scrollbar();
 		switch (event) {
 			case VM_PEN_EVENT_TAP:
 				m_i = (y + scroll_pos) / b_h;
@@ -290,8 +331,8 @@ namespace NativeApps::Menu::AppSelector {
 					if (scroll_pos < 0)
 						scroll_pos = 0;
 
-					if (scroll_pos > vxps.size() * b_h - h)
-						scroll_pos = vxps.size() * b_h - h;
+					if (scroll_pos > (int)vxps.size() * b_h - h)
+						scroll_pos = (int)vxps.size() * b_h - h;
 				}
 				break;
 			case VM_PEN_EVENT_RELEASE:
@@ -303,9 +344,9 @@ namespace NativeApps::Menu::AppSelector {
 		}
 
 		if (m_i < 0)
-			m_i = vxps.size() - 1;
+			m_i = (int)vxps.size() - 1;
 
-		if (m_i >= vxps.size())
+		if (m_i >= (int)vxps.size())
 			m_i = 0;
 
 		if (m_i != old_m_i)
