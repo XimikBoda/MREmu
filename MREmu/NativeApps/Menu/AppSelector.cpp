@@ -404,7 +404,8 @@ namespace NativeApps::Menu::AppSelector {
 			int close_w = vm_graphic_get_string_width((VMWSTR)u"Close");
 			vm_graphic_textout(layer_buf, w - close_w - 8, act_y, (VMWSTR)u"Close", 100, 0xFFFF);
 		}
-		else if (show_delete_confirm && m_i >= 0 && m_i < (int)vxps.size()) {
+
+		if (show_delete_confirm && m_i >= 0 && m_i < (int)vxps.size()) {
 			const auto& app = vxps[m_i];
 			int sheet_h = (c_h + 6) + 3 * (c_h + 3) + (c_h + 16);
 			if (sheet_h > h - 10)
