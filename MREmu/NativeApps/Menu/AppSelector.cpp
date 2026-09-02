@@ -6,6 +6,7 @@
 #include <string>
 #include <cctype>
 #include <cstring>
+#include <vmcert.h>
 #include <vmgraph.h>
 #include <vmio.h>
 #include <vmpromng.h>
@@ -177,17 +178,27 @@ namespace NativeApps::Menu::AppSelector {
 					if (tags_offset < data.size() - 8) {
 						uint32_t cur = tags_offset;
 						bool is_ucs2 = false;
+
+						uint32_t scan_cur = cur;
+						while (scan_cur + 8 < data.size()) {
+							uint32_t tag_id = *(uint32_t*)&data[scan_cur];
+							uint32_t tag_len = *(uint32_t*)&data[scan_cur + 4];
+							scan_cur += 8;
+							if (tag_id == 0 || scan_cur + tag_len > data.size())
+								break;
+							if (tag_id == VM_CE_INFO_CHARSET && tag_len >= 4) {
+								is_ucs2 = (*(uint32_t*)&data[scan_cur] != 0);
+							}
+							scan_cur += tag_len;
+						}
+
 						while (cur + 8 < data.size()) {
 							uint32_t tag_id = *(uint32_t*)&data[cur];
 							uint32_t tag_len = *(uint32_t*)&data[cur + 4];
 							cur += 8;
 							if (tag_id == 0 || cur + tag_len > data.size())
 								break;
-							if (tag_id == 7) {
-								if (tag_len >= 4)
-									is_ucs2 = (*(uint32_t*)&data[cur] != 0);
-							}
-							else if (tag_id == 1) {
+							if (tag_id == VM_CE_INFO_NAME) {
 								if (is_ucs2)
 									app_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
 								else {
@@ -195,7 +206,7 @@ namespace NativeApps::Menu::AppSelector {
 									app_name = std::u16string(s.begin(), s.end());
 								}
 							}
-							else if (tag_id == 2) {
+							else if (tag_id == VM_CE_INFO_DEV) {
 								if (is_ucs2)
 									dev_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
 								else {
@@ -203,8 +214,28 @@ namespace NativeApps::Menu::AppSelector {
 									dev_name = std::u16string(s.begin(), s.end());
 								}
 							}
+							else if (tag_id == VM_CE_INFO_NAME_LIST && app_name.empty()) {
+								if (tag_len > 4) {
+									uint32_t str_len = *(uint32_t*)&data[cur + 4];
+									if (cur + 8 + str_len <= data.size()) {
+										if (is_ucs2)
+											app_name = std::u16string((char16_t*)&data[cur + 8], str_len / 2);
+										else {
+											std::string s((char*)&data[cur + 8], str_len);
+											app_name = std::u16string(s.begin(), s.end());
+										}
+									}
+								}
+							}
 							cur += tag_len;
 						}
+
+						auto trim_u16 = [](std::u16string& s) {
+							while (!s.empty() && (s.back() == 0 || s.back() == ' ' || s.back() == '\r' || s.back() == '\n'))
+								s.pop_back();
+						};
+						trim_u16(app_name);
+						trim_u16(dev_name);
 					}
 				}
 			}
@@ -312,75 +343,96 @@ namespace NativeApps::Menu::AppSelector {
 
 		if (show_details && m_i >= 0 && m_i < (int)vxps.size()) {
 			const auto& app = vxps[m_i];
-			int dw = w - 16;
-			int dh = std::min(h - 16, c_h * 7 + 34);
-			int dx = (w - dw) / 2;
-			int dy = (h - dh) / 2;
+			int lines_count = 3 + (!app.app_name.empty() ? 1 : 0) + (!app.dev_name.empty() ? 1 : 0);
+			int sheet_h = (c_h + 8) + lines_count * (c_h + 3) + (c_h + 14);
+			if (sheet_h > h - 10)
+				sheet_h = h - 10;
+			int sheet_y = h - sheet_h;
 
-			vm_graphic_fill_rect(layer_buf, dx, dy, dw, dh, VM_COLOR_888_TO_565(32, 34, 42), VM_COLOR_888_TO_565(32, 34, 42));
-			vm_graphic_line(layer_buf, dx, dy, dx + dw, dy, VM_COLOR_888_TO_565(130, 150, 190));
-			vm_graphic_line(layer_buf, dx, dy + dh, dx + dw, dy + dh, VM_COLOR_888_TO_565(130, 150, 190));
-			vm_graphic_line(layer_buf, dx, dy, dx, dy + dh, VM_COLOR_888_TO_565(130, 150, 190));
-			vm_graphic_line(layer_buf, dx + dw, dy, dx + dw, dy + dh, VM_COLOR_888_TO_565(130, 150, 190));
+			for (int sy = 0; sy < sheet_y; ++sy) {
+				for (int sx = 0; sx < w; ++sx) {
+					VMUINT16* ptr = (VMUINT16*)layer_buf + sy * w + sx;
+					*ptr = (*ptr & 0xF7DE) >> 1;
+				}
+			}
 
-			int title_h = c_h + 4;
-			vm_graphic_fill_rect(layer_buf, dx + 1, dy + 1, dw - 2, title_h, VM_COLOR_888_TO_565(50, 65, 95), VM_COLOR_888_TO_565(50, 65, 95));
-			vm_graphic_textout(layer_buf, dx + 6, dy + 2, (VMWSTR)u"App Details", 100, 0xFFFF);
+			VMUINT16 bg_col = VM_COLOR_888_TO_565(20, 20, 20);
+			VMUINT16 border_col = VM_COLOR_888_TO_565(80, 80, 80);
+			VMUINT16 header_bg = VM_COLOR_888_TO_565(36, 36, 36);
+			VMUINT16 div_col = VM_COLOR_888_TO_565(55, 55, 55);
+			VMUINT16 txt_dim = VM_COLOR_888_TO_565(180, 180, 180);
 
-			int ty = dy + title_h + 4;
-			int pad_x = dx + 6;
+			vm_graphic_fill_rect(layer_buf, 0, sheet_y, w, sheet_h, bg_col, bg_col);
+			vm_graphic_line(layer_buf, 0, sheet_y, w, sheet_y, border_col);
+
+			int title_h = c_h + 6;
+			vm_graphic_fill_rect(layer_buf, 0, sheet_y + 1, w, title_h, header_bg, header_bg);
+			vm_graphic_line(layer_buf, 0, sheet_y + title_h + 1, w, sheet_y + title_h + 1, div_col);
+			vm_graphic_textout(layer_buf, 8, sheet_y + 3, (VMWSTR)u"App Details", 100, 0xFFFF);
+
+			int ty = sheet_y + title_h + 6;
+			int pad_x = 8;
 
 			std::u16string f_line = u"File: " + app.name;
 			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)f_line.c_str(), 100, 0xFFFF);
-			ty += c_h + 2;
+			ty += c_h + 3;
 
 			if (!app.app_name.empty()) {
 				std::u16string n_line = u"Name: " + app.app_name;
 				vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)n_line.c_str(), 100, 0xFFFF);
-				ty += c_h + 2;
+				ty += c_h + 3;
 			}
 
 			if (!app.dev_name.empty()) {
 				std::u16string d_line = u"Dev: " + app.dev_name;
 				vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)d_line.c_str(), 100, 0xFFFF);
-				ty += c_h + 2;
+				ty += c_h + 3;
 			}
 
 			std::string sz_str = "Size: " + std::to_string((app.file_size + 1023) / 1024) + " KB";
 			std::u16string sz_line(sz_str.begin(), sz_str.end());
 			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)sz_line.c_str(), 100, 0xFFFF);
-			ty += c_h + 2;
+			ty += c_h + 3;
 
 			std::string res_str = "Screen: " + std::to_string(w) + "x" + std::to_string(h);
 			std::u16string res_line(res_str.begin(), res_str.end());
 			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)res_line.c_str(), 100, 0xFFFF);
 
-			int act_y = dy + dh - c_h - 6;
-			vm_graphic_line(layer_buf, dx + 1, act_y - 2, dx + dw - 1, act_y - 2, VM_COLOR_888_TO_565(80, 90, 110));
-			vm_graphic_textout(layer_buf, dx + 6, act_y, (VMWSTR)u"[1] Delete", 100, VM_COLOR_888_TO_565(255, 90, 90));
+			int act_y = h - c_h - 7;
+			vm_graphic_line(layer_buf, 0, act_y - 3, w, act_y - 3, div_col);
+			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"[1] Delete", 100, txt_dim);
 			int close_w = vm_graphic_get_string_width((VMWSTR)u"[OK] Close");
-			vm_graphic_textout(layer_buf, dx + dw - close_w - 6, act_y, (VMWSTR)u"[OK] Close", 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, w - close_w - 8, act_y, (VMWSTR)u"[OK] Close", 100, 0xFFFF);
 		}
 		else if (show_delete_confirm && m_i >= 0 && m_i < (int)vxps.size()) {
 			const auto& app = vxps[m_i];
-			int dw = w - 20;
-			int dh = c_h * 4 + 30;
-			int dx = (w - dw) / 2;
-			int dy = (h - dh) / 2;
+			int sheet_h = c_h * 4 + 28;
+			if (sheet_h > h - 10)
+				sheet_h = h - 10;
+			int sheet_y = h - sheet_h;
 
-			vm_graphic_fill_rect(layer_buf, dx, dy, dw, dh, VM_COLOR_888_TO_565(45, 25, 25), VM_COLOR_888_TO_565(45, 25, 25));
-			vm_graphic_line(layer_buf, dx, dy, dx + dw, dy, VM_COLOR_888_TO_565(220, 80, 80));
-			vm_graphic_line(layer_buf, dx, dy + dh, dx + dw, dy + dh, VM_COLOR_888_TO_565(220, 80, 80));
-			vm_graphic_line(layer_buf, dx, dy, dx, dy + dh, VM_COLOR_888_TO_565(220, 80, 80));
-			vm_graphic_line(layer_buf, dx + dw, dy, dx + dw, dy + dh, VM_COLOR_888_TO_565(220, 80, 80));
+			for (int sy = 0; sy < sheet_y; ++sy) {
+				for (int sx = 0; sx < w; ++sx) {
+					VMUINT16* ptr = (VMUINT16*)layer_buf + sy * w + sx;
+					*ptr = (*ptr & 0xF7DE) >> 1;
+				}
+			}
 
-			vm_graphic_textout(layer_buf, dx + 6, dy + 6, (VMWSTR)u"Delete this app?", 100, 0xFFFF);
-			vm_graphic_textout(layer_buf, dx + 6, dy + 6 + c_h + 2, (VMWSTR)app.name.c_str(), 100, VM_COLOR_888_TO_565(255, 200, 200));
+			VMUINT16 bg_col = VM_COLOR_888_TO_565(22, 22, 22);
+			VMUINT16 border_col = VM_COLOR_888_TO_565(90, 90, 90);
+			VMUINT16 div_col = VM_COLOR_888_TO_565(55, 55, 55);
 
-			int act_y = dy + dh - c_h - 6;
-			vm_graphic_textout(layer_buf, dx + 6, act_y, (VMWSTR)u"[OK] Delete", 100, VM_COLOR_888_TO_565(255, 90, 90));
+			vm_graphic_fill_rect(layer_buf, 0, sheet_y, w, sheet_h, bg_col, bg_col);
+			vm_graphic_line(layer_buf, 0, sheet_y, w, sheet_y, border_col);
+
+			vm_graphic_textout(layer_buf, 8, sheet_y + 8, (VMWSTR)u"Delete this app?", 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, 8, sheet_y + 8 + c_h + 3, (VMWSTR)app.name.c_str(), 100, VM_COLOR_888_TO_565(200, 200, 200));
+
+			int act_y = h - c_h - 7;
+			vm_graphic_line(layer_buf, 0, act_y - 3, w, act_y - 3, div_col);
+			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"[OK] Delete", 100, 0xFFFF);
 			int cancel_w = vm_graphic_get_string_width((VMWSTR)u"[Back] Cancel");
-			vm_graphic_textout(layer_buf, dx + dw - cancel_w - 6, act_y, (VMWSTR)u"[Back] Cancel", 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, w - cancel_w - 8, act_y, (VMWSTR)u"[Back] Cancel", 100, 0xFFFF);
 		}
 
 		vm_graphic_flush_layer(&layer_h, 1);
@@ -545,13 +597,20 @@ namespace NativeApps::Menu::AppSelector {
 	void pen_handler(VMINT event, VMINT x, VMINT y) {
 		if (show_delete_confirm) {
 			if (event == VM_PEN_EVENT_TAP) {
-				int dw = w - 20;
-				int dh = c_h * 4 + 30;
-				int dx = (w - dw) / 2;
-				int dy = (h - dh) / 2;
-				int act_y = dy + dh - c_h - 10;
-				if (y >= act_y && y <= dy + dh) {
-					if (x < dx + dw / 2) {
+				int sheet_h = c_h * 4 + 28;
+				if (sheet_h > h - 10)
+					sheet_h = h - 10;
+				int sheet_y = h - sheet_h;
+
+				if (y < sheet_y) {
+					show_delete_confirm = false;
+					draw();
+					return;
+				}
+
+				int act_y = h - c_h - 12;
+				if (y >= act_y) {
+					if (x < w / 2) {
 						vm_file_delete((VMWSTR)vxps[m_i].path.c_str());
 						show_delete_confirm = false;
 						show_details = false;
@@ -564,24 +623,28 @@ namespace NativeApps::Menu::AppSelector {
 						return;
 					}
 				}
-				else if (x < dx || x > dx + dw || y < dy || y > dy + dh) {
-					show_delete_confirm = false;
-					draw();
-					return;
-				}
 			}
 			return;
 		}
 
 		if (show_details) {
 			if (event == VM_PEN_EVENT_TAP) {
-				int dw = w - 16;
-				int dh = std::min(h - 16, c_h * 7 + 34);
-				int dx = (w - dw) / 2;
-				int dy = (h - dh) / 2;
-				int act_y = dy + dh - c_h - 10;
-				if (y >= act_y && y <= dy + dh) {
-					if (x < dx + dw / 2) {
+				const auto& app = vxps[m_i];
+				int lines_count = 3 + (!app.app_name.empty() ? 1 : 0) + (!app.dev_name.empty() ? 1 : 0);
+				int sheet_h = (c_h + 8) + lines_count * (c_h + 3) + (c_h + 14);
+				if (sheet_h > h - 10)
+					sheet_h = h - 10;
+				int sheet_y = h - sheet_h;
+
+				if (y < sheet_y) {
+					show_details = false;
+					draw();
+					return;
+				}
+
+				int act_y = h - c_h - 12;
+				if (y >= act_y) {
+					if (x < w / 2) {
 						show_delete_confirm = true;
 						draw();
 						return;
@@ -591,11 +654,6 @@ namespace NativeApps::Menu::AppSelector {
 						draw();
 						return;
 					}
-				}
-				else if (x < dx || x > dx + dw || y < dy || y > dy + dh) {
-					show_details = false;
-					draw();
-					return;
 				}
 			}
 			return;
