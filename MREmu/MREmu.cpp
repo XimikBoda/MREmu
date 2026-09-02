@@ -295,6 +295,12 @@ int main(int argc, char** argv) {
 
 	DragAndDrop::set_callbacks(update_screen_size, repaint_device);
 
+	DragAndDrop::restore_window_state();
+
+#ifndef ANDROID
+	win_debug.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)win_debug.getSize().x, (float)win_debug.getSize().y)));
+#endif
+
 	update_screen_size(win_device.getSize().x, win_device.getSize().y);
 
 	sf::Clock fps;
@@ -350,6 +356,7 @@ int main(int argc, char** argv) {
 			ImGui::SFML::ProcessEvent(event);
 			switch (event.type) {
 			case sf::Event::Closed:
+				DragAndDrop::save_window_state();
 				win_debug.close();
 				win_device.close();
 				break;
@@ -365,6 +372,7 @@ int main(int argc, char** argv) {
 			touch.sf_event(event);
 			switch (event.type) {
 			case sf::Event::Closed:
+				DragAndDrop::save_window_state();
 				win_device.close();
 #ifndef ANDROID
 				win_debug.close();
@@ -461,6 +469,7 @@ int main(int argc, char** argv) {
 		ImGui::SFML::Render(win_debug);
 		win_debug.display();
 		win_debug.clear();
+		DragAndDrop::ensure_device_on_top();
 #endif
 	}
 

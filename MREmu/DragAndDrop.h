@@ -40,6 +40,9 @@ public:
 	virtual void set_base_size(int base_w, int base_h) = 0;
 	virtual void set_callbacks(std::function<void(unsigned int, unsigned int)> on_resize,
 							   std::function<void()> on_repaint) = 0;
+	virtual void restore_window_state() = 0;
+	virtual void save_window_state() = 0;
+	virtual void ensure_device_on_top() = 0;
 };
 
 // High-level public API used by MREmu.cpp
@@ -47,6 +50,9 @@ void init(sf::RenderWindow& win_device, sf::RenderWindow* win_debug = nullptr);
 void set_base_size(int base_w, int base_h);
 void set_callbacks(std::function<void(unsigned int, unsigned int)> on_resize,
 				   std::function<void()> on_repaint);
+void restore_window_state();
+void save_window_state();
+void ensure_device_on_top();
 void cleanup();
 
 } // namespace DragAndDrop

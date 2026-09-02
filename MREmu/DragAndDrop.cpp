@@ -6,6 +6,7 @@
 #include "DLLApp.h"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <memory>
 #include <system_error>
 
@@ -194,6 +195,109 @@ void process_dropped_files(const std::vector<std::filesystem::path>& files,
 #include <shellapi.h>
 #include <dwmapi.h>
 
+struct WindowState {
+	int debug_x = -1;
+	int debug_y = -1;
+	int debug_w = -1;
+	int debug_h = -1;
+
+	int device_x = -1;
+	int device_y = -1;
+	int device_w = -1;
+	int device_h = -1;
+
+	bool attached = false;
+	std::string side = "none";
+	int offset = 0;
+};
+
+static void write_ini_state(const WindowState& ws, const std::filesystem::path& path = "window.ini") {
+	std::ofstream f(path);
+	if (!f.is_open())
+		return;
+
+	f << "[DebugWindow]\n";
+	f << "x=" << ws.debug_x << "\n";
+	f << "y=" << ws.debug_y << "\n";
+	f << "width=" << ws.debug_w << "\n";
+	f << "height=" << ws.debug_h << "\n\n";
+
+	f << "[DeviceWindow]\n";
+	f << "x=" << ws.device_x << "\n";
+	f << "y=" << ws.device_y << "\n";
+	f << "width=" << ws.device_w << "\n";
+	f << "height=" << ws.device_h << "\n\n";
+
+	f << "[Attachment]\n";
+	f << "attached=" << (ws.attached ? 1 : 0) << "\n";
+	f << "side=" << ws.side << "\n";
+	f << "offset=" << ws.offset << "\n";
+}
+
+static bool read_ini_state(WindowState& ws, const std::filesystem::path& path = "window.ini") {
+	if (!std::filesystem::exists(path))
+		return false;
+
+	std::ifstream f(path);
+	if (!f.is_open())
+		return false;
+
+	std::string line, section;
+	while (std::getline(f, line)) {
+		size_t start = line.find_first_not_of(" \t\r\n");
+		if (start == std::string::npos)
+			continue;
+		size_t end = line.find_last_not_of(" \t\r\n");
+		line = line.substr(start, end - start + 1);
+
+		if (line.empty() || line[0] == ';' || line[0] == '#')
+			continue;
+
+		if (line.front() == '[' && line.back() == ']') {
+			section = line.substr(1, line.length() - 2);
+			continue;
+		}
+
+		size_t eq = line.find('=');
+		if (eq == std::string::npos)
+			continue;
+
+		std::string key = line.substr(0, eq);
+		std::string val = line.substr(eq + 1);
+
+		auto trim = [](std::string& s) {
+			size_t p1 = s.find_first_not_of(" \t\r\n");
+			if (p1 == std::string::npos) { s.clear(); return; }
+			size_t p2 = s.find_last_not_of(" \t\r\n");
+			s = s.substr(p1, p2 - p1 + 1);
+		};
+		trim(key);
+		trim(val);
+
+		try {
+			if (section == "DebugWindow") {
+				if (key == "x") ws.debug_x = std::stoi(val);
+				else if (key == "y") ws.debug_y = std::stoi(val);
+				else if (key == "width") ws.debug_w = std::stoi(val);
+				else if (key == "height") ws.debug_h = std::stoi(val);
+			}
+			else if (section == "DeviceWindow") {
+				if (key == "x") ws.device_x = std::stoi(val);
+				else if (key == "y") ws.device_y = std::stoi(val);
+				else if (key == "width") ws.device_w = std::stoi(val);
+				else if (key == "height") ws.device_h = std::stoi(val);
+			}
+			else if (section == "Attachment") {
+				if (key == "attached") ws.attached = (std::stoi(val) != 0);
+				else if (key == "side") ws.side = val;
+				else if (key == "offset") ws.offset = std::stoi(val);
+			}
+		}
+		catch (...) {}
+	}
+	return true;
+}
+
 class WindowsPlatformBackend : public PlatformBackend {
 public:
 	static WindowsPlatformBackend* s_instance;
@@ -359,10 +463,28 @@ public:
 					0, 0,
 					SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 			}
+			self->ensure_device_on_top();
 			return CallWindowProcW(self->old_wndproc_debug, hwnd, msg, wParam, lParam);
 		}
 		if (msg == WM_EXITSIZEMOVE) {
 			self->device_was_docked_to_debug = false;
+			self->ensure_device_on_top();
+			self->save_window_state();
+		}
+		if (msg == WM_ACTIVATE) {
+			LRESULT res = CallWindowProcW(self->old_wndproc_debug, hwnd, msg, wParam, lParam);
+			if (LOWORD(wParam) != WA_INACTIVE) {
+				self->ensure_device_on_top();
+			}
+			return res;
+		}
+		if (msg == WM_WINDOWPOSCHANGED) {
+			LRESULT res = CallWindowProcW(self->old_wndproc_debug, hwnd, msg, wParam, lParam);
+			self->ensure_device_on_top();
+			return res;
+		}
+		if (msg == WM_CLOSE) {
+			self->save_window_state();
 		}
 		return CallWindowProcW(self->old_wndproc_debug, hwnd, msg, wParam, lParam);
 	}
@@ -392,6 +514,11 @@ public:
 		}
 		if (msg == WM_EXITSIZEMOVE) {
 			self->dev_is_moving = false;
+			self->ensure_device_on_top();
+			self->save_window_state();
+		}
+		if (msg == WM_CLOSE) {
+			self->save_window_state();
 		}
 		if (msg == WM_SIZING) {
 			RECT* r = (RECT*)lParam;
@@ -450,6 +577,152 @@ public:
 		return CallWindowProcW(self->old_wndproc_device, hwnd, msg, wParam, lParam);
 	}
 
+	void ensure_device_on_top() override {
+		if (!hwnd_debug || !hwnd_device || !IsWindow(hwnd_debug) || !IsWindow(hwnd_device))
+			return;
+		if (IsIconic(hwnd_debug) || IsIconic(hwnd_device))
+			return;
+		if (!IsWindowVisible(hwnd_debug) || !IsWindowVisible(hwnd_device))
+			return;
+
+		HWND fg = GetForegroundWindow();
+		if (fg != hwnd_debug && fg != hwnd_device)
+			return;
+
+		RECT dev_r, dbg_r, inter;
+		if (GetWindowRect(hwnd_device, &dev_r) && GetWindowRect(hwnd_debug, &dbg_r)) {
+			if (IntersectRect(&inter, &dev_r, &dbg_r) || is_device_docked()) {
+				SetWindowPos(hwnd_device, HWND_TOP, 0, 0, 0, 0,
+					SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			}
+		}
+	}
+
+	void save_window_state() override {
+		if (!hwnd_debug || !hwnd_device || !IsWindow(hwnd_debug) || !IsWindow(hwnd_device))
+			return;
+		if (IsIconic(hwnd_debug) || IsIconic(hwnd_device))
+			return;
+
+		RECT dbg_rect, dev_rect;
+		GetWindowRect(hwnd_debug, &dbg_rect);
+		GetWindowRect(hwnd_device, &dev_rect);
+
+		RECT dev_client;
+		GetClientRect(hwnd_device, &dev_client);
+
+		WindowState ws;
+		ws.debug_x = dbg_rect.left;
+		ws.debug_y = dbg_rect.top;
+		ws.debug_w = dbg_rect.right - dbg_rect.left;
+		ws.debug_h = dbg_rect.bottom - dbg_rect.top;
+
+		ws.device_x = dev_rect.left;
+		ws.device_y = dev_rect.top;
+		ws.device_w = dev_client.right - dev_client.left;
+		ws.device_h = dev_client.bottom - dev_client.top;
+
+		RECT dbg_vis, dev_vis;
+		if (get_visual_rect(hwnd_debug, &dbg_vis) && get_visual_rect(hwnd_device, &dev_vis)) {
+			Rect a = { dev_vis.left, dev_vis.top, dev_vis.right, dev_vis.bottom };
+			Rect b = { dbg_vis.left, dbg_vis.top, dbg_vis.right, dbg_vis.bottom };
+			int tol = 6;
+			if (check_is_docked(a, b, tol)) {
+				ws.attached = true;
+				if (std::abs(a.left - b.right) <= tol) {
+					ws.side = "right";
+					ws.offset = a.top - b.top;
+				}
+				else if (std::abs(a.right - b.left) <= tol) {
+					ws.side = "left";
+					ws.offset = a.top - b.top;
+				}
+				else if (std::abs(a.top - b.bottom) <= tol) {
+					ws.side = "bottom";
+					ws.offset = a.left - b.left;
+				}
+				else if (std::abs(a.bottom - b.top) <= tol) {
+					ws.side = "top";
+					ws.offset = a.left - b.left;
+				}
+			}
+		}
+
+		write_ini_state(ws);
+	}
+
+	void restore_window_state() override {
+		if (!hwnd_debug || !hwnd_device || !IsWindow(hwnd_debug) || !IsWindow(hwnd_device))
+			return;
+
+		WindowState ws;
+		if (!read_ini_state(ws))
+			return;
+
+		POINT pt = { ws.debug_x, ws.debug_y };
+		if (ws.debug_x != -1 && ws.debug_y != -1 && !MonitorFromPoint(pt, MONITOR_DEFAULTTONULL)) {
+			return;
+		}
+
+		if (ws.device_w > 0 && ws.device_h > 0 && on_resize) {
+			on_resize(ws.device_w, ws.device_h);
+		}
+
+		if (ws.debug_x != -1 && ws.debug_y != -1) {
+			int w = (ws.debug_w > 0) ? ws.debug_w : 1000;
+			int h = (ws.debug_h > 0) ? ws.debug_h : 600;
+			SetWindowPos(hwnd_debug, NULL, ws.debug_x, ws.debug_y, w, h,
+				SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+
+		if (ws.attached && ws.side != "none") {
+			RECT dbg_vis;
+			if (get_visual_rect(hwnd_debug, &dbg_vis)) {
+				int m_l, m_t, m_r, m_b;
+				get_shadow_margins(hwnd_device, m_l, m_t, m_r, m_b);
+
+				RECT dev_cur;
+				GetWindowRect(hwnd_device, &dev_cur);
+				int dev_win_w = dev_cur.right - dev_cur.left;
+				int dev_win_h = dev_cur.bottom - dev_cur.top;
+				int dev_vis_w = dev_win_w - m_l - m_r;
+				int dev_vis_h = dev_win_h - m_t - m_b;
+
+				int vis_x = dbg_vis.right;
+				int vis_y = dbg_vis.top + ws.offset;
+
+				if (ws.side == "right") {
+					vis_x = dbg_vis.right;
+					vis_y = dbg_vis.top + ws.offset;
+				}
+				else if (ws.side == "left") {
+					vis_x = dbg_vis.left - dev_vis_w;
+					vis_y = dbg_vis.top + ws.offset;
+				}
+				else if (ws.side == "bottom") {
+					vis_x = dbg_vis.left + ws.offset;
+					vis_y = dbg_vis.bottom;
+				}
+				else if (ws.side == "top") {
+					vis_x = dbg_vis.left + ws.offset;
+					vis_y = dbg_vis.top - dev_vis_h;
+				}
+
+				SetWindowPos(hwnd_device, NULL, vis_x - m_l, vis_y - m_t, 0, 0,
+					SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+			}
+		}
+		else if (ws.device_x != -1 && ws.device_y != -1) {
+			SetWindowPos(hwnd_device, NULL, ws.device_x, ws.device_y, 0, 0,
+				SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+
+		ensure_device_on_top();
+
+		if (on_repaint)
+			on_repaint();
+	}
+
 	void init(sf::RenderWindow& win_device, sf::RenderWindow* win_debug) override {
 		if (win_debug) {
 			hwnd_debug = (HWND)win_debug->getSystemHandle();
@@ -462,6 +735,7 @@ public:
 	}
 
 	void cleanup() override {
+		save_window_state();
 		if (hwnd_debug && old_wndproc_debug) {
 			SetWindowLongPtrW(hwnd_debug, GWLP_WNDPROC, (LONG_PTR)old_wndproc_debug);
 			old_wndproc_debug = NULL;
@@ -519,6 +793,10 @@ public:
 		on_resize = nullptr;
 		on_repaint = nullptr;
 	}
+
+	void restore_window_state() override {}
+	void save_window_state() override {}
+	void ensure_device_on_top() override {}
 };
 
 // Fallback for unsupported and headless platforms
@@ -528,6 +806,9 @@ public:
 	void set_callbacks(std::function<void(unsigned int, unsigned int)>, std::function<void()>) override {}
 	void init(sf::RenderWindow&, sf::RenderWindow*) override {}
 	void cleanup() override {}
+	void restore_window_state() override {}
+	void save_window_state() override {}
+	void ensure_device_on_top() override {}
 };
 
 static std::unique_ptr<PlatformBackend> g_backend;
@@ -556,6 +837,18 @@ void set_base_size(int base_w, int base_h) {
 void set_callbacks(std::function<void(unsigned int, unsigned int)> on_resize,
 				   std::function<void()> on_repaint) {
 	get_backend().set_callbacks(std::move(on_resize), std::move(on_repaint));
+}
+
+void restore_window_state() {
+	get_backend().restore_window_state();
+}
+
+void save_window_state() {
+	get_backend().save_window_state();
+}
+
+void ensure_device_on_top() {
+	get_backend().ensure_device_on_top();
 }
 
 void cleanup() {
