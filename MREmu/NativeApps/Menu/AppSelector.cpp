@@ -271,7 +271,30 @@ namespace NativeApps::Menu::AppSelector {
 		}
 	}
 
+	static int g_max_marquee_scroll = 0;
+
+	void draw_marquee_text(int x, int y, int max_w, int line_h, const std::u16string& text, VMUINT16 color) {
+		int text_w = vm_graphic_get_string_width((VMWSTR)text.c_str());
+		if (text_w > max_w) {
+			int overflow = text_w - max_w + 10;
+			if (overflow > g_max_marquee_scroll)
+				g_max_marquee_scroll = overflow;
+			int off = std::min(marquee_offset, overflow);
+			int clip_top = std::max(0, y);
+			int clip_bottom = std::min(h - 1, y + line_h - 1);
+			if (clip_top <= clip_bottom) {
+				vm_graphic_set_clip(x, clip_top, x + max_w, clip_bottom);
+				vm_graphic_textout(layer_buf, x - off, y, (VMWSTR)text.c_str(), 100, color);
+				vm_graphic_reset_clip();
+			}
+		}
+		else {
+			vm_graphic_textout(layer_buf, x, y, (VMWSTR)text.c_str(), 100, color);
+		}
+	}
+
 	void draw() {
+		g_max_marquee_scroll = 0;
 		vm_graphic_fill_rect(layer_buf, 0, 0, w, h, 0x0000, 0x0000);
 
 		for (int i = 0; i < vxps.size(); ++i) {
@@ -289,24 +312,10 @@ namespace NativeApps::Menu::AppSelector {
 			int text_y = y + (b_h - c_h) / 2;
 			int max_text_w = w - text_x - 4;
 
-			if (i == m_i) {
-				int text_w = vm_graphic_get_string_width((VMWSTR)vxps[i].name.c_str());
-				if (text_w > max_text_w) {
-					int clip_top = std::max(0, y);
-					int clip_bottom = std::min(h - 1, y + b_h - 1);
-					if (clip_top <= clip_bottom) {
-						vm_graphic_set_clip(text_x, clip_top, w - 2, clip_bottom);
-						vm_graphic_textout(layer_buf, text_x - marquee_offset, text_y, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
-						vm_graphic_reset_clip();
-					}
-				}
-				else {
-					vm_graphic_textout(layer_buf, text_x, text_y, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
-				}
-			}
-			else {
+			if (i == m_i && !show_details && !show_delete_confirm)
+				draw_marquee_text(text_x, text_y, max_text_w, b_h, vxps[i].name, 0xFFFF);
+			else
 				vm_graphic_textout(layer_buf, text_x, text_y, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
-			}
 
 			vm_graphic_line(layer_buf, 0, y + b_h - 1, w, y + b_h - 1, 0xFFFF);
 		}
@@ -374,18 +383,18 @@ namespace NativeApps::Menu::AppSelector {
 			int pad_x = 8;
 
 			std::u16string f_line = u"File: " + app.name;
-			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)f_line.c_str(), 100, 0xFFFF);
+			draw_marquee_text(pad_x, ty, w - 16, c_h, f_line, 0xFFFF);
 			ty += c_h + 3;
 
 			if (!app.app_name.empty()) {
 				std::u16string n_line = u"Name: " + app.app_name;
-				vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)n_line.c_str(), 100, 0xFFFF);
+				draw_marquee_text(pad_x, ty, w - 16, c_h, n_line, 0xFFFF);
 				ty += c_h + 3;
 			}
 
 			if (!app.dev_name.empty()) {
 				std::u16string d_line = u"Dev: " + app.dev_name;
-				vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)d_line.c_str(), 100, 0xFFFF);
+				draw_marquee_text(pad_x, ty, w - 16, c_h, d_line, 0xFFFF);
 				ty += c_h + 3;
 			}
 
@@ -406,6 +415,7 @@ namespace NativeApps::Menu::AppSelector {
 		}
 
 		if (show_delete_confirm && m_i >= 0 && m_i < (int)vxps.size()) {
+			g_max_marquee_scroll = 0;
 			const auto& app = vxps[m_i];
 			int sheet_h = (c_h + 6) + 3 * (c_h + 3) + (c_h + 16);
 			if (sheet_h > h - 10)
@@ -435,7 +445,7 @@ namespace NativeApps::Menu::AppSelector {
 			int ty = sheet_y + title_h + 6;
 			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)u"Delete this application?", 100, 0xFFFF);
 			ty += c_h + 3;
-			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)app.name.c_str(), 100, VM_COLOR_888_TO_565(210, 210, 210));
+			draw_marquee_text(8, ty, w - 16, c_h, app.name, VM_COLOR_888_TO_565(210, 210, 210));
 			ty += c_h + 3;
 			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)u"File will be removed permanently.", 100, VM_COLOR_888_TO_565(160, 160, 160));
 
@@ -450,7 +460,7 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void timer_cb(VMINT tid) {
-		if (!layer_buf || vxps.empty() || touched || show_details || show_delete_confirm)
+		if (!layer_buf || vxps.empty() || touched)
 			return;
 
 		if (g_appManager) {
@@ -465,14 +475,7 @@ namespace NativeApps::Menu::AppSelector {
 			return;
 		}
 
-		if (m_i < 0 || m_i >= (int)vxps.size())
-			return;
-
-		int text_x = 2 + b_h;
-		int max_text_w = w - text_x - 4;
-		int text_w = vm_graphic_get_string_width((VMWSTR)vxps[m_i].name.c_str());
-
-		if (text_w <= max_text_w) {
+		if (g_max_marquee_scroll <= 0) {
 			if (marquee_offset != 0) {
 				marquee_offset = 0;
 				draw();
@@ -480,16 +483,14 @@ namespace NativeApps::Menu::AppSelector {
 			return;
 		}
 
-		int max_scroll = text_w - max_text_w + 10;
-
 		if (marquee_state == 0) {
 			if (--marquee_pause_ticks <= 0)
 				marquee_state = 1;
 		}
 		else if (marquee_state == 1) {
 			marquee_offset++;
-			if (marquee_offset >= max_scroll) {
-				marquee_offset = max_scroll;
+			if (marquee_offset >= g_max_marquee_scroll) {
+				marquee_offset = g_max_marquee_scroll;
 				marquee_state = 2;
 				marquee_pause_ticks = 34;
 			}
@@ -517,6 +518,7 @@ namespace NativeApps::Menu::AppSelector {
 				}
 				else if (keycode == VM_KEY_BACK || keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_CLEAR) {
 					show_delete_confirm = false;
+					reset_marquee();
 					draw();
 					return;
 				}
@@ -528,11 +530,13 @@ namespace NativeApps::Menu::AppSelector {
 			if (event == VM_KEY_EVENT_UP) {
 				if (keycode == VM_KEY_LEFT_SOFTKEY || keycode == VM_KEY_NUM1) {
 					show_delete_confirm = true;
+					reset_marquee();
 					draw();
 					return;
 				}
 				else if (keycode == VM_KEY_OK || keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_BACK || keycode == VM_KEY_CLEAR) {
 					show_details = false;
+					reset_marquee();
 					draw();
 					return;
 				}
@@ -554,6 +558,7 @@ namespace NativeApps::Menu::AppSelector {
 				break;
 			case VM_KEY_LEFT_SOFTKEY:
 				show_details = true;
+				reset_marquee();
 				draw();
 				return;
 			case VM_KEY_OK:
@@ -615,6 +620,7 @@ namespace NativeApps::Menu::AppSelector {
 
 				if (y < sheet_y) {
 					show_delete_confirm = false;
+					reset_marquee();
 					draw();
 					return;
 				}
@@ -630,6 +636,7 @@ namespace NativeApps::Menu::AppSelector {
 					}
 					else {
 						show_delete_confirm = false;
+						reset_marquee();
 						draw();
 						return;
 					}
@@ -649,6 +656,7 @@ namespace NativeApps::Menu::AppSelector {
 
 				if (y < sheet_y) {
 					show_details = false;
+					reset_marquee();
 					draw();
 					return;
 				}
@@ -657,11 +665,13 @@ namespace NativeApps::Menu::AppSelector {
 				if (y >= act_y) {
 					if (x < w / 2) {
 						show_delete_confirm = true;
+						reset_marquee();
 						draw();
 						return;
 					}
 					else {
 						show_details = false;
+						reset_marquee();
 						draw();
 						return;
 					}
@@ -699,6 +709,7 @@ namespace NativeApps::Menu::AppSelector {
 				if (item >= 0 && item < (int)vxps.size()) {
 					m_i = item;
 					show_details = true;
+					reset_marquee();
 					DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
 					draw();
 				}
