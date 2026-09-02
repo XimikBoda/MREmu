@@ -154,46 +154,6 @@ int main(int argc, char** argv) {
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	ImGui::SFML::Init(win_debug);
-
-	if (!fs::exists("imgui.ini")) {
-		const char* default_ini =
-			"[Window][Control]\n"
-			"Pos=10,10\n"
-			"Size=175,175\n"
-			"Collapsed=0\n\n"
-			"[Window][Fps]\n"
-			"Pos=10,190\n"
-			"Size=175,60\n"
-			"Collapsed=0\n\n"
-			"[Window][Memory]\n"
-			"Pos=10,255\n"
-			"Size=175,335\n"
-			"Collapsed=0\n\n"
-			"[Window][Screen]\n"
-			"Pos=195,10\n"
-			"Size=255,380\n"
-			"Collapsed=0\n\n"
-			"[Window][KeyBoard]\n"
-			"Pos=195,395\n"
-			"Size=255,195\n"
-			"Collapsed=0\n\n"
-			"[Window][CPU REG]\n"
-			"Pos=460,10\n"
-			"Size=530,180\n"
-			"Collapsed=0\n\n"
-			"[Window][Layers]\n"
-			"Pos=460,195\n"
-			"Size=260,395\n"
-			"Collapsed=0\n\n"
-			"[Window][Canvases]\n"
-			"Pos=725,195\n"
-			"Size=265,395\n"
-			"Collapsed=0\n\n";
-
-		ImGui::LoadIniSettingsFromMemory(default_ini, strlen(default_ini));
-		ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
-	}
-
 	win_debug.setFramerateLimit(60);
 	win_device.setFramerateLimit(60);
 	//win_debug.setVerticalSyncEnabled(true);
