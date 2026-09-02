@@ -43,6 +43,8 @@ public:
 	virtual void restore_window_state() = 0;
 	virtual void save_window_state() = 0;
 	virtual void ensure_device_on_top() = 0;
+	virtual std::string get_last_selected_app() { return ""; }
+	virtual void set_last_selected_app(const std::string&) {}
 };
 
 // High-level public API used by MREmu.cpp
@@ -53,6 +55,8 @@ void set_callbacks(std::function<void(unsigned int, unsigned int)> on_resize,
 void restore_window_state();
 void save_window_state();
 void ensure_device_on_top();
+std::string get_last_selected_app();
+void set_last_selected_app(const std::string& name);
 void cleanup();
 
 } // namespace DragAndDrop

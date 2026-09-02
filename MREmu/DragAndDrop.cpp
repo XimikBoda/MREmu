@@ -209,6 +209,8 @@ struct WindowState {
 	bool attached = false;
 	std::string side = "none";
 	int offset = 0;
+
+	std::string last_app;
 };
 
 static void write_ini_state(const WindowState& ws, const std::filesystem::path& path = "window.ini") {
@@ -231,7 +233,10 @@ static void write_ini_state(const WindowState& ws, const std::filesystem::path& 
 	f << "[Attachment]\n";
 	f << "attached=" << (ws.attached ? 1 : 0) << "\n";
 	f << "side=" << ws.side << "\n";
-	f << "offset=" << ws.offset << "\n";
+	f << "offset=" << ws.offset << "\n\n";
+
+	f << "[Launcher]\n";
+	f << "last_app=" << ws.last_app << "\n";
 }
 
 static bool read_ini_state(WindowState& ws, const std::filesystem::path& path = "window.ini") {
@@ -291,6 +296,9 @@ static bool read_ini_state(WindowState& ws, const std::filesystem::path& path = 
 				if (key == "attached") ws.attached = (std::stoi(val) != 0);
 				else if (key == "side") ws.side = val;
 				else if (key == "offset") ws.offset = std::stoi(val);
+			}
+			else if (section == "Launcher") {
+				if (key == "last_app") ws.last_app = val;
 			}
 		}
 		catch (...) {}
@@ -622,6 +630,8 @@ public:
 		ws.device_w = dev_client.right - dev_client.left;
 		ws.device_h = dev_client.bottom - dev_client.top;
 
+		ws.last_app = last_app;
+
 		RECT dbg_vis, dev_vis;
 		if (get_visual_rect(hwnd_debug, &dbg_vis) && get_visual_rect(hwnd_device, &dev_vis)) {
 			Rect a = { dev_vis.left, dev_vis.top, dev_vis.right, dev_vis.bottom };
@@ -658,6 +668,8 @@ public:
 		WindowState ws;
 		if (!read_ini_state(ws))
 			return;
+
+		last_app = ws.last_app;
 
 		POINT pt = { ws.debug_x, ws.debug_y };
 		if (ws.debug_x != -1 && ws.debug_y != -1 && !MonitorFromPoint(pt, MONITOR_DEFAULTTONULL)) {
@@ -747,6 +759,22 @@ public:
 		on_resize = nullptr;
 		on_repaint = nullptr;
 	}
+
+	std::string last_app;
+
+	std::string get_last_selected_app() override {
+		if (last_app.empty()) {
+			WindowState ws;
+			if (read_ini_state(ws))
+				last_app = ws.last_app;
+		}
+		return last_app;
+	}
+
+	void set_last_selected_app(const std::string& name) override {
+		last_app = name;
+		save_window_state();
+	}
 };
 
 WindowsPlatformBackend* WindowsPlatformBackend::s_instance = nullptr;
@@ -760,6 +788,7 @@ public:
 	int base_h = 528;
 	std::function<void(unsigned int, unsigned int)> on_resize;
 	std::function<void()> on_repaint;
+	std::string last_app;
 
 	void set_base_size(int w, int h) override {
 		base_w = w;
@@ -797,11 +826,14 @@ public:
 	void restore_window_state() override {}
 	void save_window_state() override {}
 	void ensure_device_on_top() override {}
+	std::string get_last_selected_app() override { return last_app; }
+	void set_last_selected_app(const std::string& name) override { last_app = name; }
 };
 
 // Fallback for unsupported and headless platforms
 class GenericPlatformBackend : public PlatformBackend {
 public:
+	std::string last_app;
 	void set_base_size(int, int) override {}
 	void set_callbacks(std::function<void(unsigned int, unsigned int)>, std::function<void()>) override {}
 	void init(sf::RenderWindow&, sf::RenderWindow*) override {}
@@ -809,6 +841,8 @@ public:
 	void restore_window_state() override {}
 	void save_window_state() override {}
 	void ensure_device_on_top() override {}
+	std::string get_last_selected_app() override { return last_app; }
+	void set_last_selected_app(const std::string& name) override { last_app = name; }
 };
 
 static std::unique_ptr<PlatformBackend> g_backend;
@@ -849,6 +883,14 @@ void save_window_state() {
 
 void ensure_device_on_top() {
 	get_backend().ensure_device_on_top();
+}
+
+std::string get_last_selected_app() {
+	return get_backend().get_last_selected_app();
+}
+
+void set_last_selected_app(const std::string& name) {
+	get_backend().set_last_selected_app(name);
 }
 
 void cleanup() {

@@ -1,8 +1,11 @@
 #include "AppSelector.h"
 #include "../../MREngine/Image.h"
 #include "../../AppManager.h"
+#include "../../DragAndDrop.h"
 #include <vector>
 #include <string>
+#include <cctype>
+#include <cstring>
 #include <vmgraph.h>
 #include <vmio.h>
 #include <vmpromng.h>
@@ -34,6 +37,9 @@ namespace NativeApps::Menu::AppSelector {
 	VMUINT last_scroll_time = 0;
 	bool scrollbar_visible = false;
 
+	bool show_details = false;
+	bool show_delete_confirm = false;
+
 	VMUINT16 gray = VM_COLOR_888_TO_565(50, 50, 50);
 
 	int m_i = 0;
@@ -41,7 +47,10 @@ namespace NativeApps::Menu::AppSelector {
 	struct vxp {
 		std::u16string name;
 		std::u16string path;
-		VMINT_CANVAS img;
+		VMINT_CANVAS img = 0;
+		size_t file_size = 0;
+		std::u16string app_name;
+		std::u16string dev_name;
 	};
 
 	std::vector<vxp> vxps;
@@ -51,6 +60,34 @@ namespace NativeApps::Menu::AppSelector {
 	void key_handler(VMINT event, VMINT keycode);
 	void pen_handler(VMINT event, VMINT x, VMINT y);
 	void timer_cb(VMINT tid);
+
+	static const char* get_t9_chars(int keycode) {
+		switch (keycode) {
+		case VM_KEY_NUM1: return "1";
+		case VM_KEY_NUM2: return "abc2";
+		case VM_KEY_NUM3: return "def3";
+		case VM_KEY_NUM4: return "ghi4";
+		case VM_KEY_NUM5: return "jkl5";
+		case VM_KEY_NUM6: return "mno6";
+		case VM_KEY_NUM7: return "pqrs7";
+		case VM_KEY_NUM8: return "tuv8";
+		case VM_KEY_NUM9: return "wxyz9";
+		case VM_KEY_NUM0: return "0 ";
+		default: return "";
+		}
+	}
+
+	static std::string u16_to_u8(const std::u16string& u16) {
+		std::string s;
+		s.reserve(u16.size());
+		for (char16_t c : u16) {
+			if (c < 128)
+				s.push_back((char)c);
+			else
+				s.push_back('?');
+		}
+		return s;
+	}
 
 	void trigger_scrollbar() {
 		last_scroll_time = vm_get_tick_count();
@@ -108,11 +145,15 @@ namespace NativeApps::Menu::AppSelector {
 			path += name;
 
 			VMINT_CANVAS img = 0;
+			size_t file_size = 0;
+			std::u16string app_name;
+			std::u16string dev_name;
 
 			int f = vm_file_open((VMWSTR)path.c_str(), MODE_READ, 1);
 			if (f >= 0) {
 				VMUINT size = 0, rsize = 0;
 				vm_file_getfilesize(f, &size);
+				file_size = size;
 
 				std::vector<uint8_t> data(size);
 				vm_file_read(f, data.data(), size, &rsize);
@@ -130,9 +171,61 @@ namespace NativeApps::Menu::AppSelector {
 
 					img = vm_graphic_load_image_resized_FIX(img_data, img_size, img_wh, img_wh);
 				}
+
+				if (data.size() >= 12) {
+					uint32_t tags_offset = *(uint32_t*)&data[data.size() - 12];
+					if (tags_offset < data.size() - 8) {
+						uint32_t cur = tags_offset;
+						bool is_ucs2 = false;
+						while (cur + 8 < data.size()) {
+							uint32_t tag_id = *(uint32_t*)&data[cur];
+							uint32_t tag_len = *(uint32_t*)&data[cur + 4];
+							cur += 8;
+							if (tag_id == 0 || cur + tag_len > data.size())
+								break;
+							if (tag_id == 7) {
+								if (tag_len >= 4)
+									is_ucs2 = (*(uint32_t*)&data[cur] != 0);
+							}
+							else if (tag_id == 1) {
+								if (is_ucs2)
+									app_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
+								else {
+									std::string s((char*)&data[cur], tag_len);
+									app_name = std::u16string(s.begin(), s.end());
+								}
+							}
+							else if (tag_id == 2) {
+								if (is_ucs2)
+									dev_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
+								else {
+									std::string s((char*)&data[cur], tag_len);
+									dev_name = std::u16string(s.begin(), s.end());
+								}
+							}
+							cur += tag_len;
+						}
+					}
+				}
 			}
 
-			vxps.push_back({ name, path, img });
+			vxps.push_back({ name, path, img, file_size, app_name, dev_name });
+		}
+
+		std::string last_saved = DragAndDrop::get_last_selected_app();
+		if (!last_saved.empty()) {
+			for (int i = 0; i < (int)vxps.size(); ++i) {
+				if (u16_to_u8(vxps[i].name) == last_saved) {
+					m_i = i;
+					if ((int)vxps.size() * b_h > h) {
+						if (b_h * m_i - scroll_pos + b_h > h)
+							scroll_pos = b_h * m_i + b_h - h;
+						if (b_h * m_i - scroll_pos < 0)
+							scroll_pos = b_h * m_i;
+					}
+					break;
+				}
+			}
 		}
 	}
 
@@ -217,11 +310,84 @@ namespace NativeApps::Menu::AppSelector {
 			vm_graphic_textout(layer_buf, 0, c_h*2 + 2, vm_ucs2_string((VMSTR)"Or drag them here to import..."), 100, 0xFFFF);
 		}
 
+		if (show_details && m_i >= 0 && m_i < (int)vxps.size()) {
+			const auto& app = vxps[m_i];
+			int dw = w - 16;
+			int dh = std::min(h - 16, c_h * 7 + 34);
+			int dx = (w - dw) / 2;
+			int dy = (h - dh) / 2;
+
+			vm_graphic_fill_rect(layer_buf, dx, dy, dw, dh, VM_COLOR_888_TO_565(32, 34, 42), VM_COLOR_888_TO_565(32, 34, 42));
+			vm_graphic_line(layer_buf, dx, dy, dx + dw, dy, VM_COLOR_888_TO_565(130, 150, 190));
+			vm_graphic_line(layer_buf, dx, dy + dh, dx + dw, dy + dh, VM_COLOR_888_TO_565(130, 150, 190));
+			vm_graphic_line(layer_buf, dx, dy, dx, dy + dh, VM_COLOR_888_TO_565(130, 150, 190));
+			vm_graphic_line(layer_buf, dx + dw, dy, dx + dw, dy + dh, VM_COLOR_888_TO_565(130, 150, 190));
+
+			int title_h = c_h + 4;
+			vm_graphic_fill_rect(layer_buf, dx + 1, dy + 1, dw - 2, title_h, VM_COLOR_888_TO_565(50, 65, 95), VM_COLOR_888_TO_565(50, 65, 95));
+			vm_graphic_textout(layer_buf, dx + 6, dy + 2, (VMWSTR)u"App Details", 100, 0xFFFF);
+
+			int ty = dy + title_h + 4;
+			int pad_x = dx + 6;
+
+			std::u16string f_line = u"File: " + app.name;
+			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)f_line.c_str(), 100, 0xFFFF);
+			ty += c_h + 2;
+
+			if (!app.app_name.empty()) {
+				std::u16string n_line = u"Name: " + app.app_name;
+				vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)n_line.c_str(), 100, 0xFFFF);
+				ty += c_h + 2;
+			}
+
+			if (!app.dev_name.empty()) {
+				std::u16string d_line = u"Dev: " + app.dev_name;
+				vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)d_line.c_str(), 100, 0xFFFF);
+				ty += c_h + 2;
+			}
+
+			std::string sz_str = "Size: " + std::to_string((app.file_size + 1023) / 1024) + " KB";
+			std::u16string sz_line(sz_str.begin(), sz_str.end());
+			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)sz_line.c_str(), 100, 0xFFFF);
+			ty += c_h + 2;
+
+			std::string res_str = "Screen: " + std::to_string(w) + "x" + std::to_string(h);
+			std::u16string res_line(res_str.begin(), res_str.end());
+			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)res_line.c_str(), 100, 0xFFFF);
+
+			int act_y = dy + dh - c_h - 6;
+			vm_graphic_line(layer_buf, dx + 1, act_y - 2, dx + dw - 1, act_y - 2, VM_COLOR_888_TO_565(80, 90, 110));
+			vm_graphic_textout(layer_buf, dx + 6, act_y, (VMWSTR)u"[1] Delete", 100, VM_COLOR_888_TO_565(255, 90, 90));
+			int close_w = vm_graphic_get_string_width((VMWSTR)u"[OK] Close");
+			vm_graphic_textout(layer_buf, dx + dw - close_w - 6, act_y, (VMWSTR)u"[OK] Close", 100, 0xFFFF);
+		}
+		else if (show_delete_confirm && m_i >= 0 && m_i < (int)vxps.size()) {
+			const auto& app = vxps[m_i];
+			int dw = w - 20;
+			int dh = c_h * 4 + 30;
+			int dx = (w - dw) / 2;
+			int dy = (h - dh) / 2;
+
+			vm_graphic_fill_rect(layer_buf, dx, dy, dw, dh, VM_COLOR_888_TO_565(45, 25, 25), VM_COLOR_888_TO_565(45, 25, 25));
+			vm_graphic_line(layer_buf, dx, dy, dx + dw, dy, VM_COLOR_888_TO_565(220, 80, 80));
+			vm_graphic_line(layer_buf, dx, dy + dh, dx + dw, dy + dh, VM_COLOR_888_TO_565(220, 80, 80));
+			vm_graphic_line(layer_buf, dx, dy, dx, dy + dh, VM_COLOR_888_TO_565(220, 80, 80));
+			vm_graphic_line(layer_buf, dx + dw, dy, dx + dw, dy + dh, VM_COLOR_888_TO_565(220, 80, 80));
+
+			vm_graphic_textout(layer_buf, dx + 6, dy + 6, (VMWSTR)u"Delete this app?", 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, dx + 6, dy + 6 + c_h + 2, (VMWSTR)app.name.c_str(), 100, VM_COLOR_888_TO_565(255, 200, 200));
+
+			int act_y = dy + dh - c_h - 6;
+			vm_graphic_textout(layer_buf, dx + 6, act_y, (VMWSTR)u"[OK] Delete", 100, VM_COLOR_888_TO_565(255, 90, 90));
+			int cancel_w = vm_graphic_get_string_width((VMWSTR)u"[Back] Cancel");
+			vm_graphic_textout(layer_buf, dx + dw - cancel_w - 6, act_y, (VMWSTR)u"[Back] Cancel", 100, 0xFFFF);
+		}
+
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
 
 	void timer_cb(VMINT tid) {
-		if (!layer_buf || vxps.empty() || touched)
+		if (!layer_buf || vxps.empty() || touched || show_details || show_delete_confirm)
 			return;
 
 		if (g_appManager) {
@@ -277,26 +443,93 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void key_handler(VMINT event, VMINT keycode) {
+		if (show_delete_confirm) {
+			if (event == VM_KEY_EVENT_UP) {
+				if (keycode == VM_KEY_OK || keycode == VM_KEY_LEFT_SOFTKEY) {
+					vm_file_delete((VMWSTR)vxps[m_i].path.c_str());
+					show_delete_confirm = false;
+					show_details = false;
+					rescan();
+					return;
+				}
+				else if (keycode == VM_KEY_BACK || keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_CLEAR) {
+					show_delete_confirm = false;
+					draw();
+					return;
+				}
+			}
+			return;
+		}
+
+		if (show_details) {
+			if (event == VM_KEY_EVENT_UP) {
+				if (keycode == VM_KEY_LEFT_SOFTKEY || keycode == VM_KEY_NUM1) {
+					show_delete_confirm = true;
+					draw();
+					return;
+				}
+				else if (keycode == VM_KEY_OK || keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_BACK || keycode == VM_KEY_CLEAR) {
+					show_details = false;
+					draw();
+					return;
+				}
+			}
+			return;
+		}
+
 		int old_m_i = m_i;
 		if (vxps.size() && event == VM_KEY_EVENT_UP) {
 			trigger_scrollbar();
 			switch (keycode) {
 			case VM_KEY_UP:
 				if (--m_i < 0)
-					m_i = vxps.size() - 1;
+					m_i = (int)vxps.size() - 1;
 				break;
 			case VM_KEY_DOWN:
-				if (++m_i >= vxps.size())
+				if (++m_i >= (int)vxps.size())
 					m_i = 0;
 				break;
+			case VM_KEY_LEFT_SOFTKEY:
+				show_details = true;
+				draw();
+				return;
 			case VM_KEY_OK:
+				DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
 				vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
 				break;
+			case VM_KEY_NUM1:
+			case VM_KEY_NUM2:
+			case VM_KEY_NUM3:
+			case VM_KEY_NUM4:
+			case VM_KEY_NUM5:
+			case VM_KEY_NUM6:
+			case VM_KEY_NUM7:
+			case VM_KEY_NUM8:
+			case VM_KEY_NUM9:
+			case VM_KEY_NUM0: {
+				const char* chars = get_t9_chars(keycode);
+				if (*chars && !vxps.empty()) {
+					for (int step = 1; step <= (int)vxps.size(); ++step) {
+						int idx = (m_i + step) % (int)vxps.size();
+						if (vxps[idx].name.empty())
+							continue;
+						char first = (char)std::tolower((char)vxps[idx].name[0]);
+						if (std::strchr(chars, first)) {
+							m_i = idx;
+							break;
+						}
+					}
+				}
+				break;
+			}
 			}
 		}
 
-		if (m_i != old_m_i)
+		if (m_i != old_m_i) {
 			reset_marquee();
+			if (m_i >= 0 && m_i < (int)vxps.size())
+				DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
+		}
 
 		if ((int)vxps.size() * b_h > h) {
 			if (b_h * m_i - scroll_pos + b_h > h)
@@ -310,6 +543,64 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void pen_handler(VMINT event, VMINT x, VMINT y) {
+		if (show_delete_confirm) {
+			if (event == VM_PEN_EVENT_TAP) {
+				int dw = w - 20;
+				int dh = c_h * 4 + 30;
+				int dx = (w - dw) / 2;
+				int dy = (h - dh) / 2;
+				int act_y = dy + dh - c_h - 10;
+				if (y >= act_y && y <= dy + dh) {
+					if (x < dx + dw / 2) {
+						vm_file_delete((VMWSTR)vxps[m_i].path.c_str());
+						show_delete_confirm = false;
+						show_details = false;
+						rescan();
+						return;
+					}
+					else {
+						show_delete_confirm = false;
+						draw();
+						return;
+					}
+				}
+				else if (x < dx || x > dx + dw || y < dy || y > dy + dh) {
+					show_delete_confirm = false;
+					draw();
+					return;
+				}
+			}
+			return;
+		}
+
+		if (show_details) {
+			if (event == VM_PEN_EVENT_TAP) {
+				int dw = w - 16;
+				int dh = std::min(h - 16, c_h * 7 + 34);
+				int dx = (w - dw) / 2;
+				int dy = (h - dh) / 2;
+				int act_y = dy + dh - c_h - 10;
+				if (y >= act_y && y <= dy + dh) {
+					if (x < dx + dw / 2) {
+						show_delete_confirm = true;
+						draw();
+						return;
+					}
+					else {
+						show_details = false;
+						draw();
+						return;
+					}
+				}
+				else if (x < dx || x > dx + dw || y < dy || y > dy + dh) {
+					show_details = false;
+					draw();
+					return;
+				}
+			}
+			return;
+		}
+
 		int old_m_i = m_i;
 		trigger_scrollbar();
 		switch (event) {
@@ -322,7 +613,6 @@ namespace NativeApps::Menu::AppSelector {
 				break;
 			case VM_PEN_EVENT_MOVE:
 			case VM_PEN_EVENT_REPEAT:
-			case VM_PEN_EVENT_LONG_TAP:
 			case VM_PEN_EVENT_DOUBLE_CLICK:
 				if (touched) {
 					scroll_pos += touch_last_y - y;
@@ -335,11 +625,23 @@ namespace NativeApps::Menu::AppSelector {
 						scroll_pos = (int)vxps.size() * b_h - h;
 				}
 				break;
+			case VM_PEN_EVENT_LONG_TAP: {
+				int item = (y + scroll_pos) / b_h;
+				if (item >= 0 && item < (int)vxps.size()) {
+					m_i = item;
+					show_details = true;
+					DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
+					draw();
+				}
+				break;
+			}
 			case VM_PEN_EVENT_RELEASE:
 			case VM_PEN_EVENT_ABORT:
 				touched = false;
-				if (std::abs(touch_start_y - y) < b_h / 2 && vm_get_tick_count() - touch_time < 150)
+				if (std::abs(touch_start_y - y) < b_h / 2 && vm_get_tick_count() - touch_time < 150) {
+					DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
 					vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
+				}
 				break;
 		}
 
@@ -349,8 +651,11 @@ namespace NativeApps::Menu::AppSelector {
 		if (m_i >= (int)vxps.size())
 			m_i = 0;
 
-		if (m_i != old_m_i)
+		if (m_i != old_m_i) {
 			reset_marquee();
+			if (m_i >= 0 && m_i < (int)vxps.size())
+				DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
+		}
 
 		draw();
 	}
