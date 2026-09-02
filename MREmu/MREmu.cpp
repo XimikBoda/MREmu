@@ -32,371 +32,16 @@ AppManager* g_appManager = 0;
 
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c);
 
-std::u16string warning_text_u16;
-sf::Clock warning_clock;
-bool show_warning = false;
+#include "DragAndDrop.h"
+
+using DragAndDrop::show_warning;
+using DragAndDrop::warning_clock;
 
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
-#include <dwmapi.h>
-#include <functional>
-
-static WNDPROC old_wndproc_debug = NULL;
-static WNDPROC old_wndproc_device = NULL;
-
-static int dev_base_w = 240;
-static int dev_base_h = 528;
-
-static HWND g_hwnd_debug = NULL;
-static HWND g_hwnd_device = NULL;
-
-static std::function<void(unsigned int, unsigned int)> g_on_device_resize;
-static std::function<void()> g_repaint_device;
-
-static int g_dev_grab_x = 0;
-static int g_dev_grab_y = 0;
-static bool g_dev_is_moving = false;
-
-static int g_dbg_last_x = 0;
-static int g_dbg_last_y = 0;
-static bool g_device_was_docked_to_debug = false;
-
-static bool get_visual_rect(HWND hwnd, RECT* out_rect) {
-	if (!hwnd || !IsWindow(hwnd))
-		return false;
-	if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, out_rect, sizeof(RECT))))
-		return true;
-	return GetWindowRect(hwnd, out_rect) != 0;
-}
-
-static void get_shadow_margins(HWND hwnd, int& m_left, int& m_top, int& m_right, int& m_bottom) {
-	RECT win_rect, vis_rect;
-	GetWindowRect(hwnd, &win_rect);
-	if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &vis_rect, sizeof(RECT)))) {
-		m_left = vis_rect.left - win_rect.left;
-		m_top = vis_rect.top - win_rect.top;
-		m_right = win_rect.right - vis_rect.right;
-		m_bottom = win_rect.bottom - vis_rect.bottom;
-	} else {
-		m_left = m_top = m_right = m_bottom = 0;
-	}
-}
-
-static bool is_device_docked_to_debug() {
-	if (!g_hwnd_debug || !g_hwnd_device || !IsWindow(g_hwnd_debug) || !IsWindow(g_hwnd_device))
-		return false;
-	RECT dbg_vis, dev_vis;
-	if (!get_visual_rect(g_hwnd_debug, &dbg_vis) || !get_visual_rect(g_hwnd_device, &dev_vis))
-		return false;
-
-	const int tol = 4;
-	bool touching_right = (std::abs(dev_vis.left - dbg_vis.right) <= tol) &&
-		(dev_vis.bottom >= dbg_vis.top - tol) && (dev_vis.top <= dbg_vis.bottom + tol);
-	bool touching_left = (std::abs(dev_vis.right - dbg_vis.left) <= tol) &&
-		(dev_vis.bottom >= dbg_vis.top - tol) && (dev_vis.top <= dbg_vis.bottom + tol);
-	bool touching_bottom = (std::abs(dev_vis.top - dbg_vis.bottom) <= tol) &&
-		(dev_vis.right >= dbg_vis.left - tol) && (dev_vis.left <= dbg_vis.right + tol);
-	bool touching_top = (std::abs(dev_vis.bottom - dbg_vis.top) <= tol) &&
-		(dev_vis.right >= dbg_vis.left - tol) && (dev_vis.left <= dbg_vis.right + tol);
-
-	return touching_right || touching_left || touching_bottom || touching_top;
-}
-
-static void snap_device_to_debug(HWND hwnd, RECT* r) {
-	if (!g_hwnd_debug || !IsWindow(g_hwnd_debug) || !IsWindowVisible(g_hwnd_debug))
-		return;
-
-	RECT dbg_vis;
-	if (!get_visual_rect(g_hwnd_debug, &dbg_vis))
-		return;
-
-	int w = r->right - r->left;
-	int h = r->bottom - r->top;
-
-	int ideal_left = r->left;
-	int ideal_top = r->top;
-	if (g_dev_is_moving) {
-		POINT pt;
-		GetCursorPos(&pt);
-		ideal_left = pt.x - g_dev_grab_x;
-		ideal_top = pt.y - g_dev_grab_y;
-	}
-
-	int m_l, m_t, m_r, m_b;
-	get_shadow_margins(hwnd, m_l, m_t, m_r, m_b);
-
-	RECT ideal_vis;
-	ideal_vis.left = ideal_left + m_l;
-	ideal_vis.top = ideal_top + m_t;
-	ideal_vis.right = ideal_left + w - m_r;
-	ideal_vis.bottom = ideal_top + h - m_b;
-
-	int vis_w = ideal_vis.right - ideal_vis.left;
-	int vis_h = ideal_vis.bottom - ideal_vis.top;
-
-	int overlap_l = std::max(ideal_vis.left, dbg_vis.left);
-	int overlap_r = std::min(ideal_vis.right, dbg_vis.right);
-	int overlap_t = std::max(ideal_vis.top, dbg_vis.top);
-	int overlap_b = std::min(ideal_vis.bottom, dbg_vis.bottom);
-
-	if (overlap_l < overlap_r && overlap_t < overlap_b) {
-		int overlap_area = (overlap_r - overlap_l) * (overlap_b - overlap_t);
-		int dev_area = vis_w * vis_h;
-		if (overlap_area > dev_area * 0.35f) {
-			r->left = ideal_left;
-			r->top = ideal_top;
-			r->right = ideal_left + w;
-			r->bottom = ideal_top + h;
-			return;
-		}
-	}
-
-	const int threshold = 16;
-	RECT snapped_vis = ideal_vis;
-
-	bool v_near = (ideal_vis.bottom >= dbg_vis.top - threshold) && (ideal_vis.top <= dbg_vis.bottom + threshold);
-	if (v_near) {
-		if (std::abs(ideal_vis.left - dbg_vis.right) <= threshold) {
-			snapped_vis.left = dbg_vis.right;
-			snapped_vis.right = snapped_vis.left + vis_w;
-		}
-		else if (std::abs(ideal_vis.right - dbg_vis.left) <= threshold) {
-			snapped_vis.right = dbg_vis.left;
-			snapped_vis.left = snapped_vis.right - vis_w;
-		}
-		else if (std::abs(ideal_vis.left - dbg_vis.left) <= threshold) {
-			snapped_vis.left = dbg_vis.left;
-			snapped_vis.right = snapped_vis.left + vis_w;
-		}
-		else if (std::abs(ideal_vis.right - dbg_vis.right) <= threshold) {
-			snapped_vis.right = dbg_vis.right;
-			snapped_vis.left = snapped_vis.right - vis_w;
-		}
-	}
-
-	bool h_near = (ideal_vis.right >= dbg_vis.left - threshold) && (ideal_vis.left <= dbg_vis.right + threshold);
-	if (h_near) {
-		if (std::abs(ideal_vis.top - dbg_vis.bottom) <= threshold) {
-			snapped_vis.top = dbg_vis.bottom;
-			snapped_vis.bottom = snapped_vis.top + vis_h;
-		}
-		else if (std::abs(ideal_vis.bottom - dbg_vis.top) <= threshold) {
-			snapped_vis.bottom = dbg_vis.top;
-			snapped_vis.top = snapped_vis.bottom - vis_h;
-		}
-		else if (std::abs(ideal_vis.top - dbg_vis.top) <= threshold) {
-			snapped_vis.top = dbg_vis.top;
-			snapped_vis.bottom = snapped_vis.top + vis_h;
-		}
-		else if (std::abs(ideal_vis.bottom - dbg_vis.bottom) <= threshold) {
-			snapped_vis.bottom = dbg_vis.bottom;
-			snapped_vis.top = snapped_vis.bottom - vis_h;
-		}
-	}
-
-	r->left = snapped_vis.left - m_l;
-	r->top = snapped_vis.top - m_t;
-	r->right = r->left + w;
-	r->bottom = r->top + h;
-}
-
-static void handle_drop(HDROP hDrop, HWND hwnd) {
-	bool is_shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-
-	UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
-	if (count == 0) {
-		DragFinish(hDrop);
-		return;
-	}
-
-	std::vector<fs::path> valid_files;
-	for (UINT i = 0; i < count; ++i) {
-		UINT len = DragQueryFileW(hDrop, i, NULL, 0);
-		std::wstring path(len, L'\0');
-		DragQueryFileW(hDrop, i, &path[0], len + 1);
-
-		fs::path src(path);
-		std::string ext = src.extension().string();
-		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-		bool valid = false;
-		if (ext == ".vxp" && fs::is_regular_file(src)) {
-			if (ArmApp::check_format(src, false))
-				valid = true;
-#ifdef WIN32
-			else if (DLLApp::check_format(src, false))
-				valid = true;
 #endif
-		}
 
-		if (valid) {
-			valid_files.push_back(src);
-		} else {
-			warning_clock.restart();
-			show_warning = true;
-		}
-	}
-
-	if (valid_files.empty()) {
-		DragFinish(hDrop);
-		return;
-	}
-
-	bool should_move = false;
-	if (is_shift) {
-		int result = MessageBoxW(hwnd, L"Do you want to move the VXP file(s) to fs/e/mre instead of copying?", L"Move VXP", MB_YESNO | MB_ICONQUESTION);
-		if (result == IDYES)
-			should_move = true;
-	}
-
-	fs::path dest_dir = fs::path("fs/e/mre").make_preferred();
-	fs::create_directories(dest_dir);
-
-	bool imported = false;
-	for (const auto& src : valid_files) {
-		std::error_code ec;
-		fs::path target = dest_dir / src.filename();
-		if (should_move) {
-			fs::rename(src, target, ec);
-			if (ec) {
-				ec.clear();
-				fs::copy_file(src, target, fs::copy_options::overwrite_existing, ec);
-				if (!ec)
-					fs::remove(src, ec);
-			}
-		} else {
-			fs::copy_file(src, target, fs::copy_options::overwrite_existing, ec);
-		}
-		if (!ec)
-			imported = true;
-	}
-	DragFinish(hDrop);
-
-	if (imported && g_appManager) {
-		NativeApp* native_app = dynamic_cast<NativeApp*>(g_appManager->get_active_app());
-		if (native_app && native_app->conf.entry == NativeApps::Menu::AppSelector::entry)
-			NativeApps::Menu::AppSelector::rescan();
-	}
-}
-
-static LRESULT CALLBACK drop_wndproc_debug(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	if (msg == WM_DROPFILES) {
-		handle_drop((HDROP)wParam, hwnd);
-		return 0;
-	}
-	if (msg == WM_ENTERSIZEMOVE) {
-		RECT dbg_rect;
-		GetWindowRect(hwnd, &dbg_rect);
-		g_dbg_last_x = dbg_rect.left;
-		g_dbg_last_y = dbg_rect.top;
-		g_device_was_docked_to_debug = is_device_docked_to_debug();
-	}
-	if (msg == WM_MOVING) {
-		RECT* r = (RECT*)lParam;
-		int dx = r->left - g_dbg_last_x;
-		int dy = r->top - g_dbg_last_y;
-		g_dbg_last_x = r->left;
-		g_dbg_last_y = r->top;
-
-		if (g_device_was_docked_to_debug && g_hwnd_device && IsWindow(g_hwnd_device) && (dx != 0 || dy != 0)) {
-			RECT dev_rect;
-			GetWindowRect(g_hwnd_device, &dev_rect);
-			SetWindowPos(g_hwnd_device, NULL,
-				dev_rect.left + dx, dev_rect.top + dy,
-				0, 0,
-				SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-		}
-		return CallWindowProcW(old_wndproc_debug, hwnd, msg, wParam, lParam);
-	}
-	if (msg == WM_EXITSIZEMOVE) {
-		g_device_was_docked_to_debug = false;
-	}
-	return CallWindowProcW(old_wndproc_debug, hwnd, msg, wParam, lParam);
-}
-
-static LRESULT CALLBACK drop_wndproc_device(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	if (msg == WM_DROPFILES) {
-		handle_drop((HDROP)wParam, hwnd);
-		return 0;
-	}
-	if (msg == WM_ENTERSIZEMOVE) {
-		POINT pt;
-		GetCursorPos(&pt);
-		RECT win_rect;
-		GetWindowRect(hwnd, &win_rect);
-		g_dev_grab_x = pt.x - win_rect.left;
-		g_dev_grab_y = pt.y - win_rect.top;
-		g_dev_is_moving = true;
-	}
-	if (msg == WM_MOVING) {
-		RECT* r = (RECT*)lParam;
-		snap_device_to_debug(hwnd, r);
-		return TRUE;
-	}
-	if (msg == WM_EXITSIZEMOVE) {
-		g_dev_is_moving = false;
-	}
-	if (msg == WM_SIZING) {
-		RECT* r = (RECT*)lParam;
-		RECT cr = { 0, 0, 100, 100 };
-		RECT wr = cr;
-		AdjustWindowRect(&wr, GetWindowLong(hwnd, GWL_STYLE), FALSE);
-		int bw = (wr.right - wr.left) - 100;
-		int bh = (wr.bottom - wr.top) - 100;
-
-		int cur_w = (r->right - r->left) - bw;
-		int cur_h = (r->bottom - r->top) - bh;
-
-		constexpr float scale_step = 0.05f;
-		float scale_val = std::max((float)cur_w / (float)dev_base_w, (float)cur_h / (float)dev_base_h);
-		scale_val = std::round(scale_val / scale_step) * scale_step;
-		if (scale_val < 1.0f)
-			scale_val = 1.0f;
-
-		int new_w = (int)std::round((float)dev_base_w * scale_val) + bw;
-		int new_h = (int)std::round((float)dev_base_h * scale_val) + bh;
-
-		switch (wParam) {
-		case WMSZ_LEFT:
-		case WMSZ_TOPLEFT:
-		case WMSZ_BOTTOMLEFT:
-			r->left = r->right - new_w;
-			break;
-		default:
-			r->right = r->left + new_w;
-			break;
-		}
-
-		switch (wParam) {
-		case WMSZ_TOP:
-		case WMSZ_TOPLEFT:
-		case WMSZ_TOPRIGHT:
-			r->top = r->bottom - new_h;
-			break;
-		default:
-			r->bottom = r->top + new_h;
-			break;
-		}
-
-		return TRUE;
-	}
-	if (msg == WM_SIZE) {
-		LRESULT res = CallWindowProcW(old_wndproc_device, hwnd, msg, wParam, lParam);
-		if (g_on_device_resize && wParam != SIZE_MINIMIZED) {
-			g_on_device_resize(LOWORD(lParam), HIWORD(lParam));
-		}
-		return res;
-	}
-	if (msg == WM_PAINT) {
-		LRESULT res = CallWindowProcW(old_wndproc_device, hwnd, msg, wParam, lParam);
-		if (g_repaint_device)
-			g_repaint_device();
-		return res;
-	}
-	return CallWindowProcW(old_wndproc_device, hwnd, msg, wParam, lParam);
-}
-#endif
 
 static void open_folder(const fs::path& p) {
 	fs::create_directories(p);
@@ -509,6 +154,46 @@ int main(int argc, char** argv) {
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	ImGui::SFML::Init(win_debug);
+
+	if (!fs::exists("imgui.ini")) {
+		const char* default_ini =
+			"[Window][Control]\n"
+			"Pos=10,10\n"
+			"Size=175,175\n"
+			"Collapsed=0\n\n"
+			"[Window][Fps]\n"
+			"Pos=10,190\n"
+			"Size=175,60\n"
+			"Collapsed=0\n\n"
+			"[Window][Memory]\n"
+			"Pos=10,255\n"
+			"Size=175,335\n"
+			"Collapsed=0\n\n"
+			"[Window][Screen]\n"
+			"Pos=195,10\n"
+			"Size=255,380\n"
+			"Collapsed=0\n\n"
+			"[Window][KeyBoard]\n"
+			"Pos=195,395\n"
+			"Size=255,195\n"
+			"Collapsed=0\n\n"
+			"[Window][CPU REG]\n"
+			"Pos=460,10\n"
+			"Size=530,180\n"
+			"Collapsed=0\n\n"
+			"[Window][Layers]\n"
+			"Pos=460,195\n"
+			"Size=260,395\n"
+			"Collapsed=0\n\n"
+			"[Window][Canvases]\n"
+			"Pos=725,195\n"
+			"Size=265,395\n"
+			"Collapsed=0\n\n";
+
+		ImGui::LoadIniSettingsFromMemory(default_ini, strlen(default_ini));
+		ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
+	}
+
 	win_debug.setFramerateLimit(60);
 	win_device.setFramerateLimit(60);
 	//win_debug.setVerticalSyncEnabled(true);
@@ -537,15 +222,10 @@ int main(int argc, char** argv) {
 	}
 #endif
 
-#ifdef _WIN32
 #ifndef ANDROID
-	g_hwnd_debug = (HWND)win_debug.getSystemHandle();
-	DragAcceptFiles(g_hwnd_debug, TRUE);
-	old_wndproc_debug = (WNDPROC)SetWindowLongPtrW(g_hwnd_debug, GWLP_WNDPROC, (LONG_PTR)drop_wndproc_debug);
-#endif
-	g_hwnd_device = (HWND)win_device.getSystemHandle();
-	DragAcceptFiles(g_hwnd_device, TRUE);
-	old_wndproc_device = (WNDPROC)SetWindowLongPtrW(g_hwnd_device, GWLP_WNDPROC, (LONG_PTR)drop_wndproc_device);
+	DragAndDrop::init(win_device, &win_debug);
+#else
+	DragAndDrop::init(win_device, nullptr);
 #endif
 
 	MREngine::IO::init();
@@ -570,8 +250,9 @@ int main(int argc, char** argv) {
 		appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
 
 
-	dev_base_w = graphic.width;
-	dev_base_h = graphic.height + 208;
+	int base_w = graphic.width;
+	int base_h = graphic.height + 208;
+	DragAndDrop::set_base_size(base_w, base_h);
 
 	float scale = 1.f;
 	sf::Sprite screen_sp(graphic.screen_tex);
@@ -627,15 +308,15 @@ int main(int argc, char** argv) {
 		resizing = true;
 
 		constexpr float scale_step = 0.05f;
-		float scale_x = (float)new_w / (float)dev_base_w;
-		float scale_y = (float)new_h / (float)dev_base_h;
+		float scale_x = (float)new_w / (float)base_w;
+		float scale_y = (float)new_h / (float)base_h;
 
 		scale = std::round(std::max(scale_x, scale_y) / scale_step) * scale_step;
 		if (scale < 1.0f)
 			scale = 1.0f;
 
-		unsigned int target_w = (unsigned int)std::round((float)dev_base_w * scale);
-		unsigned int target_h = (unsigned int)std::round((float)dev_base_h * scale);
+		unsigned int target_w = (unsigned int)std::round((float)base_w * scale);
+		unsigned int target_h = (unsigned int)std::round((float)base_h * scale);
 
 		if (win_device.getSize().x != target_w || win_device.getSize().y != target_h)
 			win_device.setSize(sf::Vector2u(target_w, target_h));
@@ -652,14 +333,7 @@ int main(int argc, char** argv) {
 		resizing = false;
 	};
 
-#ifdef _WIN32
-	g_repaint_device = [&]() {
-		repaint_device();
-	};
-	g_on_device_resize = [&](unsigned int w, unsigned int h) {
-		update_screen_size(w, h);
-	};
-#endif
+	DragAndDrop::set_callbacks(update_screen_size, repaint_device);
 
 	update_screen_size(win_device.getSize().x, win_device.getSize().y);
 
@@ -668,11 +342,49 @@ int main(int argc, char** argv) {
 	sf::Clock deltaClock;
 	sf::Event event;
 
+	bool request_hard_reset = false;
+
 	while (win_device.isOpen()
 #ifndef ANDROID
         && win_debug.isOpen()
 #endif
     ) {
+		if (request_hard_reset) {
+			request_hard_reset = false;
+
+			work = false;
+			Cpu::stop();
+			if (second_thread.joinable())
+				second_thread.join();
+
+			appManager.reset();
+
+			Cpu::deinit();
+			Memory::deinit();
+			Memory::init(32 * 1024 * 1024);
+			Cpu::init();
+			Bridge::init();
+
+			MREngine::SIM::init();
+			MREngine::System::init();
+			MREngine::CharSet::init();
+			MREngine::AppAudio::init();
+			MREngine::IO::init();
+
+			graphic.reset();
+
+			keyboard.kc.pkey.clear();
+			touch.touching = false;
+
+			if (GDB::gdb_mode)
+				GDB::cpu_state = GDB::Stop;
+
+			appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
+
+			work = true;
+			second_thread = std::thread(mre_main, &appManager);
+		}
+
 #ifndef ANDROID
 		while (win_debug.pollEvent(event)) {
 			ImGui::SFML::ProcessEvent(event);
@@ -729,6 +441,8 @@ int main(int argc, char** argv) {
 			active_app->graphic.imgui_canvases();
 		}
 
+		ImGui::SetNextWindowPos(ImVec2(10, 255), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(175, 335), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Memory") && active_app) {
 			float size = active_app->app_memory.get_memory_size();
 			float free_size = active_app->app_memory.get_free_memory_size();
@@ -743,12 +457,18 @@ int main(int argc, char** argv) {
 		}
 		ImGui::End();
 
+		ImGui::SetNextWindowPos(ImVec2(10, 190), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(175, 60), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Fps")) {
 			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
 		}
 		ImGui::End();
 
+		ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(175, 175), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Control")) {
+			if (ImGui::Button("Hard Reset"))
+				request_hard_reset = true;
 			if (ImGui::Button("Open c:/ (fs/c)"))
 				open_folder("fs/c");
 			if (ImGui::Button("Open d:/ (fs/d)"))
@@ -784,10 +504,7 @@ int main(int argc, char** argv) {
 #endif
 	}
 
-#ifdef _WIN32
-	g_repaint_device = nullptr;
-	g_on_device_resize = nullptr;
-#endif
+	DragAndDrop::cleanup();
 
 	work = false;
 	second_thread.join();

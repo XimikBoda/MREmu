@@ -157,6 +157,8 @@ bool Keyboard::event(sf::Event& event) {
 
 void Keyboard::imgui_keyboard() {
 	ImVec2 v = { 60,20 };
+	ImGui::SetNextWindowPos(ImVec2(195, 395), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(255, 195), ImGuiCond_FirstUseEver);
 	ImGui::Begin("KeyBoard");
 	for (int i = 0; i < 3 * 7; ++i) {
 		if (i % 3 != 0)

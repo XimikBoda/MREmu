@@ -71,6 +71,8 @@ namespace Cpu {
 
 		uc_reg_read(uc, UC_ARM_REG_CPSR, &cpsr);
 
+		ImGui::SetNextWindowPos(ImVec2(460, 10), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(530, 180), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("CPU REG")) {
 			ImGui::PushItemWidth(80);
 			for (int i = 0; i < 16; ++i) {
@@ -240,6 +242,18 @@ namespace Cpu {
 		//add_hook(UC_HOOK_MEM_WRITE | UC_HOOK_MEM_READ, (void*)hook_unaligned_access, 0, 1, 0);
 
 		push_cpu();
+	}
+
+	void deinit() {
+		for (auto* u : ucs) {
+			if (u)
+				uc_close(u);
+		}
+		ucs.clear();
+		hooks.clear();
+		cur_cpu_id = -1;
+		uc = 0;
+		stack_p = 0;
 	}
 
 	void push_cpu() {

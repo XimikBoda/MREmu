@@ -19,6 +19,7 @@ set(SOURCES
 						"Log.cpp" "Log.h" 
 						"miniz.c" "miniz.h" "mutex_wrapper.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
+						"DragAndDrop.cpp" "DragAndDrop.h"
 )
 
 if (ANDROID)

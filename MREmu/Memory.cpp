@@ -98,7 +98,10 @@ namespace Memory {
 
 	void deinit()
 	{
-		_aligned_free(shared_memory_prt);
+		if (shared_memory_prt) {
+			_aligned_free(shared_memory_prt);
+			shared_memory_prt = NULL;
+		}
 	}
 
 	void MemoryManager::setup(size_t start_adr, size_t size, size_t protected_size)

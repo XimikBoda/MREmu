@@ -81,6 +81,8 @@ void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
 void MREngine::AppGraphic::imgui_canvases() {
 	std::lock_guard lock(canvases_list_mutex);
 	const char* formats[4] = { "RGB565", "RGB", "RGBA", "PARGB" };
+	ImGui::SetNextWindowPos(ImVec2(725, 195), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(265, 395), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Canvases")) {
 		for (int i = 0; i < canvases_list.size(); ++i) {
 			auto& el = canvases_list[i];

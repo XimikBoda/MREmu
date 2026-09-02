@@ -3,6 +3,7 @@
 
 namespace Cpu {
 	void init();
+	void deinit();
 	void imgui_REG();
 	void trace_on();
 	void stop();

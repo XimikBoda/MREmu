@@ -278,6 +278,37 @@ void AppManager::update(size_t delta_ms) {
 	}
 }
 
+void AppManager::reset()
+{
+	{
+		std::lock_guard lock(launch_queue_mutex);
+		launch_queue = {};
+	}
+	{
+		std::lock_guard lock(close_queue_mutex);
+		close_queue = {};
+	}
+	{
+		std::lock_guard lock(keyboard_events_queue_mutex);
+		keyboard_events_queue = {};
+	}
+	{
+		std::lock_guard lock(pen_events_queue_mutex);
+		pen_events_queue = {};
+	}
+	{
+		std::lock_guard lock(message_events_queue_mutex);
+		message_events_queue = {};
+	}
+	{
+		std::lock_guard lock(system_events_queue_mutex);
+		system_events_queue = {};
+	}
+	apps.clear();
+	active_app_id = -1;
+	current_work_app_id = -1;
+}
+
 App* AppManager::get_active_app()
 {
 	if (active_app_id < 0 || active_app_id >= apps.size())

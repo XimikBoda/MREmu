@@ -23,6 +23,7 @@ namespace MREngine {
 		void update_screen();
 
 		void imgui_screen();
+		void reset();
 
 		~Graphic();
 	};

@@ -86,6 +86,7 @@ public:
 	void process_system_events();
 
 	void update(size_t delta_ms);
+	void reset();
 
 	App* get_active_app();
 	App* get_current_work_app_id();

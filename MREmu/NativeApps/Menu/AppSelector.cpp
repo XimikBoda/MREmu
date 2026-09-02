@@ -1,13 +1,16 @@
 #include "AppSelector.h"
 #include "../../MREngine/Image.h"
+#include "../../AppManager.h"
 #include <vector>
 #include <string>
 #include <vmgraph.h>
 #include <vmio.h>
 #include <vmpromng.h>
 #include <vmstdlib.h>
+#include <vmtimer.h>
 
 VMWSTR vm_ucs2_string(VMSTR s);
+extern AppManager* g_appManager;
 
 namespace NativeApps::Menu::AppSelector {
 	int layer_h = 0;
@@ -22,6 +25,11 @@ namespace NativeApps::Menu::AppSelector {
 	bool touched = false;
 	int touch_time = 0;
 	
+	int marquee_offset = 0;
+	int marquee_timer_id = 0;
+	int marquee_state = 0;
+	int marquee_pause_ticks = 28;
+	int last_selected = 0;
 
 	VMUINT16 gray = VM_COLOR_888_TO_565(50, 50, 50);
 
@@ -39,8 +47,21 @@ namespace NativeApps::Menu::AppSelector {
 	void draw();
 	void key_handler(VMINT event, VMINT keycode);
 	void pen_handler(VMINT event, VMINT x, VMINT y);
+	void timer_cb(VMINT tid);
+
+	void reset_marquee() {
+		marquee_offset = 0;
+		marquee_state = 0;
+		marquee_pause_ticks = 28;
+		last_selected = m_i;
+	}
 
 	void entry() {
+		m_i = 0;
+		scroll_pos = 0;
+		touched = false;
+		reset_marquee();
+
 		w = vm_graphic_get_screen_width();
 		h = vm_graphic_get_screen_height();
 
@@ -56,6 +77,10 @@ namespace NativeApps::Menu::AppSelector {
 
 		vm_reg_keyboard_callback(key_handler);
 		vm_reg_pen_callback(pen_handler);
+
+		if (marquee_timer_id)
+			vm_delete_timer(marquee_timer_id);
+		marquee_timer_id = vm_create_timer(35, timer_cb);
 	}
 
 	void scan() {
@@ -108,6 +133,7 @@ namespace NativeApps::Menu::AppSelector {
 			scan();
 			if (m_i >= (int)vxps.size())
 				m_i = vxps.empty() ? 0 : vxps.size() - 1;
+			reset_marquee();
 			draw();
 		}
 	}
@@ -117,6 +143,8 @@ namespace NativeApps::Menu::AppSelector {
 
 		for (int i = 0; i < vxps.size(); ++i) {
 			int y = b_h * i - scroll_pos;
+			if (y + b_h < 0 || y >= h)
+				continue;
 
 			if (i == m_i)
 				vm_graphic_fill_rect(layer_buf, 0, y, w, b_h, gray, gray);
@@ -124,7 +152,28 @@ namespace NativeApps::Menu::AppSelector {
 			if (vxps[i].img)
 				vm_graphic_blt(layer_buf, 1, y, (VMBYTE*)vxps[i].img, 0, 0, img_wh, img_wh, 1);
 
-			vm_graphic_textout(layer_buf, 2 + b_h, y + (b_h - c_h) / 2, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
+			int text_x = 2 + b_h;
+			int text_y = y + (b_h - c_h) / 2;
+			int max_text_w = w - text_x - 4;
+
+			if (i == m_i) {
+				int text_w = vm_graphic_get_string_width((VMWSTR)vxps[i].name.c_str());
+				if (text_w > max_text_w) {
+					int clip_top = std::max(0, y);
+					int clip_bottom = std::min(h - 1, y + b_h - 1);
+					if (clip_top <= clip_bottom) {
+						vm_graphic_set_clip(text_x, clip_top, w - 2, clip_bottom);
+						vm_graphic_textout(layer_buf, text_x - marquee_offset, text_y, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
+						vm_graphic_reset_clip();
+					}
+				}
+				else {
+					vm_graphic_textout(layer_buf, text_x, text_y, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
+				}
+			}
+			else {
+				vm_graphic_textout(layer_buf, text_x, text_y, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
+			}
 
 			vm_graphic_line(layer_buf, 0, y + b_h - 1, w, y + b_h - 1, 0xFFFF);
 		}
@@ -138,7 +187,58 @@ namespace NativeApps::Menu::AppSelector {
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
 
+	void timer_cb(VMINT tid) {
+		if (!layer_buf || vxps.empty() || touched)
+			return;
+
+		if (g_appManager) {
+			App* act = g_appManager->get_active_app();
+			if (act && act->system_callbacks.ph_app_id != vm_pmng_get_current_handle())
+				return;
+		}
+
+		if (m_i < 0 || m_i >= (int)vxps.size())
+			return;
+
+		int text_x = 2 + b_h;
+		int max_text_w = w - text_x - 4;
+		int text_w = vm_graphic_get_string_width((VMWSTR)vxps[m_i].name.c_str());
+
+		if (text_w <= max_text_w) {
+			if (marquee_offset != 0) {
+				marquee_offset = 0;
+				draw();
+			}
+			return;
+		}
+
+		int max_scroll = text_w - max_text_w + 10;
+
+		if (marquee_state == 0) {
+			if (--marquee_pause_ticks <= 0)
+				marquee_state = 1;
+		}
+		else if (marquee_state == 1) {
+			marquee_offset++;
+			if (marquee_offset >= max_scroll) {
+				marquee_offset = max_scroll;
+				marquee_state = 2;
+				marquee_pause_ticks = 34;
+			}
+			draw();
+		}
+		else if (marquee_state == 2) {
+			if (--marquee_pause_ticks <= 0) {
+				marquee_offset = 0;
+				marquee_state = 0;
+				marquee_pause_ticks = 28;
+				draw();
+			}
+		}
+	}
+
 	void key_handler(VMINT event, VMINT keycode) {
+		int old_m_i = m_i;
 		if (vxps.size() && event == VM_KEY_EVENT_UP) {
 			switch (keycode) {
 			case VM_KEY_UP:
@@ -155,6 +255,9 @@ namespace NativeApps::Menu::AppSelector {
 			}
 		}
 
+		if (m_i != old_m_i)
+			reset_marquee();
+
 		if (vxps.size() * b_h > h) {
 			if (b_h * m_i - scroll_pos + b_h > h)
 				scroll_pos = b_h * m_i + b_h - h;
@@ -167,6 +270,7 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void pen_handler(VMINT event, VMINT x, VMINT y) {
+		int old_m_i = m_i;
 		switch (event) {
 			case VM_PEN_EVENT_TAP:
 				m_i = (y + scroll_pos) / b_h;
@@ -203,6 +307,9 @@ namespace NativeApps::Menu::AppSelector {
 
 		if (m_i >= vxps.size())
 			m_i = 0;
+
+		if (m_i != old_m_i)
+			reset_marquee();
 
 		draw();
 	}
