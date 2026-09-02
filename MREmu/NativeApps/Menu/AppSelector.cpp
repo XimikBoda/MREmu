@@ -400,13 +400,13 @@ namespace NativeApps::Menu::AppSelector {
 
 			int act_y = h - c_h - 7;
 			vm_graphic_line(layer_buf, 0, act_y - 3, w, act_y - 3, div_col);
-			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"[1] Delete", 100, txt_dim);
-			int close_w = vm_graphic_get_string_width((VMWSTR)u"[OK] Close");
-			vm_graphic_textout(layer_buf, w - close_w - 8, act_y, (VMWSTR)u"[OK] Close", 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"Delete", 100, txt_dim);
+			int close_w = vm_graphic_get_string_width((VMWSTR)u"Close");
+			vm_graphic_textout(layer_buf, w - close_w - 8, act_y, (VMWSTR)u"Close", 100, 0xFFFF);
 		}
 		else if (show_delete_confirm && m_i >= 0 && m_i < (int)vxps.size()) {
 			const auto& app = vxps[m_i];
-			int sheet_h = c_h * 4 + 28;
+			int sheet_h = (c_h + 6) + 3 * (c_h + 3) + (c_h + 16);
 			if (sheet_h > h - 10)
 				sheet_h = h - 10;
 			int sheet_y = h - sheet_h;
@@ -418,21 +418,31 @@ namespace NativeApps::Menu::AppSelector {
 				}
 			}
 
-			VMUINT16 bg_col = VM_COLOR_888_TO_565(22, 22, 22);
+			VMUINT16 bg_col = VM_COLOR_888_TO_565(20, 20, 20);
 			VMUINT16 border_col = VM_COLOR_888_TO_565(90, 90, 90);
+			VMUINT16 header_bg = VM_COLOR_888_TO_565(36, 36, 36);
 			VMUINT16 div_col = VM_COLOR_888_TO_565(55, 55, 55);
 
 			vm_graphic_fill_rect(layer_buf, 0, sheet_y, w, sheet_h, bg_col, bg_col);
 			vm_graphic_line(layer_buf, 0, sheet_y, w, sheet_y, border_col);
 
-			vm_graphic_textout(layer_buf, 8, sheet_y + 8, (VMWSTR)u"Delete this app?", 100, 0xFFFF);
-			vm_graphic_textout(layer_buf, 8, sheet_y + 8 + c_h + 3, (VMWSTR)app.name.c_str(), 100, VM_COLOR_888_TO_565(200, 200, 200));
+			int title_h = c_h + 6;
+			vm_graphic_fill_rect(layer_buf, 0, sheet_y + 1, w, title_h, header_bg, header_bg);
+			vm_graphic_line(layer_buf, 0, sheet_y + title_h + 1, w, sheet_y + title_h + 1, div_col);
+			vm_graphic_textout(layer_buf, 8, sheet_y + 3, (VMWSTR)u"Warning", 100, 0xFFFF);
+
+			int ty = sheet_y + title_h + 6;
+			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)u"Delete this application?", 100, 0xFFFF);
+			ty += c_h + 3;
+			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)app.name.c_str(), 100, VM_COLOR_888_TO_565(210, 210, 210));
+			ty += c_h + 3;
+			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)u"File will be removed permanently.", 100, VM_COLOR_888_TO_565(160, 160, 160));
 
 			int act_y = h - c_h - 7;
 			vm_graphic_line(layer_buf, 0, act_y - 3, w, act_y - 3, div_col);
-			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"[OK] Delete", 100, 0xFFFF);
-			int cancel_w = vm_graphic_get_string_width((VMWSTR)u"[Back] Cancel");
-			vm_graphic_textout(layer_buf, w - cancel_w - 8, act_y, (VMWSTR)u"[Back] Cancel", 100, 0xFFFF);
+			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"Delete", 100, VM_COLOR_888_TO_565(220, 220, 220));
+			int cancel_w = vm_graphic_get_string_width((VMWSTR)u"Cancel");
+			vm_graphic_textout(layer_buf, w - cancel_w - 8, act_y, (VMWSTR)u"Cancel", 100, 0xFFFF);
 		}
 
 		vm_graphic_flush_layer(&layer_h, 1);
@@ -597,7 +607,7 @@ namespace NativeApps::Menu::AppSelector {
 	void pen_handler(VMINT event, VMINT x, VMINT y) {
 		if (show_delete_confirm) {
 			if (event == VM_PEN_EVENT_TAP) {
-				int sheet_h = c_h * 4 + 28;
+				int sheet_h = (c_h + 6) + 3 * (c_h + 3) + (c_h + 16);
 				if (sheet_h > h - 10)
 					sheet_h = h - 10;
 				int sheet_y = h - sheet_h;
