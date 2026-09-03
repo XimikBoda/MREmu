@@ -1,4 +1,5 @@
 #include "AppSelector.h"
+#include "BottomSheet.h"
 #include "../../MREngine/Image.h"
 #include "../../AppManager.h"
 #include "../../DragAndDrop.h"
@@ -38,8 +39,8 @@ namespace NativeApps::Menu::AppSelector {
 	VMUINT last_scroll_time = 0;
 	bool scrollbar_visible = false;
 
-	bool show_details = false;
-	bool show_delete_confirm = false;
+	BottomSheet details_sheet;
+	BottomSheet confirm_sheet;
 
 	VMUINT16 gray = VM_COLOR_888_TO_565(50, 50, 50);
 
@@ -102,6 +103,8 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void entry() {
+		details_sheet.hide();
+		confirm_sheet.hide();
 		m_i = 0;
 		scroll_pos = 0;
 		touched = false;
@@ -260,8 +263,72 @@ namespace NativeApps::Menu::AppSelector {
 		}
 	}
 
+	void update_confirm_sheet(const vxp& app);
+
+	void update_details_sheet(const vxp& app) {
+		details_sheet.set_title(u"App Details");
+		details_sheet.clear_lines();
+		details_sheet.add_line(u"File: " + app.name);
+		if (!app.app_name.empty())
+			details_sheet.add_line(u"Name: " + app.app_name);
+		if (!app.dev_name.empty())
+			details_sheet.add_line(u"Dev: " + app.dev_name);
+		std::string sz_str = "Size: " + std::to_string((app.file_size + 1023) / 1024) + " KB";
+		details_sheet.add_line(std::u16string(sz_str.begin(), sz_str.end()), 0xFFFF, false);
+		std::string res_str = "Screen: " + std::to_string(w) + "x" + std::to_string(h);
+		details_sheet.add_line(std::u16string(res_str.begin(), res_str.end()), 0xFFFF, false);
+
+		details_sheet.set_left_action(u"Delete", []() {
+			update_confirm_sheet(vxps[m_i]);
+			confirm_sheet.show();
+			reset_marquee();
+			draw();
+		}, VM_COLOR_888_TO_565(180, 180, 180), false);
+
+		details_sheet.set_right_action(u"Close", []() {
+			details_sheet.hide();
+			reset_marquee();
+			draw();
+		}, 0xFFFF, true);
+
+		details_sheet.set_on_dismiss([]() {
+			details_sheet.hide();
+			reset_marquee();
+			draw();
+		});
+	}
+
+	void update_confirm_sheet(const vxp& app) {
+		confirm_sheet.set_title(u"Warning!");
+		confirm_sheet.clear_lines();
+		confirm_sheet.add_line(u"Delete this application?", 0xFFFF, false);
+		confirm_sheet.add_line(app.name, VM_COLOR_888_TO_565(210, 210, 210), true);
+		confirm_sheet.add_line(u"Removal is permanent.", VM_COLOR_888_TO_565(160, 160, 160), false);
+
+		confirm_sheet.set_left_action(u"Delete", []() {
+			vm_file_delete((VMWSTR)vxps[m_i].path.c_str());
+			confirm_sheet.hide();
+			details_sheet.hide();
+			rescan();
+		}, VM_COLOR_888_TO_565(180, 180, 180), true);
+
+		confirm_sheet.set_right_action(u"Cancel", []() {
+			confirm_sheet.hide();
+			reset_marquee();
+			draw();
+		}, 0xFFFF, false);
+
+		confirm_sheet.set_on_dismiss([]() {
+			confirm_sheet.hide();
+			reset_marquee();
+			draw();
+		});
+	}
+
 	void rescan() {
 		if (layer_buf) {
+			details_sheet.hide();
+			confirm_sheet.hide();
 			scan();
 			if (m_i >= (int)vxps.size())
 				m_i = vxps.empty() ? 0 : vxps.size() - 1;
@@ -297,7 +364,7 @@ namespace NativeApps::Menu::AppSelector {
 		g_max_marquee_scroll = 0;
 		vm_graphic_fill_rect(layer_buf, 0, 0, w, h, 0x0000, 0x0000);
 
-		for (int i = 0; i < vxps.size(); ++i) {
+		for (int i = 0; i < (int)vxps.size(); ++i) {
 			int y = b_h * i - scroll_pos;
 			if (y + b_h < 0 || y >= h)
 				continue;
@@ -312,7 +379,7 @@ namespace NativeApps::Menu::AppSelector {
 			int text_y = y + (b_h - c_h) / 2;
 			int max_text_w = w - text_x - 4;
 
-			if (i == m_i && !show_details && !show_delete_confirm)
+			if (i == m_i && !details_sheet.is_open() && !confirm_sheet.is_open())
 				draw_marquee_text(text_x, text_y, max_text_w, b_h, vxps[i].name, 0xFFFF);
 			else
 				vm_graphic_textout(layer_buf, text_x, text_y, (VMWSTR)vxps[i].name.c_str(), 100, 0xFFFF);
@@ -350,110 +417,13 @@ namespace NativeApps::Menu::AppSelector {
 			vm_graphic_textout(layer_buf, 0, c_h*2 + 2, vm_ucs2_string((VMSTR)"Or drag them here to import..."), 100, 0xFFFF);
 		}
 
-		if (show_details && m_i >= 0 && m_i < (int)vxps.size()) {
-			const auto& app = vxps[m_i];
-			int lines_count = 3 + (!app.app_name.empty() ? 1 : 0) + (!app.dev_name.empty() ? 1 : 0);
-			int sheet_h = (c_h + 8) + lines_count * (c_h + 3) + (c_h + 14);
-			if (sheet_h > h - 10)
-				sheet_h = h - 10;
-			int sheet_y = h - sheet_h;
+		// Render modal bottom sheets
+		if (details_sheet.is_open())
+			details_sheet.draw(layer_buf, w, h, c_h, marquee_offset, g_max_marquee_scroll);
 
-			for (int sy = 0; sy < sheet_y; ++sy) {
-				for (int sx = 0; sx < w; ++sx) {
-					VMUINT16* ptr = (VMUINT16*)layer_buf + sy * w + sx;
-					*ptr = (*ptr & 0xF7DE) >> 1;
-				}
-			}
-
-			VMUINT16 bg_col = VM_COLOR_888_TO_565(20, 20, 20);
-			VMUINT16 border_col = VM_COLOR_888_TO_565(80, 80, 80);
-			VMUINT16 header_bg = VM_COLOR_888_TO_565(36, 36, 36);
-			VMUINT16 div_col = VM_COLOR_888_TO_565(55, 55, 55);
-			VMUINT16 txt_dim = VM_COLOR_888_TO_565(180, 180, 180);
-
-			vm_graphic_fill_rect(layer_buf, 0, sheet_y, w, sheet_h, bg_col, bg_col);
-			vm_graphic_line(layer_buf, 0, sheet_y, w, sheet_y, border_col);
-
-			int title_h = c_h + 6;
-			vm_graphic_fill_rect(layer_buf, 0, sheet_y + 1, w, title_h, header_bg, header_bg);
-			vm_graphic_line(layer_buf, 0, sheet_y + title_h + 1, w, sheet_y + title_h + 1, div_col);
-			vm_graphic_textout(layer_buf, 8, sheet_y + 3, (VMWSTR)u"App Details", 100, 0xFFFF);
-
-			int ty = sheet_y + title_h + 6;
-			int pad_x = 8;
-
-			std::u16string f_line = u"File: " + app.name;
-			draw_marquee_text(pad_x, ty, w - 16, c_h, f_line, 0xFFFF);
-			ty += c_h + 3;
-
-			if (!app.app_name.empty()) {
-				std::u16string n_line = u"Name: " + app.app_name;
-				draw_marquee_text(pad_x, ty, w - 16, c_h, n_line, 0xFFFF);
-				ty += c_h + 3;
-			}
-
-			if (!app.dev_name.empty()) {
-				std::u16string d_line = u"Dev: " + app.dev_name;
-				draw_marquee_text(pad_x, ty, w - 16, c_h, d_line, 0xFFFF);
-				ty += c_h + 3;
-			}
-
-			std::string sz_str = "Size: " + std::to_string((app.file_size + 1023) / 1024) + " KB";
-			std::u16string sz_line(sz_str.begin(), sz_str.end());
-			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)sz_line.c_str(), 100, 0xFFFF);
-			ty += c_h + 3;
-
-			std::string res_str = "Screen: " + std::to_string(w) + "x" + std::to_string(h);
-			std::u16string res_line(res_str.begin(), res_str.end());
-			vm_graphic_textout(layer_buf, pad_x, ty, (VMWSTR)res_line.c_str(), 100, 0xFFFF);
-
-			int act_y = h - c_h - 7;
-			vm_graphic_line(layer_buf, 0, act_y - 3, w, act_y - 3, div_col);
-			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"Delete", 100, txt_dim);
-			int close_w = vm_graphic_get_string_width((VMWSTR)u"Close");
-			vm_graphic_textout(layer_buf, w - close_w - 8, act_y, (VMWSTR)u"Close", 100, 0xFFFF);
-		}
-
-		if (show_delete_confirm && m_i >= 0 && m_i < (int)vxps.size()) {
+		if (confirm_sheet.is_open()) {
 			g_max_marquee_scroll = 0;
-			const auto& app = vxps[m_i];
-			int sheet_h = (c_h + 6) + 3 * (c_h + 3) + (c_h + 16);
-			if (sheet_h > h - 10)
-				sheet_h = h - 10;
-			int sheet_y = h - sheet_h;
-
-			for (int sy = 0; sy < sheet_y; ++sy) {
-				for (int sx = 0; sx < w; ++sx) {
-					VMUINT16* ptr = (VMUINT16*)layer_buf + sy * w + sx;
-					*ptr = (*ptr & 0xF7DE) >> 1;
-				}
-			}
-
-			VMUINT16 bg_col = VM_COLOR_888_TO_565(20, 20, 20);
-			VMUINT16 border_col = VM_COLOR_888_TO_565(90, 90, 90);
-			VMUINT16 header_bg = VM_COLOR_888_TO_565(36, 36, 36);
-			VMUINT16 div_col = VM_COLOR_888_TO_565(55, 55, 55);
-
-			vm_graphic_fill_rect(layer_buf, 0, sheet_y, w, sheet_h, bg_col, bg_col);
-			vm_graphic_line(layer_buf, 0, sheet_y, w, sheet_y, border_col);
-
-			int title_h = c_h + 6;
-			vm_graphic_fill_rect(layer_buf, 0, sheet_y + 1, w, title_h, header_bg, header_bg);
-			vm_graphic_line(layer_buf, 0, sheet_y + title_h + 1, w, sheet_y + title_h + 1, div_col);
-			vm_graphic_textout(layer_buf, 8, sheet_y + 3, (VMWSTR)u"Warning", 100, 0xFFFF);
-
-			int ty = sheet_y + title_h + 6;
-			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)u"Delete this application?", 100, 0xFFFF);
-			ty += c_h + 3;
-			draw_marquee_text(8, ty, w - 16, c_h, app.name, VM_COLOR_888_TO_565(210, 210, 210));
-			ty += c_h + 3;
-			vm_graphic_textout(layer_buf, 8, ty, (VMWSTR)u"File will be removed permanently.", 100, VM_COLOR_888_TO_565(160, 160, 160));
-
-			int act_y = h - c_h - 7;
-			vm_graphic_line(layer_buf, 0, act_y - 3, w, act_y - 3, div_col);
-			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)u"Delete", 100, VM_COLOR_888_TO_565(220, 220, 220));
-			int cancel_w = vm_graphic_get_string_width((VMWSTR)u"Cancel");
-			vm_graphic_textout(layer_buf, w - cancel_w - 8, act_y, (VMWSTR)u"Cancel", 100, 0xFFFF);
+			confirm_sheet.draw(layer_buf, w, h, c_h, marquee_offset, g_max_marquee_scroll);
 		}
 
 		vm_graphic_flush_layer(&layer_h, 1);
@@ -507,40 +477,13 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void key_handler(VMINT event, VMINT keycode) {
-		if (show_delete_confirm) {
-			if (event == VM_KEY_EVENT_UP) {
-				if (keycode == VM_KEY_OK || keycode == VM_KEY_LEFT_SOFTKEY) {
-					vm_file_delete((VMWSTR)vxps[m_i].path.c_str());
-					show_delete_confirm = false;
-					show_details = false;
-					rescan();
-					return;
-				}
-				else if (keycode == VM_KEY_BACK || keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_CLEAR) {
-					show_delete_confirm = false;
-					reset_marquee();
-					draw();
-					return;
-				}
-			}
+		if (confirm_sheet.is_open()) {
+			confirm_sheet.handle_key(event, keycode);
 			return;
 		}
 
-		if (show_details) {
-			if (event == VM_KEY_EVENT_UP) {
-				if (keycode == VM_KEY_LEFT_SOFTKEY || keycode == VM_KEY_NUM1) {
-					show_delete_confirm = true;
-					reset_marquee();
-					draw();
-					return;
-				}
-				else if (keycode == VM_KEY_OK || keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_BACK || keycode == VM_KEY_CLEAR) {
-					show_details = false;
-					reset_marquee();
-					draw();
-					return;
-				}
-			}
+		if (details_sheet.is_open()) {
+			details_sheet.handle_key(event, keycode);
 			return;
 		}
 
@@ -557,9 +500,12 @@ namespace NativeApps::Menu::AppSelector {
 					m_i = 0;
 				break;
 			case VM_KEY_LEFT_SOFTKEY:
-				show_details = true;
-				reset_marquee();
-				draw();
+				if (!vxps.empty()) {
+					update_details_sheet(vxps[m_i]);
+					details_sheet.show();
+					reset_marquee();
+					draw();
+				}
 				return;
 			case VM_KEY_OK:
 				DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
@@ -611,72 +557,13 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void pen_handler(VMINT event, VMINT x, VMINT y) {
-		if (show_delete_confirm) {
-			if (event == VM_PEN_EVENT_TAP) {
-				int sheet_h = (c_h + 6) + 3 * (c_h + 3) + (c_h + 16);
-				if (sheet_h > h - 10)
-					sheet_h = h - 10;
-				int sheet_y = h - sheet_h;
-
-				if (y < sheet_y) {
-					show_delete_confirm = false;
-					reset_marquee();
-					draw();
-					return;
-				}
-
-				int act_y = h - c_h - 12;
-				if (y >= act_y) {
-					if (x < w / 2) {
-						vm_file_delete((VMWSTR)vxps[m_i].path.c_str());
-						show_delete_confirm = false;
-						show_details = false;
-						rescan();
-						return;
-					}
-					else {
-						show_delete_confirm = false;
-						reset_marquee();
-						draw();
-						return;
-					}
-				}
-			}
+		if (confirm_sheet.is_open()) {
+			confirm_sheet.handle_pen(event, x, y, w, h, c_h);
 			return;
 		}
 
-		if (show_details) {
-			if (event == VM_PEN_EVENT_TAP) {
-				const auto& app = vxps[m_i];
-				int lines_count = 3 + (!app.app_name.empty() ? 1 : 0) + (!app.dev_name.empty() ? 1 : 0);
-				int sheet_h = (c_h + 8) + lines_count * (c_h + 3) + (c_h + 14);
-				if (sheet_h > h - 10)
-					sheet_h = h - 10;
-				int sheet_y = h - sheet_h;
-
-				if (y < sheet_y) {
-					show_details = false;
-					reset_marquee();
-					draw();
-					return;
-				}
-
-				int act_y = h - c_h - 12;
-				if (y >= act_y) {
-					if (x < w / 2) {
-						show_delete_confirm = true;
-						reset_marquee();
-						draw();
-						return;
-					}
-					else {
-						show_details = false;
-						reset_marquee();
-						draw();
-						return;
-					}
-				}
-			}
+		if (details_sheet.is_open()) {
+			details_sheet.handle_pen(event, x, y, w, h, c_h);
 			return;
 		}
 
@@ -708,7 +595,8 @@ namespace NativeApps::Menu::AppSelector {
 				int item = (y + scroll_pos) / b_h;
 				if (item >= 0 && item < (int)vxps.size()) {
 					m_i = item;
-					show_details = true;
+					update_details_sheet(vxps[m_i]);
+					details_sheet.show();
 					reset_marquee();
 					DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
 					draw();
