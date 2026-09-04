@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <cstdint>
 #include <vmgraph.h>
 
 const char* const CANVAS_MAGIC = "MTKCANVAS"; // Do we have an app that checks for this?
