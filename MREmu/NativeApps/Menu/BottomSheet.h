@@ -32,6 +32,9 @@ private:
 
 	std::function<void()> m_on_dismiss;
 
+	bool m_left_pressed = false;
+	bool m_right_pressed = false;
+
 public:
 	BottomSheet() = default;
 
@@ -62,8 +65,8 @@ public:
 	}
 
 	bool is_open() const { return m_open; }
-	void show() { m_open = true; }
-	void hide() { m_open = false; }
+	void show() { m_open = true; m_left_pressed = false; m_right_pressed = false; }
+	void hide() { m_open = false; m_left_pressed = false; m_right_pressed = false; }
 
 	int calculate_height(int char_h, int screen_h) const;
 

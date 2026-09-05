@@ -21,6 +21,7 @@
 #include "MREngine/IO.h"
 #include "MREngine/SIM.h"
 #include "MREngine/CharSet.h"
+#include "MREngine/SystemTextBox.h"
 #include <cmdparser.hpp>
 
 #include "NativeApps/Menu/AppSelector.h"
@@ -57,12 +58,71 @@ static void open_folder(const fs::path& p) {
 #endif
 }
 
+static void clear_user_data(const fs::path& root_fs) {
+	std::error_code ec;
+	if (!fs::exists(root_fs, ec))
+		return;
+
+	std::vector<fs::path> files_to_delete;
+	for (auto it = fs::recursive_directory_iterator(root_fs, ec); it != fs::recursive_directory_iterator(); it.increment(ec)) {
+		if (ec) break;
+		if (it->is_regular_file(ec)) {
+			std::string ext = it->path().extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+			if (ext != ".vxp") {
+				files_to_delete.push_back(it->path());
+			}
+		}
+	}
+
+	for (const auto& f : files_to_delete) {
+		fs::remove(f, ec);
+	}
+
+	std::vector<fs::path> dirs_to_check;
+	for (auto it = fs::recursive_directory_iterator(root_fs, ec); it != fs::recursive_directory_iterator(); it.increment(ec)) {
+		if (ec) break;
+		if (it->is_directory(ec)) {
+			dirs_to_check.push_back(it->path());
+		}
+	}
+
+	std::sort(dirs_to_check.begin(), dirs_to_check.end(), [](const fs::path& a, const fs::path& b) {
+		return a.string().length() > b.string().length();
+	});
+
+	for (const auto& d : dirs_to_check) {
+		std::string s = d.generic_string();
+		if (s == "fs/c" || s == "fs/d" || s == "fs/e" || s == "fs/e/mre")
+			continue;
+		if (fs::is_empty(d, ec)) {
+			fs::remove(d, ec);
+		}
+	}
+
+	fs::create_directories(root_fs / "c", ec);
+	fs::create_directories(root_fs / "d", ec);
+	fs::create_directories(root_fs / "e" / "mre", ec);
+}
+
 sf::Clock global_clock;
 
 bool work = true;
 
+static std::mutex g_error_mutex;
 std::string error_message = "";
-bool show_error = false;
+std::atomic<bool> show_error = false;
+std::atomic<bool> g_request_hard_reset = false;
+
+void trigger_hard_reset_with_error(const std::string& err_msg) {
+	{
+		std::lock_guard<std::mutex> lock(g_error_mutex);
+		error_message = err_msg;
+	}
+	show_error = true;
+	g_request_hard_reset = true;
+	Cpu::stop();
+}
 
 #ifdef ANDROID
 #include <spdlog/sinks/android_sink.h>
@@ -119,6 +179,8 @@ int main(int argc, char** argv) {
 	}
 	parser.run_and_exit_if_error();
 	app_path = parser.get<std::string>("");
+	if (app_path.size() >= 2 && app_path.front() == '"' && app_path.back() == '"')
+		app_path = app_path.substr(1, app_path.size() - 2);
 	path_is_local = parser.get<bool>("l");
 
 	if (app_path.size())
@@ -148,6 +210,7 @@ int main(int argc, char** argv) {
 	MREngine::System::init();
 	MREngine::CharSet::init();
 	MREngine::AppAudio::init();
+	MREngine::SystemTextBox::init();
 	MREngine::Graphic graphic;
 
 #ifndef ANDROID
@@ -221,6 +284,11 @@ int main(int argc, char** argv) {
 
 	auto repaint_device = [&]() {
 		win_device.clear(sf::Color::Black);
+		if (MREngine::SystemTextBox::is_open()) {
+			MREngine::SystemTextBox::draw((VMUINT8*)graphic.screen.data(), graphic.width, graphic.height);
+			graphic.screen_changed = true;
+			graphic.update_screen();
+		}
 		screen_sp.setTexture(graphic.screen_tex, true);
 		win_device.draw(screen_sp);
 
@@ -308,15 +376,15 @@ int main(int argc, char** argv) {
 	sf::Clock deltaClock;
 	sf::Event event;
 
-	bool request_hard_reset = false;
+	bool request_clear_user_data = false;
 
 	while (win_device.isOpen()
 #ifndef ANDROID
         && win_debug.isOpen()
 #endif
     ) {
-		if (request_hard_reset) {
-			request_hard_reset = false;
+		if (g_request_hard_reset) {
+			g_request_hard_reset = false;
 
 			work = false;
 			Cpu::stop();
@@ -324,6 +392,11 @@ int main(int argc, char** argv) {
 				second_thread.join();
 
 			appManager.reset();
+
+			if (request_clear_user_data) {
+				request_clear_user_data = false;
+				clear_user_data("fs");
+			}
 
 			Cpu::deinit();
 			Memory::deinit();
@@ -336,6 +409,7 @@ int main(int argc, char** argv) {
 			MREngine::CharSet::init();
 			MREngine::AppAudio::init();
 			MREngine::IO::init();
+			MREngine::SystemTextBox::init();
 
 			graphic.reset();
 
@@ -368,6 +442,11 @@ int main(int argc, char** argv) {
 #endif
 
 		while (win_device.pollEvent(event)) {
+			if (MREngine::SystemTextBox::is_open()) {
+				if (MREngine::SystemTextBox::handle_sfml_event(event, graphic.width, graphic.height, scale)) {
+					continue;
+				}
+			}
 			keyboard.event(event);
 			touch.sf_event(event);
 			switch (event.type) {
@@ -391,8 +470,25 @@ int main(int argc, char** argv) {
 			show_error = false; // Only call OpenPopup once
 		}
 		if (ImGui::BeginPopupModal("VXP Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-			ImGui::Text("%s", error_message.c_str());
-			if (ImGui::Button("OK", ImVec2(120, 0))) {
+			std::string current_err;
+			{
+				std::lock_guard<std::mutex> lock(g_error_mutex);
+				current_err = error_message;
+			}
+			ImGui::TextUnformatted("The emulator encountered an error and was reset:");
+			ImGui::Spacing();
+
+			// Read-only multi-line text input with monospace-like selectable area
+			ImVec2 text_size(520, std::min(300.f, std::max(120.f, ImGui::GetTextLineHeightWithSpacing() * 15)));
+			ImGui::InputTextMultiline("##error_details", const_cast<char*>(current_err.c_str()),
+				current_err.size() + 1, text_size, ImGuiInputTextFlags_ReadOnly);
+
+			ImGui::Spacing();
+			if (ImGui::Button("Copy to Clipboard", ImVec2(150, 0))) {
+				ImGui::SetClipboardText(current_err.c_str());
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("OK", ImVec2(100, 0))) {
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::EndPopup();
@@ -433,10 +529,13 @@ int main(int argc, char** argv) {
 		ImGui::End();
 
 		ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-		ImGui::SetNextWindowSize(ImVec2(175, 175), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(175, 205), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Control")) {
 			if (ImGui::Button("Hard Reset"))
-				request_hard_reset = true;
+				g_request_hard_reset = true;
+			if (ImGui::Button("Clear user data")) {
+				ImGui::OpenPopup("Clear User Data");
+			}
 			if (ImGui::Button("Open c:/ (fs/c)"))
 				open_folder("fs/c");
 			if (ImGui::Button("Open d:/ (fs/d)"))
@@ -445,6 +544,21 @@ int main(int argc, char** argv) {
 				open_folder("fs/e");
 			if (ImGui::Button("Open e:/mre (fs/e/mre)"))
 				open_folder("fs/e/mre");
+
+			if (ImGui::BeginPopupModal("Clear User Data", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+				ImGui::Text("Are you sure you want to clear all user data?\nThis will erase all saves, settings, and caches,\nwhile keeping all VXP files intact.");
+				ImGui::Separator();
+				if (ImGui::Button("Yes, Clear Data", ImVec2(130, 0))) {
+					request_clear_user_data = true;
+					g_request_hard_reset = true;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel", ImVec2(100, 0))) {
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
 		}
 		ImGui::End();
 

@@ -10,9 +10,12 @@
 #include "MREngine/Image.h"
 #include "MREngine/Resources.h"
 #include "MREngine/Log.h"
+#include "MREngine/System.h"
+#include "MREngine/SystemTextBox.h"
 
 #include "Cpu.h"
 #include "GDB.h"
+#include "MREmu.h"
 #include <string>
 #include <iostream>
 #include <thread>
@@ -32,7 +35,11 @@
 #include <vmmm.h>
 #include <vmbitstream.h>
 #include <vmsensor.h>
+#include <vmio.h>
 
+VMINT vm_get_cache_free_space(vm_cache_t* cache) {
+	return 16 * 1024 * 1024;
+}
 
 VMINT vm_get_res_header();//tmp
 VMWSTR vm_ucs2_string(VMSTR s);
@@ -137,6 +144,16 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_free), [](uc_engine* uc) {
 			vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+		}},
+		{FUNCN(vm_global_get_max_alloc_size), [](uc_engine* uc) {
+			write_ret(uc, vm_global_get_max_alloc_size());
+		}},
+		{FUNCN(vm_global_malloc), [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_global_malloc(read_arg(uc, 0))));
+		}},
+		{FUNCN(vm_global_free), [](uc_engine* uc) {
+			uint32_t arg0 = read_arg(uc, 0);
+			vm_global_free(arg0 ? (void*)ADDRESS_FROM_EMU(arg0) : NULL);
 		}},
 		{FUNCN(vm_reg_sysevt_callback), [](uc_engine* uc) {
 			vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
@@ -351,18 +368,65 @@ namespace Bridge {
 		{FUNCN(vm_get_removeable_driver), [](uc_engine* uc) {
 			write_ret(uc, vm_get_removable_driver());
 		}},
+		{"vm_get_removable_driver", NULL, [](uc_engine* uc) {
+			write_ret(uc, vm_get_removable_driver());
+		}},
 		{FUNCN(vm_get_system_driver), [](uc_engine* uc) {
 			write_ret(uc, vm_get_system_driver());
 		}},
 		{FUNCN(vm_get_disk_free_space), [](uc_engine* uc) {
-			write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+			uint32_t arg0 = read_arg(uc, 0);
+			write_ret(uc, vm_get_disk_free_space(arg0 ? (VMWSTR)ADDRESS_FROM_EMU(arg0) : NULL));
 		}},
 		{FUNCN(vm_get_disk_info), [](uc_engine* uc) {
+			uint32_t arg0 = read_arg(uc, 0);
+			uint32_t arg1 = read_arg(uc, 1);
 			write_ret(uc, vm_get_disk_info(
-				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(vm_fs_disk_info*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				arg0 ? (VMCHAR*)ADDRESS_FROM_EMU(arg0) : NULL,
+				arg1 ? (vm_fs_disk_info*)ADDRESS_FROM_EMU(arg1) : NULL,
 				(vm_fs_di_enum)read_arg(uc, 2)
 			));
+		}},
+		{FUNCN(vm_sys_file_open), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_open(
+				read_arg(uc, 0),
+				read_arg(uc, 1)
+			));
+		}},
+		{FUNCN(vm_sys_file_seek), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_seek(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2)
+			));
+		}},
+		{FUNCN(vm_sys_file_read), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_read(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+			));
+		}},
+		{FUNCN(vm_sys_file_write), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_write(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+			));
+		}},
+		{FUNCN(vm_sys_file_close), [](uc_engine* uc) {
+			vm_sys_file_close(read_arg(uc, 0));
+		}},
+		{FUNCN(vm_sys_file_delete), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_delete());
+		}},
+		{FUNCN(vm_sys_file_get_space), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_get_space());
+		}},
+		{FUNCN(vm_get_cache_free_space), [](uc_engine* uc) {
+			write_ret(uc, vm_get_cache_free_space((vm_cache_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 		{FUNCN(vm_is_support_keyborad), [](uc_engine* uc) {
 			write_ret(uc, vm_is_support_keyborad());
@@ -410,6 +474,54 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_sim_get_prefer_sim_card), [](uc_engine* uc) {
 			write_ret(uc, vm_sim_max_card_count());
+		}},
+
+
+		// Network & Sockets
+		{FUNCN(vm_is_support_wifi), [](uc_engine* uc) {
+			write_ret(uc, vm_is_support_wifi());
+		}},
+		{FUNCN(vm_wifi_is_connected), [](uc_engine* uc) {
+			write_ret(uc, vm_wifi_is_connected());
+		}},
+		{"vm_tcp_wifi_connected", (void*)vm_tcp_wifi_connected, [](uc_engine* uc) {
+			write_ret(uc, vm_tcp_wifi_connected());
+		}},
+		{FUNCN(vm_soc_get_last_error), [](uc_engine* uc) {
+			write_ret(uc, vm_soc_get_last_error());
+		}},
+		{FUNCN(vm_soc_get_host_by_name), [](uc_engine* uc) {
+			write_ret(uc, vm_soc_get_host_by_name(
+				read_arg(uc, 0),
+				(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+				(VMINT(*)(vm_soc_dns_result*))read_arg(uc, 3)
+			));
+		}},
+		{FUNCN(vm_tcp_connect), [](uc_engine* uc) {
+			write_ret(uc, vm_tcp_connect(
+				(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(void(*)(VMINT, VMINT))read_arg(uc, 3)
+			));
+		}},
+		{FUNCN(vm_tcp_read), [](uc_engine* uc) {
+			write_ret(uc, vm_tcp_read(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2)
+			));
+		}},
+		{FUNCN(vm_tcp_write), [](uc_engine* uc) {
+			write_ret(uc, vm_tcp_write(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2)
+			));
+		}},
+		{FUNCN(vm_tcp_close), [](uc_engine* uc) {
+			vm_tcp_close(read_arg(uc, 0));
 		}},
 
 
@@ -1382,52 +1494,6 @@ namespace Bridge {
 			mremu_media_stop();
 		}},
 
-
-		// Sock
-		{FUNCN(vm_is_support_wifi), [](uc_engine* uc) {
-			write_ret(uc, vm_is_support_wifi());
-		}},
-		{FUNCN(vm_wifi_is_connected), [](uc_engine* uc) {
-			write_ret(uc, vm_wifi_is_connected());
-		}},
-		{FUNCN(vm_soc_get_host_by_name), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_soc_get_host_by_name(
-					read_arg(uc, 0),
-					(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					(VMINT(*)(vm_soc_dns_result*))read_arg(uc, 3)
-				));
-		}},
-		{FUNCN(vm_tcp_connect), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_tcp_connect(
-					(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					(void (*)(VMINT, VMINT))read_arg(uc, 3)
-				));
-		}},
-		{FUNCN(vm_tcp_close), [](uc_engine* uc) {
-			vm_tcp_close(read_arg(uc, 0));
-		}},
-		{FUNCN(vm_tcp_read), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_tcp_read(
-					read_arg(uc, 0),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2)
-				));
-		}},
-		{FUNCN(vm_tcp_write), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_tcp_write(
-					read_arg(uc, 0),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2)
-				));
-		}},
-
 		// Sensor
 		{FUNCN(vm_srv_sensor_is_available), [](uc_engine* uc) {
 			vm_srv_sensor_is_available((vm_srv_sensor_type_enum)read_arg(uc, 0));
@@ -1442,6 +1508,44 @@ namespace Bridge {
 		}},
 		{FUNCN(strtoi), [](uc_engine* uc) {
 			write_ret(uc, strtoi((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+
+		// Input Text / Editor
+		{"vm_input_text", NULL, [](uc_engine* uc) {
+			uint32_t cb = read_arg(uc, 0);
+			write_ret(uc, MREngine::SystemTextBox::open(nullptr, 250, 1, cb));
+		}},
+		{"vm_input_text2", NULL, [](uc_engine* uc) {
+			VMWSTR def_str = (VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0));
+			VMINT def_input_method = read_arg(uc, 1);
+			uint32_t cb = read_arg(uc, 2);
+			write_ret(uc, MREngine::SystemTextBox::open(def_str, 250, def_input_method, cb));
+		}},
+		{"vm_input_text3", NULL, [](uc_engine* uc) {
+			VMWSTR def_str = (VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0));
+			VMINT max_size = read_arg(uc, 1);
+			VMINT input_method = read_arg(uc, 2);
+			uint32_t cb = read_arg(uc, 3);
+			write_ret(uc, MREngine::SystemTextBox::open(def_str, max_size, input_method, cb));
+		}},
+		{"vm_set_app_desired_input_mode", NULL, [](uc_engine* uc) {
+		}},
+		{"vm_input_close_screen", NULL, [](uc_engine* uc) {
+			MREngine::SystemTextBox::close_by_app();
+		}},
+		{"vm_input_move_cursor_to_start", NULL, [](uc_engine* uc) {
+			MREngine::SystemTextBox::move_cursor_to_start();
+		}},
+		{"vm_input_set_vk_default_enlarge", NULL, [](uc_engine* uc) {
+		}},
+		{"vm_input_set_editor_title", NULL, [](uc_engine* uc) {
+			VMWSTR title = (VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0));
+			if (title) {
+				MREngine::SystemTextBox::set_title((char16_t*)title);
+				write_ret(uc, 1);
+			} else {
+				write_ret(uc, 0);
+			}
 		}},
 
 
@@ -1576,14 +1680,24 @@ namespace Bridge {
 		//write_reg(uc, UC_ARM_REG_LR, (uint64_t)stack_p);
 		write_reg(uc, UC_ARM_REG_LR, (uint64_t)idle_p);
 
+		uint32_t cpsr = read_reg(uc, UC_ARM_REG_CPSR);
+		cpsr = (cpsr & ~(1L << 5)) | ((adr & 1) ? (1L << 5) : 0);
+		write_reg(uc, UC_ARM_REG_CPSR, cpsr);
+
 		if (!GDB::gdb_mode) {
 			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, 0);
 			if (err) {
+				std::string reg_dump = Cpu::dumpREG(uc);
+				std::string app_name = Cpu::get_app_name();
+				std::string err_line = fmt::format("[{}] [error] uc_emu_start returned {} ({})\n",
+					app_name, (int)err, uc_strerror(err));
+				std::string full_err = err_line + reg_dump;
+
 				spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
-				Cpu::printREG(uc);
-				while (1) {
-					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-				}
+				printf("%s\n", reg_dump.c_str());
+
+				trigger_hard_reset_with_error(full_err);
+				return 0;
 			}
 		}
 		else

@@ -4,7 +4,7 @@
 #include <vmgraph.h>
 #include <cstring>
 
-extern MREngine::Graphic* graphic;
+using MREngine::graphic;
 
 ColorRGBA read_16_color(const void* buf, int idx, int trans_color) {
 	uint16_t c = ((const uint16_t*)buf)[idx];

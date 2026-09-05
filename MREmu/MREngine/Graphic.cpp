@@ -7,7 +7,9 @@
 #include <vmgraph.h>
 #include <vmpromng.h>
 
-MREngine::Graphic* graphic = 0; // Do I really need this?
+namespace MREngine {
+	Graphic* graphic = 0;
+}
 
 MREngine::RenderBox::RenderBox(int st_x, int st_y, int end_x, int end_y) {
 	this->st_x = st_x;
@@ -317,16 +319,16 @@ void MREngine::AppGraphic::imgui_layers() {
 
 VMINT vm_graphic_get_screen_width(void)
 {
-	if (graphic)
-		return graphic->width;
+	if (MREngine::graphic)
+		return MREngine::graphic->width;
 	else
 		return 0;
 }
 
 VMINT vm_graphic_get_screen_height(void)
 {
-	if (graphic)
-		return graphic->height;
+	if (MREngine::graphic)
+		return MREngine::graphic->height;
 	else
 		return 0;
 }
@@ -857,7 +859,7 @@ void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 void vm_graphic_reset_clip(void) {
 	auto& clip = get_current_app_graphic().clip;
 
-	clip = { 0, 0, (short)graphic->width, (short)graphic->height, 0 };
+	clip = { 0, 0, (short)(MREngine::graphic ? MREngine::graphic->width : 240), (short)(MREngine::graphic ? MREngine::graphic->height : 320), 0 };
 }
 
 void vm_graphic_flush_screen(void) {

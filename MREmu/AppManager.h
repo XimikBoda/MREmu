@@ -41,6 +41,12 @@ struct system_event_el {
 	int param;
 };
 
+struct input_event_el {
+	uint32_t callback;
+	int state;
+	uint32_t text_emu_addr;
+};
+
 class AppManager {
 	std::queue<launch_el> launch_queue;
 	std::mutex launch_queue_mutex;
@@ -59,6 +65,9 @@ class AppManager {
 
 	std::queue<system_event_el> system_events_queue;
 	std::mutex system_events_queue_mutex;
+
+	std::queue<input_event_el> input_events_queue;
+	std::mutex input_events_queue_mutex;
 
 	void fix_mtone_wireless();
 public:
@@ -85,9 +94,14 @@ public:
 	void add_system_event(int phandle, int message, int param);
 	void process_system_events();
 
+	void add_input_event(uint32_t callback, int state, uint32_t text_emu_addr);
+	void process_input_events();
+
 	void update(size_t delta_ms);
 	void reset();
 
 	App* get_active_app();
 	App* get_current_work_app_id();
 };
+
+void add_input_event(uint32_t callback, int state, uint32_t text_emu_addr);

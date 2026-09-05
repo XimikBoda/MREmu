@@ -28,6 +28,8 @@ namespace MREngine {
 		~Graphic();
 	};
 
+	extern Graphic* graphic;
+
 	struct layer {
 		void* buf = 0;
 		int x = 0, y = 0, w = 0, h = 0;

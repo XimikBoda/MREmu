@@ -13,6 +13,7 @@
 #include <vmpromng.h>
 #include <vmstdlib.h>
 #include <vmtimer.h>
+#include <algorithm>
 
 VMWSTR vm_ucs2_string(VMSTR s);
 extern AppManager* g_appManager;
@@ -53,8 +54,10 @@ namespace NativeApps::Menu::AppSelector {
 		size_t file_size = 0;
 		std::u16string app_name;
 		std::u16string dev_name;
+		bool is_dir = false;
 	};
 
+	std::u16string current_dir = u"e:\\mre\\";
 	std::vector<vxp> vxps;
 
 	void scan();
@@ -138,113 +141,185 @@ namespace NativeApps::Menu::AppSelector {
 				vm_graphic_release_canvas_FIX(v.img);
 		vxps.clear();
 
-		vm_fileinfo_ext direntry;
+		std::vector<vxp> dir_entries;
+		std::vector<vxp> vxp_entries;
 
-		for (int ret = 0, find_h = vm_find_first_ext((VMWSTR)u"e:\\mre\\*.vxp", &direntry);
+		// Add ".." entry if not at root folder
+		if (current_dir != u"e:\\mre\\" && current_dir != u"e:\\mre") {
+			std::u16string parent_dir = current_dir;
+			if (!parent_dir.empty() && parent_dir.back() == u'\\')
+				parent_dir.pop_back();
+			size_t last_slash = parent_dir.find_last_of(u"\\/");
+			if (last_slash != std::u16string::npos)
+				parent_dir = parent_dir.substr(0, last_slash + 1);
+			else
+				parent_dir = u"e:\\mre\\";
+
+			vxp up_dir;
+			up_dir.name = u".. (Back)";
+			up_dir.path = parent_dir;
+			up_dir.is_dir = true;
+			dir_entries.push_back(up_dir);
+		}
+
+		vm_fileinfo_ext direntry;
+		std::u16string pattern = current_dir;
+		if (pattern.empty() || pattern.back() != u'\\')
+			pattern += u'\\';
+		pattern += u"*";
+
+		for (int ret = 0, find_h = vm_find_first_ext((VMWSTR)pattern.c_str(), &direntry);
 			find_h >= 0 && !ret;
 			ret = vm_find_next_ext(find_h, &direntry))
 		{
-			std::u16string path = u"e:\\mre\\";
 			std::u16string name = (char16_t*)direntry.filefullname;
-			path += name;
+			if (name == u"." || name == u"..")
+				continue;
 
-			VMINT_CANVAS img = 0;
-			size_t file_size = 0;
-			std::u16string app_name;
-			std::u16string dev_name;
+			std::u16string item_path = current_dir;
+			if (item_path.empty() || item_path.back() != u'\\')
+				item_path += u'\\';
+			item_path += name;
 
-			int f = vm_file_open((VMWSTR)path.c_str(), MODE_READ, 1);
-			if (f >= 0) {
-				VMUINT size = 0, rsize = 0;
-				vm_file_getfilesize(f, &size);
-				file_size = size;
+			bool is_folder = (direntry.attributes & VM_FS_ATTR_DIR) != 0;
 
-				std::vector<uint8_t> data(size);
-				vm_file_read(f, data.data(), size, &rsize);
-
-				vm_file_close(f);
-
-				std::string_view data_view(reinterpret_cast<const char*>(data.data()), data.size());
-				size_t pos = data_view.find("VREAPPLOGO09BVRE");
-
-				if (pos != std::string_view::npos) {
-					int img_size = *(int*)(data.data() + pos + 16 + 3);
-					VMUINT8* img_data = (data.data() + pos + 16 + 3 + 4);
-					if (data_view.substr(pos + 16, 3) == "PNG")
-						img_data += 8;
-
-					img = vm_graphic_load_image_resized_FIX(img_data, img_size, img_wh, img_wh);
+			if (is_folder) {
+				vxp d;
+				d.name = name;
+				d.path = item_path + u"\\";
+				d.is_dir = true;
+				dir_entries.push_back(d);
+			}
+			else {
+				// Check for .vxp extension (case-insensitive)
+				if (name.size() >= 4) {
+					std::u16string ext = name.substr(name.size() - 4);
+					for (auto& c : ext) c = (char16_t)std::tolower((char)c);
+					if (ext != u".vxp")
+						continue;
+				}
+				else {
+					continue;
 				}
 
-				if (data.size() >= 12) {
-					uint32_t tags_offset = *(uint32_t*)&data[data.size() - 12];
-					if (tags_offset < data.size() - 8) {
-						uint32_t cur = tags_offset;
-						bool is_ucs2 = false;
+				VMINT_CANVAS img = 0;
+				size_t file_size = 0;
+				std::u16string app_name;
+				std::u16string dev_name;
 
-						uint32_t scan_cur = cur;
-						while (scan_cur + 8 < data.size()) {
-							uint32_t tag_id = *(uint32_t*)&data[scan_cur];
-							uint32_t tag_len = *(uint32_t*)&data[scan_cur + 4];
-							scan_cur += 8;
-							if (tag_id == 0 || scan_cur + tag_len > data.size())
-								break;
-							if (tag_id == VM_CE_INFO_CHARSET && tag_len >= 4) {
-								is_ucs2 = (*(uint32_t*)&data[scan_cur] != 0);
-							}
-							scan_cur += tag_len;
-						}
+				int f = vm_file_open((VMWSTR)item_path.c_str(), MODE_READ, 1);
+				if (f >= 0) {
+					VMUINT size = 0, rsize = 0;
+					vm_file_getfilesize(f, &size);
+					file_size = size;
 
-						while (cur + 8 < data.size()) {
-							uint32_t tag_id = *(uint32_t*)&data[cur];
-							uint32_t tag_len = *(uint32_t*)&data[cur + 4];
-							cur += 8;
-							if (tag_id == 0 || cur + tag_len > data.size())
-								break;
-							if (tag_id == VM_CE_INFO_NAME) {
-								if (is_ucs2)
-									app_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
-								else {
-									std::string s((char*)&data[cur], tag_len);
-									app_name = std::u16string(s.begin(), s.end());
+					std::vector<uint8_t> data(size);
+					vm_file_read(f, data.data(), size, &rsize);
+
+					vm_file_close(f);
+
+					std::string_view data_view(reinterpret_cast<const char*>(data.data()), data.size());
+					size_t pos = data_view.find("VREAPPLOGO09BVRE");
+
+					if (pos != std::string_view::npos) {
+						int img_size = *(int*)(data.data() + pos + 16 + 3);
+						VMUINT8* img_data = (data.data() + pos + 16 + 3 + 4);
+						if (data_view.substr(pos + 16, 3) == "PNG")
+							img_data += 8;
+
+						img = vm_graphic_load_image_resized_FIX(img_data, img_size, img_wh, img_wh);
+					}
+
+					if (data.size() >= 12) {
+						uint32_t tags_offset = *(uint32_t*)&data[data.size() - 12];
+						if (tags_offset < data.size() - 8) {
+							uint32_t cur = tags_offset;
+							bool is_ucs2 = false;
+
+							uint32_t scan_cur = cur;
+							while (scan_cur + 8 < data.size()) {
+								uint32_t tag_id = *(uint32_t*)&data[scan_cur];
+								uint32_t tag_len = *(uint32_t*)&data[scan_cur + 4];
+								scan_cur += 8;
+								if (tag_id == 0 || scan_cur + tag_len > data.size())
+									break;
+								if (tag_id == VM_CE_INFO_CHARSET && tag_len >= 4) {
+									is_ucs2 = (*(uint32_t*)&data[scan_cur] != 0);
 								}
+								scan_cur += tag_len;
 							}
-							else if (tag_id == VM_CE_INFO_DEV) {
-								if (is_ucs2)
-									dev_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
-								else {
-									std::string s((char*)&data[cur], tag_len);
-									dev_name = std::u16string(s.begin(), s.end());
+
+							while (cur + 8 < data.size()) {
+								uint32_t tag_id = *(uint32_t*)&data[cur];
+								uint32_t tag_len = *(uint32_t*)&data[cur + 4];
+								cur += 8;
+								if (tag_id == 0 || cur + tag_len > data.size())
+									break;
+								if (tag_id == VM_CE_INFO_NAME) {
+									if (is_ucs2)
+										app_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
+									else {
+										std::string s((char*)&data[cur], tag_len);
+										app_name = std::u16string(s.begin(), s.end());
+									}
 								}
-							}
-							else if (tag_id == VM_CE_INFO_NAME_LIST && app_name.empty()) {
-								if (tag_len > 4) {
-									uint32_t str_len = *(uint32_t*)&data[cur + 4];
-									if (cur + 8 + str_len <= data.size()) {
-										if (is_ucs2)
-											app_name = std::u16string((char16_t*)&data[cur + 8], str_len / 2);
-										else {
-											std::string s((char*)&data[cur + 8], str_len);
-											app_name = std::u16string(s.begin(), s.end());
+								else if (tag_id == VM_CE_INFO_DEV) {
+									if (is_ucs2)
+										dev_name = std::u16string((char16_t*)&data[cur], tag_len / 2);
+									else {
+										std::string s((char*)&data[cur], tag_len);
+										dev_name = std::u16string(s.begin(), s.end());
+									}
+								}
+								else if (tag_id == VM_CE_INFO_NAME_LIST && app_name.empty()) {
+									if (tag_len > 4) {
+										uint32_t str_len = *(uint32_t*)&data[cur + 4];
+										if (cur + 8 + str_len <= data.size()) {
+											if (is_ucs2)
+												app_name = std::u16string((char16_t*)&data[cur + 8], str_len / 2);
+											else {
+												std::string s((char*)&data[cur + 8], str_len);
+												app_name = std::u16string(s.begin(), s.end());
+											}
 										}
 									}
 								}
+								cur += tag_len;
 							}
-							cur += tag_len;
-						}
 
-						auto trim_u16 = [](std::u16string& s) {
-							while (!s.empty() && (s.back() == 0 || s.back() == ' ' || s.back() == '\r' || s.back() == '\n'))
-								s.pop_back();
-						};
-						trim_u16(app_name);
-						trim_u16(dev_name);
+							auto trim_u16 = [](std::u16string& s) {
+								while (!s.empty() && (s.back() == 0 || s.back() == ' ' || s.back() == '\r' || s.back() == '\n'))
+									s.pop_back();
+							};
+							trim_u16(app_name);
+							trim_u16(dev_name);
+						}
 					}
 				}
-			}
 
-			vxps.push_back({ name, path, img, file_size, app_name, dev_name });
+				vxp_entries.push_back({ name, item_path, img, file_size, app_name, dev_name, false });
+			}
 		}
+
+		auto sort_entries = [](std::vector<vxp>& list, size_t start_idx) {
+			std::sort(list.begin() + start_idx, list.end(), [](const vxp& a, const vxp& b) {
+				std::u16string na = a.name;
+				std::u16string nb = b.name;
+				for (auto& c : na) c = (char16_t)std::tolower((char)c);
+				for (auto& c : nb) c = (char16_t)std::tolower((char)c);
+				return na < nb;
+			});
+		};
+
+		// Sort directories (preserving ".." at index 0 if present)
+		size_t dir_sort_start = (dir_entries.size() > 0 && dir_entries[0].name == u".. (Back)") ? 1 : 0;
+		sort_entries(dir_entries, dir_sort_start);
+		sort_entries(vxp_entries, 0);
+
+		for (auto& d : dir_entries)
+			vxps.push_back(std::move(d));
+		for (auto& v : vxp_entries)
+			vxps.push_back(std::move(v));
 
 		std::string last_saved = DragAndDrop::get_last_selected_app();
 		if (!last_saved.empty()) {
@@ -372,8 +447,46 @@ namespace NativeApps::Menu::AppSelector {
 			if (i == m_i)
 				vm_graphic_fill_rect(layer_buf, 0, y, w, b_h, gray, gray);
 
-			if (vxps[i].img)
+			if (vxps[i].is_dir) {
+				// Render folder icon
+				int fx = 3;
+				int fy = y + (b_h - img_wh) / 2;
+				int fw = img_wh - 2;
+				int fh = img_wh - 6;
+				if (fw > 6 && fh > 6) {
+					VMUINT16 tab_color = VM_COLOR_888_TO_565(240, 195, 60);
+					VMUINT16 body_color = VM_COLOR_888_TO_565(255, 210, 80);
+					VMUINT16 line_color = VM_COLOR_888_TO_565(200, 150, 30);
+
+					// Tab: top-left small rect
+					int tab_w = fw / 3 + 2;
+					int tab_h = 4;
+					vm_graphic_fill_rect(layer_buf, fx + 1, fy + 2, tab_w, tab_h, tab_color, tab_color);
+
+					// Folder body
+					vm_graphic_fill_rect(layer_buf, fx + 1, fy + 4, fw, fh - 2, body_color, body_color);
+
+					// Outline / accents
+					vm_graphic_line(layer_buf, fx, fy + 4, fx, fy + 2 + fh, line_color);
+					vm_graphic_line(layer_buf, fx, fy + 2 + fh, fx + fw, fy + 2 + fh, line_color);
+					vm_graphic_line(layer_buf, fx + fw, fy + 4, fx + fw, fy + 2 + fh, line_color);
+					vm_graphic_line(layer_buf, fx + tab_w, fy + 4, fx + fw, fy + 4, line_color);
+					vm_graphic_line(layer_buf, fx, fy + 2, fx + tab_w, fy + 2, line_color);
+
+					// If ".." entry, draw a small up/back arrow inside folder
+					if (vxps[i].name.find(u"..") == 0) {
+						int cx = fx + fw / 2;
+						int cy = fy + 4 + (fh - 2) / 2;
+						VMUINT16 arrow_color = VM_COLOR_888_TO_565(30, 30, 30);
+						vm_graphic_line(layer_buf, cx, cy - 2, cx, cy + 3, arrow_color);
+						vm_graphic_line(layer_buf, cx - 2, cy, cx, cy - 2, arrow_color);
+						vm_graphic_line(layer_buf, cx + 2, cy, cx, cy - 2, arrow_color);
+					}
+				}
+			}
+			else if (vxps[i].img) {
 				vm_graphic_blt(layer_buf, 1, y, (VMBYTE*)vxps[i].img, 0, 0, img_wh, img_wh, 1);
+			}
 
 			int text_x = 2 + b_h;
 			int text_y = y + (b_h - c_h) / 2;
@@ -479,11 +592,13 @@ namespace NativeApps::Menu::AppSelector {
 	void key_handler(VMINT event, VMINT keycode) {
 		if (confirm_sheet.is_open()) {
 			confirm_sheet.handle_key(event, keycode);
+			draw();
 			return;
 		}
 
 		if (details_sheet.is_open()) {
 			details_sheet.handle_key(event, keycode);
+			draw();
 			return;
 		}
 
@@ -500,16 +615,50 @@ namespace NativeApps::Menu::AppSelector {
 					m_i = 0;
 				break;
 			case VM_KEY_LEFT_SOFTKEY:
-				if (!vxps.empty()) {
+				if (!vxps.empty() && !vxps[m_i].is_dir) {
 					update_details_sheet(vxps[m_i]);
 					details_sheet.show();
 					reset_marquee();
 					draw();
 				}
 				return;
+			case VM_KEY_RIGHT_SOFTKEY:
+				if (current_dir != u"e:\\mre\\" && current_dir != u"e:\\mre") {
+					std::u16string parent_dir = current_dir;
+					if (!parent_dir.empty() && parent_dir.back() == u'\\')
+						parent_dir.pop_back();
+					size_t last_slash = parent_dir.find_last_of(u"\\/");
+					if (last_slash != std::u16string::npos)
+						parent_dir = parent_dir.substr(0, last_slash + 1);
+					else
+						parent_dir = u"e:\\mre\\";
+					current_dir = parent_dir;
+					m_i = 0;
+					scroll_pos = 0;
+					scan();
+					reset_marquee();
+					trigger_scrollbar();
+					draw();
+					return;
+				}
+				break;
 			case VM_KEY_OK:
-				DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
-				vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
+				if (!vxps.empty()) {
+					if (vxps[m_i].is_dir) {
+						current_dir = vxps[m_i].path;
+						m_i = 0;
+						scroll_pos = 0;
+						scan();
+						reset_marquee();
+						trigger_scrollbar();
+						draw();
+						return;
+					}
+					else {
+						DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
+						vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
+					}
+				}
 				break;
 			case VM_KEY_NUM1:
 			case VM_KEY_NUM2:
@@ -559,11 +708,13 @@ namespace NativeApps::Menu::AppSelector {
 	void pen_handler(VMINT event, VMINT x, VMINT y) {
 		if (confirm_sheet.is_open()) {
 			confirm_sheet.handle_pen(event, x, y, w, h, c_h);
+			draw();
 			return;
 		}
 
 		if (details_sheet.is_open()) {
 			details_sheet.handle_pen(event, x, y, w, h, c_h);
+			draw();
 			return;
 		}
 
@@ -593,7 +744,7 @@ namespace NativeApps::Menu::AppSelector {
 				break;
 			case VM_PEN_EVENT_LONG_TAP: {
 				int item = (y + scroll_pos) / b_h;
-				if (item >= 0 && item < (int)vxps.size()) {
+				if (item >= 0 && item < (int)vxps.size() && !vxps[item].is_dir) {
 					m_i = item;
 					update_details_sheet(vxps[m_i]);
 					details_sheet.show();
@@ -607,8 +758,24 @@ namespace NativeApps::Menu::AppSelector {
 			case VM_PEN_EVENT_ABORT:
 				touched = false;
 				if (std::abs(touch_start_y - y) < b_h / 2 && vm_get_tick_count() - touch_time < 150) {
-					DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
-					vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
+					int tapped = (touch_start_y + scroll_pos) / b_h;
+					if (tapped >= 0 && tapped < (int)vxps.size()) {
+						m_i = tapped;
+						if (vxps[m_i].is_dir) {
+							current_dir = vxps[m_i].path;
+							m_i = 0;
+							scroll_pos = 0;
+							scan();
+							reset_marquee();
+							trigger_scrollbar();
+							draw();
+							return;
+						}
+						else {
+							DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
+							vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
+						}
+					}
 				}
 				break;
 		}

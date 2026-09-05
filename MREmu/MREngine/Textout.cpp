@@ -10,7 +10,7 @@
 #include <SFML/Graphics/Texture.hpp>
 #include <SFML/Graphics/Image.hpp>
 
-extern MREngine::Graphic* graphic;
+using MREngine::graphic;
 
 static bool is_skip_symbol(VMWCHAR c) {
 	return c < 0x20 || c == 0x7F;
@@ -344,3 +344,47 @@ VMINT vm_graphic_get_highest_char_height_of_all_language(void);
 VMINT vm_graphic_get_char_height_alllang(VMINT size);
 
 VMINT vm_graphic_get_char_baseline_alllang(VMINT size);
+
+void raw_textout_to_buf(uint16_t* buf, int screen_w, int screen_h, int x, int y,
+	const std::u16string& str, uint16_t color, int clip_y1, int clip_y2) {
+	if (!buf || str.empty()) return;
+
+	int x_off = x;
+	for (size_t i = 0; i < str.length(); ++i) {
+		char16_t c = str[i];
+		if (is_skip_symbol(c)) continue;
+
+		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)c];
+		if (data_offset == 0) continue;
+
+		int ch_d = unifont_15_1_04_bin[data_offset];
+		int ch_w = ch_d & 0xF;
+		bool sho = ch_w >= 8;
+		int char_w = sho ? 16 : 8;
+
+		if (x_off + char_w > 0 && x_off < screen_w) {
+			for (int tex_ty = 0; tex_ty < 16; ++tex_ty) {
+				int py = y + tex_ty;
+				if (py < clip_y1 || py >= clip_y2 || py < 0 || py >= screen_h)
+					continue;
+
+				unsigned short line = 0;
+				if (sho)
+					line = (unifont_15_1_04_bin[data_offset + 2 + tex_ty * 2] << 8) |
+					       unifont_15_1_04_bin[data_offset + 2 + tex_ty * 2 + 1];
+				else
+					line = unifont_15_1_04_bin[data_offset + 2 + tex_ty] << 8;
+
+				for (int im_x = 0; im_x < char_w; ++im_x) {
+					int px = x_off + im_x;
+					if (px < 0 || px >= screen_w) continue;
+
+					if ((line >> (15 - im_x)) & 1) {
+						buf[py * screen_w + px] = color;
+					}
+				}
+			}
+		}
+		x_off += char_w;
+	}
+}

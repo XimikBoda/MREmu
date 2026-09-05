@@ -37,31 +37,44 @@ namespace Cpu {
 		uc_reg_write(uc, reg, &val);
 	}
 
+	std::string get_app_name() {
+		return Log::get_module();
+	}
+
 	void printREG(uc_engine* uc) {
+		printf("%s\n", dumpREG(uc).c_str());
+	}
+
+	std::string dumpREG(uc_engine* uc) {
+		if (!uc) return "";
 		uint32_t v, cpsr;
+		char buf[128];
+		std::string out;
 
 		uc_reg_read(uc, UC_ARM_REG_CPSR, &cpsr);
-		printf("==========================REG=================================\n");
-		uc_reg_read(uc, UC_ARM_REG_R0, &v); printf(" R0=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R1, &v); printf("R1=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R2, &v); printf(" R2=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R3, &v); printf(" R3=0x%08X\tN:%d\n", v, (cpsr & (1 << 31)) >> 31);
+		out += "==========================REG=================================\n";
 
-		uc_reg_read(uc, UC_ARM_REG_R4, &v); printf(" R4=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R5, &v); printf("R5=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R6, &v); printf(" R6=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R7, &v); printf(" R7=0x%08X\tZ:%d\n", v, (cpsr & (1 << 30)) >> 30);
+		uc_reg_read(uc, UC_ARM_REG_R0, &v); snprintf(buf, sizeof(buf), " R0=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R1, &v); snprintf(buf, sizeof(buf), "R1=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R2, &v); snprintf(buf, sizeof(buf), " R2=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R3, &v); snprintf(buf, sizeof(buf), " R3=0x%08X\tN:%d\n", v, (cpsr & (1 << 31)) >> 31); out += buf;
 
-		uc_reg_read(uc, UC_ARM_REG_R8, &v); printf(" R8=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R9, &v); printf("R9=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R10, &v); printf("R10=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_R11, &v); printf("R11=0x%08X\tC:%d\n", v, (cpsr & (1 << 29)) >> 29);
+		uc_reg_read(uc, UC_ARM_REG_R4, &v); snprintf(buf, sizeof(buf), " R4=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R5, &v); snprintf(buf, sizeof(buf), "R5=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R6, &v); snprintf(buf, sizeof(buf), " R6=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R7, &v); snprintf(buf, sizeof(buf), " R7=0x%08X\tZ:%d\n", v, (cpsr & (1 << 30)) >> 30); out += buf;
 
-		uc_reg_read(uc, UC_ARM_REG_R12, &v); printf("R12=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_SP, &v); printf("SP=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_LR, &v); printf(" LR=0x%08X\t", v);
-		uc_reg_read(uc, UC_ARM_REG_PC, &v); printf(" PC=0x%08X\tV:%d\tThumb:%d\n", v, (cpsr & (1 << 28)) >> 28, (cpsr & (1 << 5)) >> 5);
-		printf("==============================================================\n");
+		uc_reg_read(uc, UC_ARM_REG_R8, &v); snprintf(buf, sizeof(buf), " R8=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R9, &v); snprintf(buf, sizeof(buf), "R9=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R10, &v); snprintf(buf, sizeof(buf), "R10=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_R11, &v); snprintf(buf, sizeof(buf), "R11=0x%08X\tC:%d\n", v, (cpsr & (1 << 29)) >> 29); out += buf;
+
+		uc_reg_read(uc, UC_ARM_REG_R12, &v); snprintf(buf, sizeof(buf), "R12=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_SP, &v); snprintf(buf, sizeof(buf), "SP=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_LR, &v); snprintf(buf, sizeof(buf), " LR=0x%08X\t", v); out += buf;
+		uc_reg_read(uc, UC_ARM_REG_PC, &v); snprintf(buf, sizeof(buf), " PC=0x%08X\tV:%d\tThumb:%d\n", v, (cpsr & (1 << 28)) >> 28, (cpsr & (1 << 5)) >> 5); out += buf;
+		out += "==============================================================";
+		return out;
 	}
 
 	void imgui_REG() {

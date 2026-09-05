@@ -4,7 +4,8 @@
 namespace NativeApps {
 
 int BottomSheet::calculate_height(int char_h, int screen_h) const {
-	int h = (char_h + 6) + (int)m_lines.size() * (char_h + 3) + (char_h + 16);
+	int action_h = (!m_left_action.empty() || !m_right_action.empty()) ? (char_h + 16) : (char_h + 8);
+	int h = (char_h + 6) + (int)m_lines.size() * (char_h + 3) + action_h;
 	if (h > screen_h - 10)
 		h = screen_h - 10;
 	return h;
@@ -66,16 +67,49 @@ void BottomSheet::draw(VMUINT8* layer_buf, int screen_w, int screen_h, int char_
 		ty += char_h + 3;
 	}
 
-	// Bottom action bar
-	int act_y = screen_h - char_h - 7;
-	vm_graphic_line(layer_buf, 0, act_y - 3, screen_w, act_y - 3, div_col);
+	// Bottom action bar (if actions are defined)
+	if (!m_left_action.empty() || !m_right_action.empty()) {
+		int act_y = screen_h - char_h - 7;
+		vm_graphic_line(layer_buf, 0, act_y - 3, screen_w, act_y - 3, div_col);
 
-	if (!m_left_action.empty())
-		vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)m_left_action.c_str(), 100, m_left_action_color);
+		VMUINT16 highlight_col = VM_COLOR_888_TO_565(150, 150, 150);
 
-	if (!m_right_action.empty()) {
-		int rw = vm_graphic_get_string_width((VMWSTR)m_right_action.c_str());
-		vm_graphic_textout(layer_buf, screen_w - rw - 8, act_y, (VMWSTR)m_right_action.c_str(), 100, m_right_action_color);
+		if (m_left_pressed && !m_left_action.empty()) {
+			int bx1 = 0;
+			int bx2 = screen_w / 2 - 1;
+			int by1 = act_y - 2;
+			int by2 = screen_h - 1;
+			for (int sy = by1; sy <= by2; ++sy) {
+				for (int sx = bx1; sx <= bx2; ++sx) {
+					VMUINT16* ptr = (VMUINT16*)layer_buf + sy * screen_w + sx;
+					*ptr = ((*ptr & 0xF7DE) >> 1) + ((highlight_col & 0xF7DE) >> 1);
+				}
+			}
+		}
+
+		if (m_right_pressed && !m_right_action.empty()) {
+			int bx1 = screen_w / 2;
+			int bx2 = screen_w - 1;
+			int by1 = act_y - 2;
+			int by2 = screen_h - 1;
+			for (int sy = by1; sy <= by2; ++sy) {
+				for (int sx = bx1; sx <= bx2; ++sx) {
+					VMUINT16* ptr = (VMUINT16*)layer_buf + sy * screen_w + sx;
+					*ptr = ((*ptr & 0xF7DE) >> 1) + ((highlight_col & 0xF7DE) >> 1);
+				}
+			}
+		}
+
+		if (!m_left_action.empty()) {
+			VMUINT16 col = m_left_pressed ? 0xFFFF : m_left_action_color;
+			vm_graphic_textout(layer_buf, 8, act_y, (VMWSTR)m_left_action.c_str(), 100, col);
+		}
+
+		if (!m_right_action.empty()) {
+			VMUINT16 col = m_right_pressed ? 0xFFFF : m_right_action_color;
+			int rw = vm_graphic_get_string_width((VMWSTR)m_right_action.c_str());
+			vm_graphic_textout(layer_buf, screen_w - rw - 8, act_y, (VMWSTR)m_right_action.c_str(), 100, col);
+		}
 	}
 }
 
@@ -83,15 +117,29 @@ bool BottomSheet::handle_key(VMINT event, VMINT keycode) {
 	if (!m_open)
 		return false;
 
-	if (event == VM_KEY_EVENT_UP) {
+	if (event == VM_KEY_EVENT_DOWN) {
 		if (keycode == VM_KEY_LEFT_SOFTKEY || (m_left_ok_triggers && keycode == VM_KEY_OK) ||
 			(keycode == VM_KEY_NUM1 && !m_left_action.empty())) {
+			m_left_pressed = true;
+			return true;
+		}
+		else if (keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_BACK || keycode == VM_KEY_CLEAR ||
+			(m_right_ok_triggers && keycode == VM_KEY_OK)) {
+			m_right_pressed = true;
+			return true;
+		}
+	}
+	else if (event == VM_KEY_EVENT_UP) {
+		if (keycode == VM_KEY_LEFT_SOFTKEY || (m_left_ok_triggers && keycode == VM_KEY_OK) ||
+			(keycode == VM_KEY_NUM1 && !m_left_action.empty())) {
+			m_left_pressed = false;
 			if (m_on_left)
 				m_on_left();
 			return true;
 		}
 		else if (keycode == VM_KEY_RIGHT_SOFTKEY || keycode == VM_KEY_BACK || keycode == VM_KEY_CLEAR ||
 			(m_right_ok_triggers && keycode == VM_KEY_OK)) {
+			m_right_pressed = false;
 			if (m_on_right)
 				m_on_right();
 			else if (m_on_dismiss)
@@ -100,6 +148,8 @@ bool BottomSheet::handle_key(VMINT event, VMINT keycode) {
 				hide();
 			return true;
 		}
+		m_left_pressed = false;
+		m_right_pressed = false;
 	}
 	return true;
 }
@@ -108,12 +158,14 @@ bool BottomSheet::handle_pen(VMINT event, VMINT x, VMINT y, int screen_w, int sc
 	if (!m_open)
 		return false;
 
-	if (event == VM_PEN_EVENT_TAP) {
-		int sheet_h = calculate_height(char_h, screen_h);
-		int sheet_y = screen_h - sheet_h;
+	int sheet_h = calculate_height(char_h, screen_h);
+	int sheet_y = screen_h - sheet_h;
+	int act_y = screen_h - char_h - 12;
 
-		// Tap outside sheet (in dimmed area) -> dismiss
+	if (event == VM_PEN_EVENT_TAP) {
 		if (y < sheet_y) {
+			m_left_pressed = false;
+			m_right_pressed = false;
 			if (m_on_dismiss)
 				m_on_dismiss();
 			else if (m_on_right)
@@ -123,19 +175,64 @@ bool BottomSheet::handle_pen(VMINT event, VMINT x, VMINT y, int screen_w, int sc
 			return true;
 		}
 
-		// Action bar tap
-		int act_y = screen_h - char_h - 12;
 		if (y >= act_y) {
 			if (x < screen_w / 2) {
-				if (m_on_left)
-					m_on_left();
+				m_left_pressed = true;
+				m_right_pressed = false;
 			}
 			else {
-				if (m_on_right)
-					m_on_right();
+				m_left_pressed = false;
+				m_right_pressed = true;
 			}
 			return true;
 		}
+		else {
+			m_left_pressed = false;
+			m_right_pressed = false;
+			return true;
+		}
+	}
+	else if (event == VM_PEN_EVENT_MOVE) {
+		if (m_left_pressed || m_right_pressed) {
+			if (y >= act_y) {
+				if (x < screen_w / 2) {
+					m_left_pressed = true;
+					m_right_pressed = false;
+				}
+				else {
+					m_left_pressed = false;
+					m_right_pressed = true;
+				}
+			}
+			else {
+				m_left_pressed = false;
+				m_right_pressed = false;
+			}
+			return true;
+		}
+	}
+	else if (event == VM_PEN_EVENT_RELEASE) {
+		if (m_left_pressed) {
+			m_left_pressed = false;
+			if (m_on_left)
+				m_on_left();
+			return true;
+		}
+		else if (m_right_pressed) {
+			m_right_pressed = false;
+			if (m_on_right)
+				m_on_right();
+			else if (m_on_dismiss)
+				m_on_dismiss();
+			else
+				hide();
+			return true;
+		}
+	}
+	else if (event == VM_PEN_EVENT_ABORT) {
+		m_left_pressed = false;
+		m_right_pressed = false;
+		return true;
 	}
 
 	return true;
