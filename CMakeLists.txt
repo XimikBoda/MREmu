@@ -24,6 +24,13 @@ if(CAPSTONE)
 endif()
 
 add_definitions(-DLIBICONV_PLUG)
+add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+
+if (MSVC)
+  add_compile_options(/wd4828)
+  set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:LIBCMTD")
+endif()
+
 set(BUILD_SHARED_LIBS FALSE) 
 
 include_directories("include")
@@ -31,3 +38,5 @@ include_directories("include")
 add_subdirectory (deps)
 
 add_subdirectory (MREmu)
+
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT MREmu)

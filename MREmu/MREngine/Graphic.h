@@ -23,9 +23,12 @@ namespace MREngine {
 		void update_screen();
 
 		void imgui_screen();
+		void reset();
 
 		~Graphic();
 	};
+
+	extern Graphic* graphic;
 
 	struct layer {
 		void* buf = 0;

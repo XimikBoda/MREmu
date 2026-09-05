@@ -103,11 +103,35 @@ const std::map<sf::Keyboard::Key, int> key_to_key =
 	{sf::Keyboard::Down, VM_KEY_DOWN},
 	{sf::Keyboard::Left, VM_KEY_LEFT},
 	{sf::Keyboard::Right, VM_KEY_RIGHT},
+	{sf::Keyboard::W, VM_KEY_UP},
+	{sf::Keyboard::S, VM_KEY_DOWN},
+	{sf::Keyboard::A, VM_KEY_LEFT},
+	{sf::Keyboard::D, VM_KEY_RIGHT},
+
 	{sf::Keyboard::Slash, VM_KEY_LEFT_SOFTKEY},
 	{sf::Keyboard::RShift, VM_KEY_RIGHT_SOFTKEY},
+	{sf::Keyboard::Q, VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::E, VM_KEY_RIGHT_SOFTKEY},
+	{sf::Keyboard::F1, VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::F2, VM_KEY_RIGHT_SOFTKEY},
+
 	{sf::Keyboard::Enter, VM_KEY_OK},
+	{sf::Keyboard::Space, VM_KEY_OK},
+
 	{sf::Keyboard::BackSpace, VM_KEY_CLEAR},
 	{sf::Keyboard::Escape, VM_KEY_BACK},
+
+	{sf::Keyboard::Num1, VM_KEY_NUM1},
+	{sf::Keyboard::Num2, VM_KEY_NUM2},
+	{sf::Keyboard::Num3, VM_KEY_NUM3},
+	{sf::Keyboard::Num4, VM_KEY_NUM4},
+	{sf::Keyboard::Num5, VM_KEY_NUM5},
+	{sf::Keyboard::Num6, VM_KEY_NUM6},
+	{sf::Keyboard::Num7, VM_KEY_NUM7},
+	{sf::Keyboard::Num8, VM_KEY_NUM8},
+	{sf::Keyboard::Num9, VM_KEY_NUM9},
+	{sf::Keyboard::Num0, VM_KEY_NUM0},
+
 	{sf::Keyboard::Numpad7, VM_KEY_NUM1},
 	{sf::Keyboard::Numpad8, VM_KEY_NUM2},
 	{sf::Keyboard::Numpad9, VM_KEY_NUM3},
@@ -157,6 +181,8 @@ bool Keyboard::event(sf::Event& event) {
 
 void Keyboard::imgui_keyboard() {
 	ImVec2 v = { 60,20 };
+	ImGui::SetNextWindowPos(ImVec2(195, 395), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(255, 195), ImGuiCond_FirstUseEver);
 	ImGui::Begin("KeyBoard");
 	for (int i = 0; i < 3 * 7; ++i) {
 		if (i % 3 != 0)

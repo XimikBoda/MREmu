@@ -26,13 +26,15 @@ const fs::path base_path = "./";
 
 void MREngine::IO::init()
 {
+	std::error_code ec;
 #ifdef ANDROID
-	fs::create_directory(base_path);
+	fs::create_directories(base_path, ec);
 #endif
-	fs::create_directory(base_path / fs::path("fs").make_preferred());
-	fs::create_directory(base_path / fs::path("fs/e").make_preferred());
-	fs::create_directory(base_path / fs::path("fs/c").make_preferred());
-	fs::create_directory(base_path / fs::path("fs/d").make_preferred());
+	fs::create_directories(base_path / fs::path("fs").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/e").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/c").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/d").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/e/mre").make_preferred(), ec);
 }
 
 
@@ -162,9 +164,13 @@ void vm_reg_pen_callback(vm_pen_handler_t handler) {
 }
 
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
+	if (!filename)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	fs::path path = path_from_emu(filename);
+	spdlog::info("vm_file_open: {} -> {}, mode={}", UCS2_to_path(filename).string(), path.string(), mode);
 
 	std::string fmode;
 
@@ -185,11 +191,20 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		return -1;
 	}
 
+	std::error_code ec;
+	if (mode != MODE_READ) {
+		fs::create_directories(path.parent_path(), ec);
+	}
+
 #ifdef _WIN32
 	std::wstring wfmode(fmode.begin(), fmode.end());
 	FILE* f = _wfopen(path.wstring().c_str(), wfmode.c_str());
+	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
+		f = _wfopen(path.wstring().c_str(), L"w+b");
 #else
 	FILE* f = fopen(path.string().c_str(), fmode.c_str());
+	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
+		f = fopen(path.string().c_str(), "w+b");
 #endif
 
 	if (!f) {
@@ -197,10 +212,13 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		return -1;
 	}
 
-	return io.files.push(f);
+	return (VMFILE)io.files.push(f);
 }
 
 void vm_file_close(VMFILE handle) {
+	if (handle <= 0)
+		return;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (io.files.is_active(handle)) {
@@ -213,15 +231,15 @@ void vm_file_close(VMFILE handle) {
 }
 
 VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
+	if (handle <= 0 || !data || !nread)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
 		return -1;
 
 	FILE* f = io.files[handle];
-
-	if (!f)
-		return -1;
 
 	size_t read_bytes = fread(data, 1, length, f);
 	*nread = (VMUINT)read_bytes;
@@ -230,6 +248,9 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 }
 
 VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
+	if (handle <= 0 || !data || !written)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -248,6 +269,9 @@ VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 }
 
 VMINT vm_file_commit(VMFILE handle) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -261,6 +285,9 @@ VMINT vm_file_commit(VMFILE handle) {
 }
 
 VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -283,6 +310,9 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 }
 
 VMINT vm_file_tell(VMFILE handle) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -297,6 +327,9 @@ VMINT vm_file_tell(VMFILE handle) {
 }
 
 VMINT vm_file_is_eof(VMFILE handle) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -306,6 +339,9 @@ VMINT vm_file_is_eof(VMFILE handle) {
 }
 
 VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
+	if (handle <= 0 || !file_size)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -428,6 +464,9 @@ VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 	return 0;
 }
 void vm_find_close(VMINT handle) {
+	if (handle <= 0)
+		return;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	io.find.remove(handle);
@@ -491,6 +530,9 @@ VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 }
 
 void vm_find_close_ext(VMINT handle) {
+	if (handle <= 0)
+		return;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	io.find_ext.remove(handle);
@@ -534,11 +576,182 @@ VMINT vm_get_system_driver(void) {
 }
 
 VMUINT vm_get_disk_free_space(VMWSTR drv_name) {
+	if (drv_name) {
+		const unsigned char* p = (const unsigned char*)drv_name;
+		char drive = 0;
+		if (p[0] != 0 && p[1] != 0) {
+			// ASCII string (e.g. "c", "c:", "c:\\")
+			const char* cp = (const char*)drv_name;
+			while (*cp) {
+				if ((*cp >= 'a' && *cp <= 'z') || (*cp >= 'A' && *cp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*cp);
+					break;
+				}
+				cp++;
+			}
+		} else {
+			// UCS-2 string (e.g. L"c", L"c:", L"c:\\")
+			const VMWCHAR* wp = (const VMWCHAR*)drv_name;
+			while (*wp) {
+				if ((*wp >= 'a' && *wp <= 'z') || (*wp >= 'A' && *wp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*wp);
+					break;
+				}
+				wp++;
+			}
+		}
+	}
 	return 256 * 1024 * 1024;
 }
 
 VMINT vm_get_disk_info(const VMCHAR* drv_name, vm_fs_disk_info* fs_disk, vm_fs_di_enum e_di) {
-	return -1;
+	if (!fs_disk)
+		return -1;
+	memset(fs_disk, 0, sizeof(vm_fs_disk_info));
+
+	char drive = 'C';
+	if (drv_name) {
+		const unsigned char* p = (const unsigned char*)drv_name;
+		if (p[0] != 0 && p[1] != 0) {
+			// ASCII string
+			const char* cp = (const char*)drv_name;
+			while (*cp) {
+				if ((*cp >= 'a' && *cp <= 'z') || (*cp >= 'A' && *cp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*cp);
+					break;
+				}
+				cp++;
+			}
+		} else {
+			// UCS-2 string
+			const VMWCHAR* wp = (const VMWCHAR*)drv_name;
+			while (*wp) {
+				if ((*wp >= 'a' && *wp <= 'z') || (*wp >= 'A' && *wp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*wp);
+					break;
+				}
+				wp++;
+			}
+		}
+	}
+
+	fs_disk->DriveLetter = drive;
+	fs_disk->WriteProtect = 0;
+	fs_disk->FATType = 32;
+	fs_disk->FATCount = 2;
+	fs_disk->BytesPerSector = 512;
+	fs_disk->SectorsPerCluster = 8;
+	fs_disk->TotalClusters = 65536;
+	fs_disk->FreeClusters = 65536;
+	fs_disk->LargestFreeChain = 65536;
+	fs_disk->FreeChains = 1;
+	strcpy(fs_disk->Label, "MRE");
+	return 0;
+}
+
+static fs::path get_sys_file_path() {
+	std::string stem;
+	fs::path rp = get_current_app_real_path();
+	if (!rp.empty())
+		stem = rp.stem().string();
+	if (stem.empty())
+		stem = get_current_app_name();
+	if (stem.empty()) {
+		fs::path p = get_current_app_path();
+		stem = p.stem().string();
+	}
+	if (stem.empty())
+		stem = "app";
+
+	// Sanitize stem: remove characters not allowed in file names
+	for (char& c : stem) {
+		if (c == '\\' || c == '/' || c == ':' || c == '*' || c == '?' ||
+			c == '"' || c == '<' || c == '>' || c == '|' || c == '@') {
+			c = '_';
+		}
+	}
+
+	fs::path sys_dir = (base_path / "fs" / "c").make_preferred();
+	std::error_code ec;
+	fs::create_directories(sys_dir, ec);
+
+	return (sys_dir / ("@" + stem + ".sys")).make_preferred();
+}
+
+VMFILE vm_sys_file_open(VMUINT mode, VMUINT binary) {
+	MREngine::AppIO& io = get_current_app_io();
+	fs::path path = get_sys_file_path();
+
+	std::string fmode;
+	switch (mode) {
+	case MODE_READ:
+		fmode = "rb";
+		break;
+	case MODE_WRITE:
+		fmode = "r+b";
+		break;
+	case MODE_CREATE_ALWAYS_WRITE:
+		fmode = "w+b";
+		break;
+	case MODE_APPEND:
+		fmode = "a+b";
+		break;
+	default:
+		return -1;
+	}
+
+	std::error_code ec;
+	if (mode != MODE_READ) {
+		fs::create_directories(path.parent_path(), ec);
+	}
+
+#ifdef _WIN32
+	std::wstring wfmode(fmode.begin(), fmode.end());
+	FILE* f = _wfopen(path.wstring().c_str(), wfmode.c_str());
+	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
+		f = _wfopen(path.wstring().c_str(), L"w+b");
+#else
+	FILE* f = fopen(path.string().c_str(), fmode.c_str());
+	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
+		f = fopen(path.string().c_str(), "w+b");
+#endif
+
+	if (!f) {
+		spdlog::warn("vm_sys_file_open({}, {}) = -1", path.string(), mode);
+		return -1;
+	}
+
+	return (VMFILE)io.files.push(f);
+}
+
+VMINT vm_sys_file_seek(VMFILE handle, VMINT offset, VMINT base) {
+	return vm_file_seek(handle, offset, base);
+}
+
+VMINT vm_sys_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
+	return vm_file_read(handle, data, length, nread);
+}
+
+VMINT vm_sys_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
+	return vm_file_write(handle, data, length, written);
+}
+
+void vm_sys_file_close(VMFILE h) {
+	vm_file_close(h);
+}
+
+VMINT vm_sys_file_delete(void) {
+	fs::path path = get_sys_file_path();
+	std::error_code ec;
+	if (fs::exists(path, ec)) {
+		if (!fs::remove(path, ec))
+			return -1;
+	}
+	return 0;
+}
+
+VMINT vm_sys_file_get_space(void) {
+	return 128 * 1024 * 1024;
 }
 
 VMINT vm_is_support_keyborad(void) {

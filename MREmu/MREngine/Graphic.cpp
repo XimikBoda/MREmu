@@ -7,7 +7,9 @@
 #include <vmgraph.h>
 #include <vmpromng.h>
 
-MREngine::Graphic* graphic = 0; // Do I really need this?
+namespace MREngine {
+	Graphic* graphic = 0;
+}
 
 MREngine::RenderBox::RenderBox(int st_x, int st_y, int end_x, int end_y) {
 	this->st_x = st_x;
@@ -169,12 +171,42 @@ void MREngine::Graphic::update_screen() {
 }
 
 void MREngine::Graphic::imgui_screen() {
+	ImGui::SetNextWindowPos(ImVec2(195, 10), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(255, 380), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Screen")) {
 		ImGui::Image(screen_tex);
 		if (ImGui::Button("Paint"))
 			vm_graphic_flush_screen();
 	}
 	ImGui::End();
+}
+
+void MREngine::Graphic::reset() {
+	std::fill(screen.begin(), screen.end(), 0);
+	screen_changed = true;
+	int image_size = width * height * 2;
+	void* canvas_buf1 = Memory::shared_malloc(VM_CANVAS_DATA_OFFSET + image_size);
+	if (canvas_buf1 == 0) abort();
+	MREngine::canvas_signature* cs1 = (MREngine::canvas_signature*)canvas_buf1;
+	*cs1 = MREngine::canvas_signature();
+	memcpy(cs1->magic, CANVAS_MAGIC, 9);
+	MREngine::canvas_frame_property* cfp1 = (MREngine::canvas_frame_property*)(cs1 + 1);
+	*cfp1 = MREngine::canvas_frame_property();
+	cfp1->width = width;
+	cfp1->height = height;
+	base_buf1 = (cfp1 + 1);
+
+	void* canvas_buf2 = Memory::shared_malloc(VM_CANVAS_DATA_OFFSET + image_size);
+	if (canvas_buf2 == 0) abort();
+	MREngine::canvas_signature* cs2 = (MREngine::canvas_signature*)canvas_buf2;
+	*cs2 = MREngine::canvas_signature();
+	memcpy(cs2->magic, CANVAS_MAGIC, 9);
+	MREngine::canvas_frame_property* cfp2 = (MREngine::canvas_frame_property*)(cs2 + 1);
+	*cfp2 = MREngine::canvas_frame_property();
+	cfp2->width = width;
+	cfp2->height = height;
+	base_buf2 = (cfp2 + 1);
+	update_screen();
 }
 
 MREngine::Graphic::~Graphic()
@@ -267,6 +299,8 @@ void* MREngine::AppGraphic::get_layer_buf(int handle) {
 }
 
 void MREngine::AppGraphic::imgui_layers() {
+	ImGui::SetNextWindowPos(ImVec2(460, 195), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(260, 395), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Layers")) {
 		for (int i = 0; i < layers.size(); ++i) {
 			auto& el = layers[i];
@@ -285,16 +319,16 @@ void MREngine::AppGraphic::imgui_layers() {
 
 VMINT vm_graphic_get_screen_width(void)
 {
-	if (graphic)
-		return graphic->width;
+	if (MREngine::graphic)
+		return MREngine::graphic->width;
 	else
 		return 0;
 }
 
 VMINT vm_graphic_get_screen_height(void)
 {
-	if (graphic)
-		return graphic->height;
+	if (MREngine::graphic)
+		return MREngine::graphic->height;
 	else
 		return 0;
 }
@@ -825,7 +859,7 @@ void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 void vm_graphic_reset_clip(void) {
 	auto& clip = get_current_app_graphic().clip;
 
-	clip = { 0, 0, (short)graphic->width, (short)graphic->height, 0 };
+	clip = { 0, 0, (short)(MREngine::graphic ? MREngine::graphic->width : 240), (short)(MREngine::graphic ? MREngine::graphic->height : 320), 0 };
 }
 
 void vm_graphic_flush_screen(void) {

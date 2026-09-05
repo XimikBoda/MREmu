@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.8)
 
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
@@ -19,6 +19,7 @@ set(SOURCES
 						"Log.cpp" "Log.h" 
 						"miniz.c" "miniz.h" "mutex_wrapper.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
+						"DragAndDrop.cpp" "DragAndDrop.h"
 )
 
 if (ANDROID)
@@ -44,6 +45,10 @@ target_link_libraries(MREmu spdlog)
 
 if(CAPSTONE)
 	target_link_libraries(MREmu capstone)
+endif()
+
+if(WIN32)
+	target_link_libraries(MREmu shell32 dwmapi)
 endif()
 
 if (ANDROID)
