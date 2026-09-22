@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MREmu WebAssembly Emulator Interface</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+    }
+    canvas {
+      border: 2px solid #333;
+      background-color: #000;
+      width: 240px;
+      height: 320px;
+      image-rendering: pixelated;
+    }
+    .status-bar {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #4caf50;
+    }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 15px;
+      width: 240px;
+    }
+    .keypad button {
+      background-color: #333;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .keypad button:active {
+      background-color: #555;
+    }
+    .config-panel {
+      margin-top: 15px;
+      width: 240px;
+      font-size: 12px;
+      background: #2a2a2a;
+      padding: 10px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>MREmu WebAssembly Emulator</h1>
+  <div class="container">
+    <canvas id="canvas" width="240" height="320"></canvas>
+    <div id="status" class="status-bar">Downloading WASM Module...</div>
+
+    <div class="keypad">
+      <button onmousedown="sendKey(1001,0)" onmouseup="sendKey(1001,1)">L-Soft</button>
+      <button onmousedown="sendKey(1,0)" onmouseup="sendKey(1,1)">UP</button>
+      <button onmousedown="sendKey(1002,0)" onmouseup="sendKey(1002,1)">R-Soft</button>
+      <button onmousedown="sendKey(3,0)" onmouseup="sendKey(3,1)">LEFT</button>
+      <button onmousedown="sendKey(5,0)" onmouseup="sendKey(5,1)">OK</button>
+      <button onmousedown="sendKey(4,0)" onmouseup="sendKey(4,1)">RIGHT</button>
+      <button onmousedown="sendKey(2,0)" onmouseup="sendKey(2,1)">DOWN</button>
+      <button onmousedown="sendKey(48,0)" onmouseup="sendKey(48,1)">0</button>
+      <button onmousedown="sendKey(49,0)" onmouseup="sendKey(49,1)">1</button>
+    </div>
+
+    <div class="config-panel">
+      <strong>Key Mappings:</strong><br/>
+      Arrows: D-Pad | Space/Enter: OK<br/>
+      Q: Left Softkey | E: Right Softkey<br/>
+      0-9: Numpad 0-9
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    var sendKeyFunc = null;
+    var sendPenFunc = null;
+
+    var statusElement = document.getElementById('status');
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+    var imageData = null;
+
+    var Module = {
+      preRun: [],
+      postRun: [function() {
+        initInputBindings();
+        startRenderingLoop();
+      }],
+      print: function(text) {
+        console.log('[MREmu WASM]: ' + text);
+      },
+      printErr: function(text) {
+        console.error('[MREmu WASM Error]: ' + text);
+      },
+      canvas: canvas,
+      setStatus: function(text) {
+        statusElement.innerHTML = text;
+      }
+    };
+
+    function initInputBindings() {
+      if (typeof Module.cwrap === 'function') {
+        sendKeyFunc = Module.cwrap('mremu_wasm_send_key_event', null, ['number', 'number']);
+        sendPenFunc = Module.cwrap('mremu_wasm_send_pen_event', null, ['number', 'number', 'number']);
+      }
+    }
+
+    function sendKey(code, type) {
+      if (sendKeyFunc) {
+        sendKeyFunc(code, type);
+      }
+    }
+
+    // Configurable Keyboard Mappings
+    var keyMap = {
+      'ArrowUp': 1,
+      'ArrowDown': 2,
+      'ArrowLeft': 3,
+      'ArrowRight': 4,
+      'Enter': 5,
+      'Space': 5,
+      'Digit0': 48,
+      'Digit1': 49,
+      'Digit2': 50,
+      'Digit3': 51,
+      'Digit4': 52,
+      'Digit5': 53,
+      'Digit6': 54,
+      'Digit7': 55,
+      'Digit8': 56,
+      'Digit9': 57,
+      'KeyQ': 1001,
+      'KeyE': 1002
+    };
+
+    window.addEventListener('keydown', function(e) {
+      if (keyMap[e.code] !== undefined) {
+        e.preventDefault();
+        sendKey(keyMap[e.code], 0);
+      }
+    });
+
+    window.addEventListener('keyup', function(e) {
+      if (keyMap[e.code] !== undefined) {
+        e.preventDefault();
+        sendKey(keyMap[e.code], 1);
+      }
+    });
+
+    // Gamepad API Polling Loop
+    var lastGamepadState = {};
+    function pollGamepads() {
+      var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < gamepads.length; i++) {
+        var gp = gamepads[i];
+        if (!gp) continue;
+
+        // Button 0 (A / Cross) -> OK
+        checkGamepadButton(gp.id, 0, gp.buttons[0].pressed, 5);
+        // Button 12 (D-Pad Up) -> UP
+        checkGamepadButton(gp.id, 12, gp.buttons[12]?.pressed, 1);
+        // Button 13 (D-Pad Down) -> DOWN
+        checkGamepadButton(gp.id, 13, gp.buttons[13]?.pressed, 2);
+        // Button 14 (D-Pad Left) -> LEFT
+        checkGamepadButton(gp.id, 14, gp.buttons[14]?.pressed, 3);
+        // Button 15 (D-Pad Right) -> RIGHT
+        checkGamepadButton(gp.id, 15, gp.buttons[15]?.pressed, 4);
+        // Button 4 (L1) -> Left Softkey
+        checkGamepadButton(gp.id, 4, gp.buttons[4]?.pressed, 1001);
+        // Button 5 (R1) -> Right Softkey
+        checkGamepadButton(gp.id, 5, gp.buttons[5]?.pressed, 1002);
+      }
+      requestAnimationFrame(pollGamepads);
+    }
+
+    function checkGamepadButton(gpId, btnIdx, isPressed, mreKey) {
+      var keyState = gpId + '_' + btnIdx;
+      var wasPressed = !!lastGamepadState[keyState];
+      if (isPressed && !wasPressed) {
+        sendKey(mreKey, 0); // Down
+        lastGamepadState[keyState] = true;
+      } else if (!isPressed && wasPressed) {
+        sendKey(mreKey, 1); // Up
+        lastGamepadState[keyState] = false;
+      }
+    }
+
+    window.addEventListener("gamepadconnected", function(e) {
+      statusElement.innerText = "Gamepad Connected: " + e.gamepad.id;
+      pollGamepads();
+    });
+
+    window.addEventListener("gamepaddisconnected", function(e) {
+      statusElement.innerText = "Gamepad Disconnected";
+    });
+
+    function startRenderingLoop() {
+      statusElement.innerText = "Emulator Active";
+      var getBuffer = Module.cwrap('mremu_wasm_get_screen_buffer', 'number', []);
+      var getWidth = Module.cwrap('mremu_wasm_get_screen_width', 'number', []);
+      var getHeight = Module.cwrap('mremu_wasm_get_screen_height', 'number', []);
+
+      function renderFrame() {
+        var width = getWidth() || 240;
+        var height = getHeight() || 320;
+
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          imageData = null;
+        }
+
+        if (!imageData) {
+          imageData = ctx.createImageData(width, height);
+        }
+
+        var bufPtr = getBuffer();
+        if (bufPtr) {
+          var numPixels = width * height;
+          var heap16 = Module.HEAPU16;
+          var startIdx = bufPtr >> 1;
+          var data32 = new Uint32Array(imageData.data.buffer);
+
+          for (var i = 0; i < numPixels; i++) {
+            var rgb565 = heap16[startIdx + i];
+            var r = ((rgb565 >> 11) & 0x1F) * 255 / 31;
+            var g = ((rgb565 >> 5) & 0x3F) * 255 / 63;
+            var b = (rgb565 & 0x1F) * 255 / 31;
+            data32[i] = (0xFF << 24) | (b << 16) | (g << 8) | r;
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        requestAnimationFrame(renderFrame);
+      }
+
+      requestAnimationFrame(renderFrame);
+    }
+  </script>
+  <script async src="mremu.js"></script>
+</body>
+</html>

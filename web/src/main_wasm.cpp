@@ -83,6 +83,7 @@ int main(int argc, char** argv) {
     MREngine::IO::init();
 
     static MREngine::Graphic web_graphic;
+    web_graphic.activate();
 
     spdlog::info("MREmu Core & Graphics initialized successfully for WebAssembly.");
 
