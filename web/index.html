@@ -36,6 +36,25 @@
       font-size: 14px;
       color: #4caf50;
     }
+    .file-drop-zone {
+      margin-top: 15px;
+      width: 240px;
+      padding: 12px;
+      border: 2px dashed #555;
+      border-radius: 8px;
+      background-color: #2a2a2a;
+      text-align: center;
+      font-size: 13px;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+    .file-drop-zone.hover {
+      border-color: #4caf50;
+      background-color: #333;
+    }
+    .file-input {
+      display: none;
+    }
     .keypad {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -62,6 +81,7 @@
       background: #2a2a2a;
       padding: 10px;
       border-radius: 6px;
+      box-sizing: border-box;
     }
   </style>
 </head>
@@ -70,6 +90,12 @@
   <div class="container">
     <canvas id="canvas" width="240" height="320"></canvas>
     <div id="status" class="status-bar">Downloading WASM Module...</div>
+
+    <div id="dropZone" class="file-drop-zone" onclick="document.getElementById('fileInput').click()">
+      <strong>Select or Drag & Drop VXP / VRE File</strong>
+      <br/><span style="font-size:11px; color:#aaa;">(.vxp, .vre, .mre)</span>
+      <input type="file" id="fileInput" class="file-input" accept=".vxp,.vre,.mre" onchange="handleFileSelect(event)">
+    </div>
 
     <div class="keypad">
       <button onmousedown="sendKey(1001,0)" onmouseup="sendKey(1001,1)">L-Soft</button>
@@ -94,16 +120,18 @@
   <script type="text/javascript">
     var sendKeyFunc = null;
     var sendPenFunc = null;
+    var loadFileFunc = null;
 
     var statusElement = document.getElementById('status');
     var canvas = document.getElementById('canvas');
+    var dropZone = document.getElementById('dropZone');
     var ctx = canvas.getContext('2d');
     var imageData = null;
 
     var Module = {
       preRun: [],
       postRun: [function() {
-        initInputBindings();
+        initBindings();
         startRenderingLoop();
       }],
       print: function(text) {
@@ -118,10 +146,11 @@
       }
     };
 
-    function initInputBindings() {
+    function initBindings() {
       if (typeof Module.cwrap === 'function') {
         sendKeyFunc = Module.cwrap('mremu_wasm_send_key_event', null, ['number', 'number']);
         sendPenFunc = Module.cwrap('mremu_wasm_send_pen_event', null, ['number', 'number', 'number']);
+        loadFileFunc = Module.cwrap('mremu_wasm_load_file', 'number', ['string', 'number', 'number']);
       }
     }
 
@@ -130,6 +159,94 @@
         sendKeyFunc(code, type);
       }
     }
+
+    // Client-side File Loader
+    function processSelectedFile(file) {
+      if (!file) return;
+
+      var validExts = ['.vxp', '.vre', '.mre'];
+      var fileName = file.name.toLowerCase();
+      var isValidExt = validExts.some(function(ext) { return fileName.endsWith(ext); });
+
+      if (!isValidExt) {
+        statusElement.style.color = '#f44336';
+        statusElement.innerText = 'Error: Invalid file extension. Select a .vxp, .vre, or .mre file.';
+        return;
+      }
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var arrayBuffer = e.target.result;
+        var uint8Array = new Uint8Array(arrayBuffer);
+
+        if (uint8Array.length < 4) {
+          statusElement.style.color = '#f44336';
+          statusElement.innerText = 'Error: File is empty or corrupt.';
+          return;
+        }
+
+        // Validate Magic Bytes: Zlib header (0x78) or ELF header (0x7F 'E' 'L' 'F')
+        var isZlib = uint8Array[0] === 0x78;
+        var isElf = uint8Array[0] === 0x7F && uint8Array[1] === 0x45 && uint8Array[2] === 0x4C && uint8Array[3] === 0x46;
+
+        if (!isZlib && !isElf) {
+          statusElement.style.color = '#ff9800';
+          statusElement.innerText = 'Warning: Unrecognized file magic bytes. Attempting launch...';
+        } else {
+          statusElement.style.color = '#4caf50';
+          statusElement.innerText = 'Loaded file: ' + file.name + ' (' + uint8Array.length + ' bytes)';
+        }
+
+        // Pass memory into WASM heap
+        var ptr = Module._malloc(uint8Array.length);
+        Module.HEAPU8.set(uint8Array, ptr);
+
+        if (loadFileFunc) {
+          var res = loadFileFunc(file.name, ptr, uint8Array.length);
+          if (res === 1) {
+            statusElement.innerText = 'Successfully launched ' + file.name;
+          } else {
+            statusElement.style.color = '#f44336';
+            statusElement.innerText = 'Failed to launch ' + file.name;
+          }
+        }
+
+        Module._free(ptr);
+      };
+
+      reader.onerror = function() {
+        statusElement.style.color = '#f44336';
+        statusElement.innerText = 'Error reading file in browser.';
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    function handleFileSelect(evt) {
+      var files = evt.target.files;
+      if (files && files.length > 0) {
+        processSelectedFile(files[0]);
+      }
+    }
+
+    // Drag and Drop Event Handlers
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropZone.classList.add('hover');
+    });
+
+    dropZone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processSelectedFile(e.dataTransfer.files[0]);
+      }
+    });
 
     // Configurable Keyboard Mappings
     var keyMap = {
@@ -167,7 +284,7 @@
       }
     });
 
-    // Gamepad API Polling Loop
+    // Gamepad API Polling
     var lastGamepadState = {};
     function pollGamepads() {
       var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -175,19 +292,12 @@
         var gp = gamepads[i];
         if (!gp) continue;
 
-        // Button 0 (A / Cross) -> OK
         checkGamepadButton(gp.id, 0, gp.buttons[0].pressed, 5);
-        // Button 12 (D-Pad Up) -> UP
         checkGamepadButton(gp.id, 12, gp.buttons[12]?.pressed, 1);
-        // Button 13 (D-Pad Down) -> DOWN
         checkGamepadButton(gp.id, 13, gp.buttons[13]?.pressed, 2);
-        // Button 14 (D-Pad Left) -> LEFT
         checkGamepadButton(gp.id, 14, gp.buttons[14]?.pressed, 3);
-        // Button 15 (D-Pad Right) -> RIGHT
         checkGamepadButton(gp.id, 15, gp.buttons[15]?.pressed, 4);
-        // Button 4 (L1) -> Left Softkey
         checkGamepadButton(gp.id, 4, gp.buttons[4]?.pressed, 1001);
-        // Button 5 (R1) -> Right Softkey
         checkGamepadButton(gp.id, 5, gp.buttons[5]?.pressed, 1002);
       }
       requestAnimationFrame(pollGamepads);
@@ -197,10 +307,10 @@
       var keyState = gpId + '_' + btnIdx;
       var wasPressed = !!lastGamepadState[keyState];
       if (isPressed && !wasPressed) {
-        sendKey(mreKey, 0); // Down
+        sendKey(mreKey, 0);
         lastGamepadState[keyState] = true;
       } else if (!isPressed && wasPressed) {
-        sendKey(mreKey, 1); // Up
+        sendKey(mreKey, 1);
         lastGamepadState[keyState] = false;
       }
     }

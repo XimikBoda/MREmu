@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <spdlog/spdlog.h>
 
 #ifdef __EMSCRIPTEN__
@@ -52,6 +53,40 @@ extern "C" {
             return graphic->height;
         }
         return 320;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    int mremu_wasm_load_file(const char* filename, const uint8_t* data, size_t length) {
+        spdlog::info("WASM receiving client file: {} ({} bytes)", filename, length);
+
+        if (!filename || !data || length == 0) {
+            spdlog::error("Invalid file payload passed to WASM");
+            return 0;
+        }
+
+        // Write file into Emscripten MEMFS virtual drive /fs/e/
+        std::string dest_path = std::string("e:/") + filename;
+        fs::path target_path = path_from_emu(dest_path);
+
+        fs::create_directories(target_path.parent_path());
+
+        std::ofstream out(target_path, std::ios::binary);
+        if (!out.is_open()) {
+            spdlog::error("Failed to open WASM MEMFS path for writing: {}", target_path.string());
+            return 0;
+        }
+
+        out.write(reinterpret_cast<const char*>(data), length);
+        out.close();
+
+        spdlog::info("WASM MEMFS file written to: {}", target_path.string());
+
+        if (g_webAppManager) {
+            g_webAppManager->add_app_for_launch(target_path.string(), false);
+            return 1;
+        }
+
+        return 0;
     }
 
     EMSCRIPTEN_KEEPALIVE

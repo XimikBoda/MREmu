@@ -95,7 +95,7 @@ if (EMSCRIPTEN)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINITIAL_MEMORY=67108864"
         "-sFORCE_FILESYSTEM=1"
-        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_mremu_wasm_get_screen_buffer','_mremu_wasm_get_screen_width','_mremu_wasm_get_screen_height','_mremu_wasm_send_key_event','_mremu_wasm_send_pen_event']"
+        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_mremu_wasm_get_screen_buffer','_mremu_wasm_get_screen_width','_mremu_wasm_get_screen_height','_mremu_wasm_send_key_event','_mremu_wasm_send_pen_event','_mremu_wasm_load_file']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
         "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/shell_minimal.html"
     )
