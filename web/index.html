@@ -4,253 +4,78 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MREmu WebAssembly Emulator</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background-color: #121212;
-      color: #e0e0e0;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background-color: #1e1e1e;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.6);
-    }
-    canvas {
-      border: 2px solid #333;
-      background-color: #000;
-      width: 240px;
-      height: 320px;
-      image-rendering: pixelated;
-    }
-    .status-bar {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #4caf50;
-    }
-    .controls-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 12px;
-    }
-    .btn {
-      background-color: #2196f3;
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    .btn:hover {
-      background-color: #1e88e5;
-    }
-    .btn-secondary {
-      background-color: #555;
-    }
-    .file-drop-zone {
-      margin-top: 15px;
-      width: 240px;
-      padding: 12px;
-      border: 2px dashed #555;
-      border-radius: 8px;
-      background-color: #2a2a2a;
-      text-align: center;
-      font-size: 13px;
-      cursor: pointer;
-      box-sizing: border-box;
-    }
-    .file-drop-zone.hover {
-      border-color: #4caf50;
-      background-color: #333;
-    }
-    .file-input {
-      display: none;
-    }
-    .keypad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-top: 15px;
-      width: 240px;
-    }
-    .keypad button {
-      background-color: #333;
-      color: #fff;
-      border: 1px solid #555;
-      padding: 10px;
-      border-radius: 6px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .keypad button:active {
-      background-color: #555;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>MREmu WebAssembly Emulator</h1>
-  <div class="container">
-    <canvas id="canvas" width="240" height="320"></canvas>
-    <div id="status" class="status-bar">Initializing Emulator API...</div>
+  <header>
+    <h1>MREmu WebAssembly</h1>
+    <p>MediaTek MRE / VXP Platform Web Emulator</p>
+  </header>
 
-    <div class="controls-row">
-      <button class="btn" onclick="toggleAudio()" id="audioBtn">🔊 Enable Audio</button>
-      <button class="btn btn-secondary" onclick="togglePause()" id="pauseBtn">Pause</button>
-      <button class="btn btn-secondary" onclick="resetEmu()">Reset</button>
-    </div>
+  <main class="app-layout">
+    <!-- Left Column: Display Canvas & Status -->
+    <section class="screen-column">
+      <div class="canvas-wrapper">
+        <canvas id="canvas" width="240" height="320" oncontextmenu="event.preventDefault()"></canvas>
+      </div>
 
-    <div id="dropZone" class="file-drop-zone" onclick="document.getElementById('fileInput').click()">
-      <strong>Select or Drag & Drop VXP / VRE File</strong>
-      <br/><span style="font-size:11px; color:#aaa;">(.vxp, .vre, .mre)</span>
-      <input type="file" id="fileInput" class="file-input" accept=".vxp,.vre,.mre" onchange="handleFileSelect(event)">
-    </div>
+      <div class="status-badge">
+        <span id="statusText">Initializing...</span>
+      </div>
 
-    <div class="keypad">
-      <button onmousedown="emulator.setKey(1001,0)" onmouseup="emulator.setKey(1001,1)">L-Soft</button>
-      <button onmousedown="emulator.setKey(1,0)" onmouseup="emulator.setKey(1,1)">UP</button>
-      <button onmousedown="emulator.setKey(1002,0)" onmouseup="emulator.setKey(1002,1)">R-Soft</button>
-      <button onmousedown="emulator.setKey(3,0)" onmouseup="emulator.setKey(3,1)">LEFT</button>
-      <button onmousedown="emulator.setKey(5,0)" onmouseup="emulator.setKey(5,1)">OK</button>
-      <button onmousedown="emulator.setKey(4,0)" onmouseup="emulator.setKey(4,1)">RIGHT</button>
-      <button onmousedown="emulator.setKey(2,0)" onmouseup="emulator.setKey(2,1)">DOWN</button>
-      <button onmousedown="emulator.setKey(48,0)" onmouseup="emulator.setKey(48,1)">0</button>
-      <button onmousedown="emulator.setKey(49,0)" onmouseup="emulator.setKey(49,1)">1</button>
-    </div>
-  </div>
+      <div id="gamepadStatus" class="gamepad-indicator">
+        🎮 No Gamepad Detected
+      </div>
+
+      <div id="errorBanner" class="error-banner"></div>
+    </section>
+
+    <!-- Right Column: Emulator Controls & Keypad -->
+    <section class="controls-column">
+      <!-- Toolbar Controls -->
+      <div class="toolbar">
+        <button id="startBtn" class="btn">▶ Start</button>
+        <button id="pauseBtn" class="btn btn-secondary">⏸ Pause</button>
+        <button id="resetBtn" class="btn btn-secondary">🔄 Reset</button>
+      </div>
+
+      <!-- Audio Toolbar & Volume Slider -->
+      <div class="audio-controls">
+        <button id="audioBtn" class="btn btn-secondary">🔊 Enable Audio</button>
+        <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" title="Volume">
+      </div>
+
+      <!-- Client-Side File Open & Drag/Drop Target -->
+      <div id="dropZone" class="file-drop-zone">
+        <p><strong>Open VXP / VRE Application</strong></p>
+        <span>Click to select or drag & drop file (.vxp, .vre, .mre)</span>
+        <input type="file" id="fileInput" class="file-input" accept=".vxp,.vre,.mre">
+      </div>
+
+      <!-- Virtual Phone Keypad -->
+      <div class="keypad">
+        <button onmousedown="emulator.setKey(1001,0)" onmouseup="emulator.setKey(1001,1)">L-Soft</button>
+        <button onmousedown="emulator.setKey(1,0)" onmouseup="emulator.setKey(1,1)">▲ UP</button>
+        <button onmousedown="emulator.setKey(1002,0)" onmouseup="emulator.setKey(1002,1)">R-Soft</button>
+        <button onmousedown="emulator.setKey(3,0)" onmouseup="emulator.setKey(3,1)">◄ LEFT</button>
+        <button onmousedown="emulator.setKey(5,0)" onmouseup="emulator.setKey(5,1)">OK</button>
+        <button onmousedown="emulator.setKey(4,0)" onmouseup="emulator.setKey(4,1)">► RIGHT</button>
+        <button onmousedown="emulator.setKey(2,0)" onmouseup="emulator.setKey(2,1)">▼ DOWN</button>
+        <button onmousedown="emulator.setKey(48,0)" onmouseup="emulator.setKey(48,1)">0</button>
+        <button onmousedown="emulator.setKey(49,0)" onmouseup="emulator.setKey(49,1)">1</button>
+      </div>
+
+      <!-- Key Mappings Guide -->
+      <div class="key-help">
+        <strong>Desktop Controls:</strong><br/>
+        • D-Pad: Arrow Keys | OK: Enter / Space<br/>
+        • Softkeys: Q (Left), E (Right)<br/>
+        • Numpad: 0-9 Keys
+      </div>
+    </section>
+  </main>
 
   <script src="src/MREmu.js"></script>
-  <script type="text/javascript">
-    var canvas = document.getElementById('canvas');
-    var statusElement = document.getElementById('status');
-    var dropZone = document.getElementById('dropZone');
-
-    // Instantiate clean MREmu JS API Wrapper
-    var emulator = new MREmu({
-      canvas: canvas,
-      wasmScriptUrl: 'mremu.js'
-    });
-
-    async function init() {
-      try {
-        await emulator.init();
-        emulator.start();
-        statusElement.innerText = "Emulator Active (Status: " + emulator.getStatus() + ")";
-      } catch (err) {
-        statusElement.style.color = "#f44336";
-        statusElement.innerText = err.message;
-      }
-    }
-
-    function toggleAudio() {
-      emulator.enableAudio();
-      var btn = document.getElementById('audioBtn');
-      btn.innerText = '🔊 Audio Enabled';
-      btn.style.backgroundColor = '#4caf50';
-    }
-
-    function togglePause() {
-      var btn = document.getElementById('pauseBtn');
-      if (emulator.getStatus() === 'running') {
-        emulator.pause();
-        btn.innerText = 'Resume';
-        statusElement.innerText = "Emulator Paused";
-      } else if (emulator.getStatus() === 'paused') {
-        emulator.start();
-        btn.innerText = 'Pause';
-        statusElement.innerText = "Emulator Running";
-      }
-    }
-
-    function resetEmu() {
-      emulator.reset();
-      emulator.start();
-      statusElement.innerText = "Emulator Reset";
-    }
-
-    async function processSelectedFile(file) {
-      if (!file) return;
-
-      try {
-        statusElement.style.color = '#4caf50';
-        statusElement.innerText = 'Loading ' + file.name + '...';
-        await emulator.load(file);
-        emulator.start();
-        statusElement.innerText = 'Running: ' + file.name;
-      } catch (err) {
-        statusElement.style.color = '#f44336';
-        statusElement.innerText = 'Error: ' + err.message;
-      }
-    }
-
-    function handleFileSelect(evt) {
-      if (evt.target.files && evt.target.files.length > 0) {
-        processSelectedFile(evt.target.files[0]);
-      }
-    }
-
-    dropZone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      dropZone.classList.add('hover');
-    });
-
-    dropZone.addEventListener('dragleave', function(e) {
-      e.preventDefault();
-      dropZone.classList.remove('hover');
-    });
-
-    dropZone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      dropZone.classList.remove('hover');
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        processSelectedFile(e.dataTransfer.files[0]);
-      }
-    });
-
-    var keyMap = {
-      'ArrowUp': 1,
-      'ArrowDown': 2,
-      'ArrowLeft': 3,
-      'ArrowRight': 4,
-      'Enter': 5,
-      'Space': 5,
-      'Digit0': 48,
-      'Digit1': 49,
-      'Digit2': 50,
-      'Digit3': 51,
-      'Digit4': 52,
-      'Digit5': 53,
-      'Digit6': 54,
-      'Digit7': 55,
-      'Digit8': 56,
-      'Digit9': 57,
-      'KeyQ': 1001,
-      'KeyE': 1002
-    };
-
-    window.addEventListener('keydown', function(e) {
-      if (keyMap[e.code] !== undefined) {
-        e.preventDefault();
-        emulator.setKey(keyMap[e.code], 0);
-      }
-    });
-
-    window.addEventListener('keyup', function(e) {
-      if (keyMap[e.code] !== undefined) {
-        e.preventDefault();
-        emulator.setKey(keyMap[e.code], 1);
-      }
-    });
-
-    init();
-  </script>
+  <script src="src/app.js"></script>
 </body>
 </html>

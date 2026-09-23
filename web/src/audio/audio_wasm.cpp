@@ -1,4 +1,4 @@
-#include "Audio.h"
+#include "MREngine/Audio.h"
 #include <vector>
 #include <spdlog/spdlog.h>
 
@@ -15,7 +15,7 @@ namespace MREngine {
             auto& midi = midi_pair.second;
             if (midi && midi->midi_player && !midi->error && !midi->done) {
                 std::lock_guard lock(midi->access_mutex);
-                int samples = adl_play(midi->midi_player, (int)g_web_audio_buffer.size() / 2, g_web_audio_buffer.data());
+                int samples = adl_play(midi->midi_player, (int)g_web_audio_buffer.size(), g_web_audio_buffer.data());
                 if (samples > 0) return;
             }
         }
