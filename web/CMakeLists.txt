@@ -60,6 +60,7 @@ set(WEB_SOURCES
     "src/main_wasm.cpp"
     "src/Cpu_wasm.cpp"
     "src/input/input_wasm.cpp"
+    "src/audio/audio_wasm.cpp"
     "../MREmu/Memory.cpp"
     "../MREmu/Bridge.cpp"
     "../MREmu/App.cpp"
@@ -95,7 +96,7 @@ if (EMSCRIPTEN)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINITIAL_MEMORY=67108864"
         "-sFORCE_FILESYSTEM=1"
-        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_mremu_wasm_get_screen_buffer','_mremu_wasm_get_screen_width','_mremu_wasm_get_screen_height','_mremu_wasm_send_key_event','_mremu_wasm_send_pen_event','_mremu_wasm_load_file']"
+        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_mremu_wasm_get_screen_buffer','_mremu_wasm_get_screen_width','_mremu_wasm_get_screen_height','_mremu_wasm_send_key_event','_mremu_wasm_send_pen_event','_mremu_wasm_load_file','_mremu_wasm_get_audio_buffer','_mremu_wasm_get_audio_sample_rate','_mremu_wasm_get_audio_channels','_mremu_wasm_get_audio_buffer_size']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
         "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/shell_minimal.html"
     )
