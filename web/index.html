@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MREmu WebAssembly Emulator Interface</title>
+  <title>MREmu WebAssembly Emulator</title>
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -36,18 +36,25 @@
       font-size: 14px;
       color: #4caf50;
     }
-    .audio-btn {
-      margin-top: 10px;
+    .controls-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .btn {
       background-color: #2196f3;
       color: white;
       border: none;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 6px;
       font-size: 13px;
       cursor: pointer;
     }
-    .audio-btn:hover {
+    .btn:hover {
       background-color: #1e88e5;
+    }
+    .btn-secondary {
+      background-color: #555;
     }
     .file-drop-zone {
       margin-top: 15px;
@@ -87,23 +94,19 @@
     .keypad button:active {
       background-color: #555;
     }
-    .config-panel {
-      margin-top: 15px;
-      width: 240px;
-      font-size: 12px;
-      background: #2a2a2a;
-      padding: 10px;
-      border-radius: 6px;
-      box-sizing: border-box;
-    }
   </style>
 </head>
 <body>
   <h1>MREmu WebAssembly Emulator</h1>
   <div class="container">
     <canvas id="canvas" width="240" height="320"></canvas>
-    <div id="status" class="status-bar">Downloading WASM Module...</div>
-    <button id="audioBtn" class="audio-btn" onclick="enableAudio()">🔊 Enable Audio</button>
+    <div id="status" class="status-bar">Initializing Emulator API...</div>
+
+    <div class="controls-row">
+      <button class="btn" onclick="toggleAudio()" id="audioBtn">🔊 Enable Audio</button>
+      <button class="btn btn-secondary" onclick="togglePause()" id="pauseBtn">Pause</button>
+      <button class="btn btn-secondary" onclick="resetEmu()">Reset</button>
+    </div>
 
     <div id="dropZone" class="file-drop-zone" onclick="document.getElementById('fileInput').click()">
       <strong>Select or Drag & Drop VXP / VRE File</strong>
@@ -112,180 +115,85 @@
     </div>
 
     <div class="keypad">
-      <button onmousedown="sendKey(1001,0)" onmouseup="sendKey(1001,1)">L-Soft</button>
-      <button onmousedown="sendKey(1,0)" onmouseup="sendKey(1,1)">UP</button>
-      <button onmousedown="sendKey(1002,0)" onmouseup="sendKey(1002,1)">R-Soft</button>
-      <button onmousedown="sendKey(3,0)" onmouseup="sendKey(3,1)">LEFT</button>
-      <button onmousedown="sendKey(5,0)" onmouseup="sendKey(5,1)">OK</button>
-      <button onmousedown="sendKey(4,0)" onmouseup="sendKey(4,1)">RIGHT</button>
-      <button onmousedown="sendKey(2,0)" onmouseup="sendKey(2,1)">DOWN</button>
-      <button onmousedown="sendKey(48,0)" onmouseup="sendKey(48,1)">0</button>
-      <button onmousedown="sendKey(49,0)" onmouseup="sendKey(49,1)">1</button>
-    </div>
-
-    <div class="config-panel">
-      <strong>Key Mappings:</strong><br/>
-      Arrows: D-Pad | Space/Enter: OK<br/>
-      Q: Left Softkey | E: Right Softkey<br/>
-      0-9: Numpad 0-9
+      <button onmousedown="emulator.setKey(1001,0)" onmouseup="emulator.setKey(1001,1)">L-Soft</button>
+      <button onmousedown="emulator.setKey(1,0)" onmouseup="emulator.setKey(1,1)">UP</button>
+      <button onmousedown="emulator.setKey(1002,0)" onmouseup="emulator.setKey(1002,1)">R-Soft</button>
+      <button onmousedown="emulator.setKey(3,0)" onmouseup="emulator.setKey(3,1)">LEFT</button>
+      <button onmousedown="emulator.setKey(5,0)" onmouseup="emulator.setKey(5,1)">OK</button>
+      <button onmousedown="emulator.setKey(4,0)" onmouseup="emulator.setKey(4,1)">RIGHT</button>
+      <button onmousedown="emulator.setKey(2,0)" onmouseup="emulator.setKey(2,1)">DOWN</button>
+      <button onmousedown="emulator.setKey(48,0)" onmouseup="emulator.setKey(48,1)">0</button>
+      <button onmousedown="emulator.setKey(49,0)" onmouseup="emulator.setKey(49,1)">1</button>
     </div>
   </div>
 
+  <script src="src/MREmu.js"></script>
   <script type="text/javascript">
-    var sendKeyFunc = null;
-    var sendPenFunc = null;
-    var loadFileFunc = null;
-
-    var audioCtx = null;
-    var audioNode = null;
-    var audioEnabled = false;
-
-    var statusElement = document.getElementById('status');
     var canvas = document.getElementById('canvas');
+    var statusElement = document.getElementById('status');
     var dropZone = document.getElementById('dropZone');
-    var ctx = canvas.getContext('2d');
-    var imageData = null;
 
-    var Module = {
-      preRun: [],
-      postRun: [function() {
-        initBindings();
-        startRenderingLoop();
-      }],
-      print: function(text) {
-        console.log('[MREmu WASM]: ' + text);
-      },
-      printErr: function(text) {
-        console.error('[MREmu WASM Error]: ' + text);
-      },
+    // Instantiate clean MREmu JS API Wrapper
+    var emulator = new MREmu({
       canvas: canvas,
-      setStatus: function(text) {
-        statusElement.innerHTML = text;
-      }
-    };
+      wasmScriptUrl: 'mremu.js'
+    });
 
-    function initBindings() {
-      if (typeof Module.cwrap === 'function') {
-        sendKeyFunc = Module.cwrap('mremu_wasm_send_key_event', null, ['number', 'number']);
-        sendPenFunc = Module.cwrap('mremu_wasm_send_pen_event', null, ['number', 'number', 'number']);
-        loadFileFunc = Module.cwrap('mremu_wasm_load_file', 'number', ['string', 'number', 'number']);
+    async function init() {
+      try {
+        await emulator.init();
+        emulator.start();
+        statusElement.innerText = "Emulator Active (Status: " + emulator.getStatus() + ")";
+      } catch (err) {
+        statusElement.style.color = "#f44336";
+        statusElement.innerText = err.message;
       }
     }
 
-    function enableAudio() {
-      if (audioEnabled) return;
-
-      var AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContext({ sampleRate: 44100 });
-
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-
-      var getAudioBuffer = Module.cwrap('mremu_wasm_get_audio_buffer', 'number', []);
-      var getAudioBufferSize = Module.cwrap('mremu_wasm_get_audio_buffer_size', 'number', []);
-
-      var bufferSize = 2048;
-      audioNode = audioCtx.createScriptProcessor(bufferSize, 1, 2);
-
-      audioNode.onaudioprocess = function(e) {
-        var outputL = e.outputBuffer.getChannelData(0);
-        var outputR = e.outputBuffer.getChannelData(1);
-
-        var bufPtr = getAudioBuffer ? getAudioBuffer() : 0;
-        if (bufPtr) {
-          var heap16 = Module.HEAP16;
-          var startIdx = bufPtr >> 1;
-
-          for (var i = 0; i < bufferSize; i++) {
-            outputL[i] = (heap16[startIdx + i * 2] || 0) / 32768.0;
-            outputR[i] = (heap16[startIdx + i * 2 + 1] || 0) / 32768.0;
-          }
-        } else {
-          for (var i = 0; i < bufferSize; i++) {
-            outputL[i] = 0;
-            outputR[i] = 0;
-          }
-        }
-      };
-
-      audioNode.connect(audioCtx.destination);
-      audioEnabled = true;
-
+    function toggleAudio() {
+      emulator.enableAudio();
       var btn = document.getElementById('audioBtn');
       btn.innerText = '🔊 Audio Enabled';
       btn.style.backgroundColor = '#4caf50';
     }
 
-    function sendKey(code, type) {
-      if (sendKeyFunc) {
-        sendKeyFunc(code, type);
+    function togglePause() {
+      var btn = document.getElementById('pauseBtn');
+      if (emulator.getStatus() === 'running') {
+        emulator.pause();
+        btn.innerText = 'Resume';
+        statusElement.innerText = "Emulator Paused";
+      } else if (emulator.getStatus() === 'paused') {
+        emulator.start();
+        btn.innerText = 'Pause';
+        statusElement.innerText = "Emulator Running";
       }
     }
 
-    function processSelectedFile(file) {
+    function resetEmu() {
+      emulator.reset();
+      emulator.start();
+      statusElement.innerText = "Emulator Reset";
+    }
+
+    async function processSelectedFile(file) {
       if (!file) return;
 
-      var validExts = ['.vxp', '.vre', '.mre'];
-      var fileName = file.name.toLowerCase();
-      var isValidExt = validExts.some(function(ext) { return fileName.endsWith(ext); });
-
-      if (!isValidExt) {
+      try {
+        statusElement.style.color = '#4caf50';
+        statusElement.innerText = 'Loading ' + file.name + '...';
+        await emulator.load(file);
+        emulator.start();
+        statusElement.innerText = 'Running: ' + file.name;
+      } catch (err) {
         statusElement.style.color = '#f44336';
-        statusElement.innerText = 'Error: Invalid file extension. Select a .vxp, .vre, or .mre file.';
-        return;
+        statusElement.innerText = 'Error: ' + err.message;
       }
-
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        var arrayBuffer = e.target.result;
-        var uint8Array = new Uint8Array(arrayBuffer);
-
-        if (uint8Array.length < 4) {
-          statusElement.style.color = '#f44336';
-          statusElement.innerText = 'Error: File is empty or corrupt.';
-          return;
-        }
-
-        var isZlib = uint8Array[0] === 0x78;
-        var isElf = uint8Array[0] === 0x7F && uint8Array[1] === 0x45 && uint8Array[2] === 0x4C && uint8Array[3] === 0x46;
-
-        if (!isZlib && !isElf) {
-          statusElement.style.color = '#ff9800';
-          statusElement.innerText = 'Warning: Unrecognized file magic bytes. Attempting launch...';
-        } else {
-          statusElement.style.color = '#4caf50';
-          statusElement.innerText = 'Loaded file: ' + file.name + ' (' + uint8Array.length + ' bytes)';
-        }
-
-        var ptr = Module._malloc(uint8Array.length);
-        Module.HEAPU8.set(uint8Array, ptr);
-
-        if (loadFileFunc) {
-          var res = loadFileFunc(file.name, ptr, uint8Array.length);
-          if (res === 1) {
-            statusElement.innerText = 'Successfully launched ' + file.name;
-          } else {
-            statusElement.style.color = '#f44336';
-            statusElement.innerText = 'Failed to launch ' + file.name;
-          }
-        }
-
-        Module._free(ptr);
-      };
-
-      reader.onerror = function() {
-        statusElement.style.color = '#f44336';
-        statusElement.innerText = 'Error reading file in browser.';
-      };
-
-      reader.readAsArrayBuffer(file);
     }
 
     function handleFileSelect(evt) {
-      var files = evt.target.files;
-      if (files && files.length > 0) {
-        processSelectedFile(files[0]);
+      if (evt.target.files && evt.target.files.length > 0) {
+        processSelectedFile(evt.target.files[0]);
       }
     }
 
@@ -331,100 +239,18 @@
     window.addEventListener('keydown', function(e) {
       if (keyMap[e.code] !== undefined) {
         e.preventDefault();
-        sendKey(keyMap[e.code], 0);
+        emulator.setKey(keyMap[e.code], 0);
       }
     });
 
     window.addEventListener('keyup', function(e) {
       if (keyMap[e.code] !== undefined) {
         e.preventDefault();
-        sendKey(keyMap[e.code], 1);
+        emulator.setKey(keyMap[e.code], 1);
       }
     });
 
-    var lastGamepadState = {};
-    function pollGamepads() {
-      var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-      for (var i = 0; i < gamepads.length; i++) {
-        var gp = gamepads[i];
-        if (!gp) continue;
-
-        checkGamepadButton(gp.id, 0, gp.buttons[0].pressed, 5);
-        checkGamepadButton(gp.id, 12, gp.buttons[12]?.pressed, 1);
-        checkGamepadButton(gp.id, 13, gp.buttons[13]?.pressed, 2);
-        checkGamepadButton(gp.id, 14, gp.buttons[14]?.pressed, 3);
-        checkGamepadButton(gp.id, 15, gp.buttons[15]?.pressed, 4);
-        checkGamepadButton(gp.id, 4, gp.buttons[4]?.pressed, 1001);
-        checkGamepadButton(gp.id, 5, gp.buttons[5]?.pressed, 1002);
-      }
-      requestAnimationFrame(pollGamepads);
-    }
-
-    function checkGamepadButton(gpId, btnIdx, isPressed, mreKey) {
-      var keyState = gpId + '_' + btnIdx;
-      var wasPressed = !!lastGamepadState[keyState];
-      if (isPressed && !wasPressed) {
-        sendKey(mreKey, 0);
-        lastGamepadState[keyState] = true;
-      } else if (!isPressed && wasPressed) {
-        sendKey(mreKey, 1);
-        lastGamepadState[keyState] = false;
-      }
-    }
-
-    window.addEventListener("gamepadconnected", function(e) {
-      statusElement.innerText = "Gamepad Connected: " + e.gamepad.id;
-      pollGamepads();
-    });
-
-    window.addEventListener("gamepaddisconnected", function(e) {
-      statusElement.innerText = "Gamepad Disconnected";
-    });
-
-    function startRenderingLoop() {
-      statusElement.innerText = "Emulator Active";
-      var getBuffer = Module.cwrap('mremu_wasm_get_screen_buffer', 'number', []);
-      var getWidth = Module.cwrap('mremu_wasm_get_screen_width', 'number', []);
-      var getHeight = Module.cwrap('mremu_wasm_get_screen_height', 'number', []);
-
-      function renderFrame() {
-        var width = getWidth() || 240;
-        var height = getHeight() || 320;
-
-        if (canvas.width !== width || canvas.height !== height) {
-          canvas.width = width;
-          canvas.height = height;
-          imageData = null;
-        }
-
-        if (!imageData) {
-          imageData = ctx.createImageData(width, height);
-        }
-
-        var bufPtr = getBuffer();
-        if (bufPtr) {
-          var numPixels = width * height;
-          var heap16 = Module.HEAPU16;
-          var startIdx = bufPtr >> 1;
-          var data32 = new Uint32Array(imageData.data.buffer);
-
-          for (var i = 0; i < numPixels; i++) {
-            var rgb565 = heap16[startIdx + i];
-            var r = ((rgb565 >> 11) & 0x1F) * 255 / 31;
-            var g = ((rgb565 >> 5) & 0x3F) * 255 / 63;
-            var b = (rgb565 & 0x1F) * 255 / 31;
-            data32[i] = (0xFF << 24) | (b << 16) | (g << 8) | r;
-          }
-
-          ctx.putImageData(imageData, 0, 0);
-        }
-
-        requestAnimationFrame(renderFrame);
-      }
-
-      requestAnimationFrame(renderFrame);
-    }
+    init();
   </script>
-  <script async src="mremu.js"></script>
 </body>
 </html>
