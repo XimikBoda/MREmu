@@ -186,7 +186,7 @@
       var getAudioBufferSize = Module.cwrap('mremu_wasm_get_audio_buffer_size', 'number', []);
 
       var bufferSize = 2048;
-      audioNode = audioCtx.createScriptProcessor(bufferSize, 0, 2);
+      audioNode = audioCtx.createScriptProcessor(bufferSize, 1, 2);
 
       audioNode.onaudioprocess = function(e) {
         var outputL = e.outputBuffer.getChannelData(0);
@@ -198,7 +198,6 @@
           var startIdx = bufPtr >> 1;
 
           for (var i = 0; i < bufferSize; i++) {
-            // Convert 16-bit PCM to [-1.0, 1.0] float
             outputL[i] = (heap16[startIdx + i * 2] || 0) / 32768.0;
             outputR[i] = (heap16[startIdx + i * 2 + 1] || 0) / 32768.0;
           }

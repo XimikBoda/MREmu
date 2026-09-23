@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include <spdlog/spdlog.h>
 
 #ifdef __EMSCRIPTEN__
@@ -20,10 +21,16 @@
 extern MREngine::Graphic* graphic;
 
 AppManager* g_webAppManager = nullptr;
+static auto g_last_frame_time = std::chrono::high_resolution_clock::now();
 
 void web_main_loop() {
-    static uint32_t last_tick = 0;
-    uint32_t delta_ms = 16; // ~60 FPS frame tick slice
+    auto current_time = std::chrono::high_resolution_clock::now();
+    uint32_t delta_ms = (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(current_time - g_last_frame_time).count();
+    g_last_frame_time = current_time;
+
+    // Clamp delta to avoid huge time skips when tab is backgrounded
+    if (delta_ms > 100) delta_ms = 100;
+    if (delta_ms == 0) delta_ms = 16;
 
     if (g_webAppManager) {
         g_webAppManager->update(delta_ms);
@@ -64,7 +71,6 @@ extern "C" {
             return 0;
         }
 
-        // Write file into Emscripten MEMFS virtual drive /fs/e/
         std::string dest_path = std::string("e:/") + filename;
         fs::path target_path = path_from_emu(dest_path);
 
@@ -123,6 +129,9 @@ int main(int argc, char** argv) {
     spdlog::info("MREmu Core & Graphics initialized successfully for WebAssembly.");
 
 #ifdef __EMSCRIPTEN__
+    g_last_frame_time = std::chrono::high_resolution_clock::now();
+    // emscripten_set_main_loop(func, fps, simulate_infinite_loop)
+    // fps = 0 uses requestAnimationFrame for browser timing synchronization
     emscripten_set_main_loop(web_main_loop, 0, 1);
 #else
     spdlog::info("Web main loop skipped outside Emscripten environment.");
