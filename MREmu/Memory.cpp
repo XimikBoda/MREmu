@@ -5,7 +5,14 @@
 #include <cstring>
 
 #ifndef WIN32
+
+#if defined(__ANDROID__) && __ANDROID_API__ < 28
+#include <malloc.h>
+#define _aligned_malloc(size, alignment) memalign((alignment), (size))
+#else
 #define _aligned_malloc(size, alignment) aligned_alloc((alignment), (size))
+#endif
+
 #define _aligned_free(ptr) free((ptr))
 #endif // !WIN32
 
