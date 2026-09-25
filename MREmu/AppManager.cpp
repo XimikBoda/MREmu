@@ -3,11 +3,10 @@
 #include "ArmApp.h"
 #include "DLLApp.h"
 #include "NativeApp.h"
+#include "MREngine/SystemTextBox.h"
+#include "MREmu.h"
 #include <string>
 #include <vmcert.h>
-
-extern std::string error_message;
-extern bool show_error;
 
 void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
 {
@@ -148,6 +147,11 @@ void AppManager::process_keyboard_events()
 			keyboard_events_queue.pop();
 		}
 
+		if (MREngine::SystemTextBox::is_open()) {
+			if (MREngine::SystemTextBox::handle_key(ke.event, ke.keycode))
+				continue;
+		}
+
 		current_work_app_id = active_app_id;
 
 		if (current_work_app_id < 0 || current_work_app_id >= apps.size())
@@ -173,6 +177,11 @@ void AppManager::process_pen_events()
 			std::lock_guard lock(pen_events_queue_mutex);
 			pe = pen_events_queue.front();
 			pen_events_queue.pop();
+		}
+
+		if (MREngine::SystemTextBox::is_open()) {
+			if (MREngine::SystemTextBox::handle_pen(pe.event, pe.x, pe.y, 240, 320))
+				continue;
 		}
 
 		current_work_app_id = active_app_id;
@@ -265,6 +274,7 @@ void AppManager::update(size_t delta_ms) {
 	process_keyboard_events();
 	process_pen_events();
 	process_message_events();
+	process_input_events();
 	for (int i = 0; i < apps.size(); ++i) {
 		current_work_app_id = i;
 		bool active = active_app_id == current_work_app_id;
@@ -276,6 +286,41 @@ void AppManager::update(size_t delta_ms) {
 		apps[i]->timer.update(delta_ms, cur_app);//active
 		apps[i]->sock.update(cur_app);
 	}
+}
+
+void AppManager::reset()
+{
+	{
+		std::lock_guard lock(launch_queue_mutex);
+		launch_queue = {};
+	}
+	{
+		std::lock_guard lock(close_queue_mutex);
+		close_queue = {};
+	}
+	{
+		std::lock_guard lock(keyboard_events_queue_mutex);
+		keyboard_events_queue = {};
+	}
+	{
+		std::lock_guard lock(pen_events_queue_mutex);
+		pen_events_queue = {};
+	}
+	{
+		std::lock_guard lock(message_events_queue_mutex);
+		message_events_queue = {};
+	}
+	{
+		std::lock_guard lock(system_events_queue_mutex);
+		system_events_queue = {};
+	}
+	{
+		std::lock_guard lock(input_events_queue_mutex);
+		input_events_queue = {};
+	}
+	apps.clear();
+	active_app_id = -1;
+	current_work_app_id = -1;
 }
 
 App* AppManager::get_active_app()
@@ -341,7 +386,34 @@ MREngine::AppAudio& get_current_app_audio() {
 }
 
 fs::path get_current_app_path() {
-	return get_cur_app()->path;
+	if (g_appManager) {
+		App* app = g_appManager->get_current_work_app_id();
+		if (app)
+			return app->path;
+	}
+	return "";
+}
+
+fs::path get_current_app_real_path() {
+	if (g_appManager) {
+		App* app = g_appManager->get_current_work_app_id();
+		if (app)
+			return app->real_path;
+	}
+	return "";
+}
+
+std::string get_current_app_name() {
+	if (g_appManager) {
+		App* app = g_appManager->get_current_work_app_id();
+		if (app) {
+			if (!app->app_name.empty())
+				return app->app_name;
+			auto u8name = app->tags.get_app_name();
+			return std::string(u8name.begin(), u8name.end());
+		}
+	}
+	return "";
 }
 
 MreTags* get_tags_by_mem_adr(size_t offset_mem) {
@@ -379,3 +451,38 @@ void add_system_event(int phandle, int message, int param)
 	if (g_appManager)
 		g_appManager->add_system_event(phandle, message, param);
 }
+
+void AppManager::add_input_event(uint32_t callback, int state, uint32_t text_emu_addr)
+{
+	std::lock_guard lock(input_events_queue_mutex);
+	input_events_queue.push({ callback, state, text_emu_addr });
+}
+
+void AppManager::process_input_events()
+{
+	while (input_events_queue.size()) {
+		input_event_el ie;
+		{
+			std::lock_guard lock(input_events_queue_mutex);
+			ie = input_events_queue.front();
+			input_events_queue.pop();
+		}
+
+		current_work_app_id = active_app_id;
+
+		if (current_work_app_id < 0 || current_work_app_id >= apps.size())
+			return;
+
+		App& cur_app = *apps[current_work_app_id];
+		if (ie.callback) {
+			cur_app.run((void(*)(VMINT, uint32_t))ie.callback, ie.state, ie.text_emu_addr);
+			add_system_event(cur_app.system_callbacks.ph_app_id, VM_MSG_PAINT, 0);
+		}
+	}
+}
+
+void add_input_event(uint32_t callback, int state, uint32_t text_emu_addr)
+{
+	if (g_appManager)
+		g_appManager->add_input_event(callback, state, text_emu_addr);
+}

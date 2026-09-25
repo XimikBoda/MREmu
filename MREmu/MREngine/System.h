@@ -17,3 +17,7 @@ namespace MREngine {
 }
 
 MREngine::SystemCallbacks& get_current_app_system_callbacks();
+
+VMINT vm_global_get_max_alloc_size(void);
+void* vm_global_malloc(unsigned int size);
+void vm_global_free(void* ptr);

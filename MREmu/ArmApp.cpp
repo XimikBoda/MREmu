@@ -70,7 +70,7 @@ bool ArmApp::preparation()
 	is_zipped = tags.is_zipped();
 
 	mem_size = tags.get_ram() * 1024;
-	mem_size = std::max<size_t>(512 * 1024, mem_size);
+	mem_size = std::max<size_t>(4 * 1024 * 1024, mem_size);
 
 	mem_location = Memory::shared_malloc(mem_size, true, 0x100000);
 	memset(mem_location, 0, mem_size);

@@ -30,13 +30,30 @@ VMINT vm_get_time(vm_time_t* time) {
 	time->hour = pTInfo->tm_hour;
 	time->min = pTInfo->tm_min;
 	time->sec = pTInfo->tm_sec;
+
+	const char* env_year = getenv("MREMU_YEAR");
+	if (env_year && *env_year) {
+		int y = std::atoi(env_year);
+		if (y > 1990 && y < 2050)
+			time->year = y;
+	}
 	return 0;
 }
 
 VMINT vm_get_curr_utc(VMUINT* utc) {
 	if (utc == 0)
 		return -1;
-	*utc = std::time(nullptr);
+	std::time_t t = std::time(nullptr);
+	const char* env_year = getenv("MREMU_YEAR");
+	if (env_year && *env_year) {
+		int y = std::atoi(env_year);
+		if (y > 1990 && y < 2050) {
+			std::tm* pTInfo = std::localtime(&t);
+			pTInfo->tm_year = y - 1900;
+			t = std::mktime(pTInfo);
+		}
+	}
+	*utc = (VMUINT)t;
 	return 0;
 }
 
@@ -97,6 +114,20 @@ void* vm_realloc(void* p, int size) {
 
 void vm_free(void* ptr) {
 	Memory::app_free(ptr);
+}
+
+VMINT vm_global_get_max_alloc_size(void) {
+	Memory::MemoryManager& mm = get_current_app_memory();
+	return (VMINT)mm.get_free_memory_size();
+}
+
+void* vm_global_malloc(unsigned int size) {
+	return vm_malloc(size);
+}
+
+void vm_global_free(void* ptr) {
+	if (ptr)
+		vm_free(ptr);
 }
 
 void vm_reg_sysevt_callback(void (*f)(VMINT message, VMINT param)) {

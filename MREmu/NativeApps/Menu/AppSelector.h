@@ -6,6 +6,7 @@ struct nativeapp_conf {
 
 namespace NativeApps::Menu::AppSelector {
 	void entry();
+	void rescan();
 
 	const nativeapp_conf Conf = { entry };
 }

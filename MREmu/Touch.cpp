@@ -65,6 +65,13 @@ bool Touch::sf_event(sf::Event& event) {
 	case sf::Event::MouseButtonPressed:
 		if (event.mouseButton.button == sf::Mouse::Button::Left)
 			return d_event(Began, Mouse, { event.mouseButton.x, event.mouseButton.y });
+		else if (event.mouseButton.button == sf::Mouse::Button::Right) {
+			auto s_pos = to_screen_coords({ event.mouseButton.x, event.mouseButton.y });
+			if (is_on_screen(s_pos)) {
+				add_pen_event(VM_PEN_EVENT_LONG_TAP, s_pos.x, s_pos.y);
+				return true;
+			}
+		}
 		break;
 	case sf::Event::MouseMoved:
 		return d_event(Moved, Mouse, { event.mouseMove.x, event.mouseMove.y });
