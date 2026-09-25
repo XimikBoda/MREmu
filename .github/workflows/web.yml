@@ -1,0 +1,54 @@
+name: Deploy MREmu WebAssembly to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.50
+
+      - name: Build WebAssembly Target
+        run: |
+          chmod +x web/build_web.sh
+          ./web/build_web.sh
+
+      - name: Prepare Static Site Artifacts
+        run: |
+          mkdir -p dist
+          cp web/index.html dist/
+          cp web/style.css dist/
+          cp -r web/src dist/
+          cp web/build/mremu.js dist/
+          cp web/build/mremu.wasm dist/
+          cp web/build/mremu.html dist/ || true
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

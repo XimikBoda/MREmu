@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MREmu WebAssembly Emulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>MREmu WebAssembly</h1>
+    <p>MediaTek MRE / VXP Platform Web Emulator</p>
+  </header>
+
+  <main class="app-layout">
+    <!-- Left Column: Display Canvas & Status -->
+    <section class="screen-column">
+      <div class="canvas-wrapper">
+        <canvas id="canvas" width="240" height="320" oncontextmenu="event.preventDefault()"></canvas>
+      </div>
+
+      <div class="status-badge">
+        <span id="statusText">Initializing...</span>
+      </div>
+
+      <div id="gamepadStatus" class="gamepad-indicator">
+        🎮 No Gamepad Detected
+      </div>
+
+      <div id="errorBanner" class="error-banner"></div>
+    </section>
+
+    <!-- Right Column: Emulator Controls & Keypad -->
+    <section class="controls-column">
+      <!-- Toolbar Controls -->
+      <div class="toolbar">
+        <button id="startBtn" class="btn">▶ Start</button>
+        <button id="pauseBtn" class="btn btn-secondary">⏸ Pause</button>
+        <button id="resetBtn" class="btn btn-secondary">🔄 Reset</button>
+      </div>
+
+      <!-- Audio Toolbar & Volume Slider -->
+      <div class="audio-controls">
+        <button id="audioBtn" class="btn btn-secondary">🔊 Enable Audio</button>
+        <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" title="Volume">
+      </div>
+
+      <!-- Client-Side File Open & Drag/Drop Target -->
+      <div id="dropZone" class="file-drop-zone">
+        <p><strong>Open VXP / VRE Application</strong></p>
+        <span>Click to select or drag & drop file (.vxp, .vre, .mre)</span>
+        <input type="file" id="fileInput" class="file-input" accept=".vxp,.vre,.mre">
+      </div>
+
+      <!-- Virtual Phone Keypad -->
+      <div class="keypad">
+        <button onmousedown="emulator.setKey(1001,0)" onmouseup="emulator.setKey(1001,1)">L-Soft</button>
+        <button onmousedown="emulator.setKey(1,0)" onmouseup="emulator.setKey(1,1)">▲ UP</button>
+        <button onmousedown="emulator.setKey(1002,0)" onmouseup="emulator.setKey(1002,1)">R-Soft</button>
+        <button onmousedown="emulator.setKey(3,0)" onmouseup="emulator.setKey(3,1)">◄ LEFT</button>
+        <button onmousedown="emulator.setKey(5,0)" onmouseup="emulator.setKey(5,1)">OK</button>
+        <button onmousedown="emulator.setKey(4,0)" onmouseup="emulator.setKey(4,1)">► RIGHT</button>
+        <button onmousedown="emulator.setKey(2,0)" onmouseup="emulator.setKey(2,1)">▼ DOWN</button>
+        <button onmousedown="emulator.setKey(48,0)" onmouseup="emulator.setKey(48,1)">0</button>
+        <button onmousedown="emulator.setKey(49,0)" onmouseup="emulator.setKey(49,1)">1</button>
+      </div>
+
+      <!-- Key Mappings Guide -->
+      <div class="key-help">
+        <strong>Desktop Controls:</strong><br/>
+        • D-Pad: Arrow Keys | OK: Enter / Space<br/>
+        • Softkeys: Q (Left), E (Right)<br/>
+        • Numpad: 0-9 Keys
+      </div>
+    </section>
+  </main>
+
+  <script src="src/MREmu.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

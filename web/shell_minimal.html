@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>MREmu WebAssembly Display</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background-color: #121212;
+        color: #f0f0f0;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .display-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #222;
+        padding: 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      }
+      #canvas {
+        border: 2px solid #444;
+        background-color: #000;
+        width: 240px;
+        height: 320px;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      #status {
+        margin-top: 10px;
+        font-weight: bold;
+        color: #4caf50;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>MREmu WebAssembly Emulator</h1>
+    <div class="display-container">
+      <canvas id="canvas" width="240" height="320" oncontextmenu="event.preventDefault()"></canvas>
+      <div id="status">Downloading WASM...</div>
+    </div>
+
+    <script type='text/javascript'>
+      var statusElement = document.getElementById('status');
+      var canvas = document.getElementById('canvas');
+      var ctx = canvas.getContext('2d');
+      var imageData = null;
+
+      var Module = {
+        preRun: [],
+        postRun: [function() {
+          startRenderingLoop();
+        }],
+        print: function(text) {
+          console.log('[MREmu WASM]: ' + text);
+        },
+        printErr: function(text) {
+          console.error('[MREmu WASM Error]: ' + text);
+        },
+        canvas: canvas,
+        setStatus: function(text) {
+          if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+          if (text === Module.setStatus.last.text) return;
+          statusElement.innerHTML = text;
+        }
+      };
+
+      function startRenderingLoop() {
+        Module.setStatus('Emulator Active');
+
+        var getBuffer = Module.cwrap('mremu_wasm_get_screen_buffer', 'number', []);
+        var getWidth = Module.cwrap('mremu_wasm_get_screen_width', 'number', []);
+        var getHeight = Module.cwrap('mremu_wasm_get_screen_height', 'number', []);
+
+        function renderFrame() {
+          var width = getWidth() || 240;
+          var height = getHeight() || 320;
+
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+            imageData = null;
+          }
+
+          if (!imageData) {
+            imageData = ctx.createImageData(width, height);
+          }
+
+          var bufPtr = getBuffer();
+          if (bufPtr) {
+            var numPixels = width * height;
+            var heap16 = Module.HEAPU16;
+            var startIdx = bufPtr >> 1;
+            var data32 = new Uint32Array(imageData.data.buffer);
+
+            for (var i = 0; i < numPixels; i++) {
+              var rgb565 = heap16[startIdx + i];
+
+              var r = ((rgb565 >> 11) & 0x1F) * 255 / 31;
+              var g = ((rgb565 >> 5) & 0x3F) * 255 / 63;
+              var b = (rgb565 & 0x1F) * 255 / 31;
+
+              // Little-endian ABGR for Uint32Array
+              data32[i] = (0xFF << 24) | (b << 16) | (g << 8) | r;
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+          }
+
+          requestAnimationFrame(renderFrame);
+        }
+
+        requestAnimationFrame(renderFrame);
+      }
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>
