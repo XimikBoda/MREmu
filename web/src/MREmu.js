@@ -1,6 +1,6 @@
 /**
  * MREmu WebAssembly Emulator JavaScript API Wrapper
- * Provides an asynchronous, high-level object-oriented interface over the low-level WASM module.
+ * Optimized zero-allocation rendering and memory inspection pipeline.
  */
 class MREmu {
   /**
@@ -11,7 +11,7 @@ class MREmu {
   constructor(options = {}) {
     this.canvas = options.canvas || null;
     this.wasmScriptUrl = options.wasmScriptUrl || 'mremu.js';
-    this.status = 'uninitialized'; // 'uninitialized' | 'loading' | 'ready' | 'running' | 'paused' | 'error'
+    this.status = 'uninitialized';
     this.volume = 1.0;
     this.audioCtx = null;
     this.audioNode = null;
@@ -19,9 +19,10 @@ class MREmu {
     this.module = null;
     this.renderAnimFrameId = null;
     this.imageData = null;
+    this.pixelUint32Buffer = null;
     this.activeFileName = null;
 
-    // Exported WASM functions
+    // Fast-path cached function wrappers
     this._getBuffer = null;
     this._getWidth = null;
     this._getHeight = null;
@@ -31,10 +32,6 @@ class MREmu {
     this._getAudioBuffer = null;
   }
 
-  /**
-   * Initializes the WebAssembly module and connects export bindings.
-   * @returns {Promise<void>}
-   */
   async init() {
     if (this.status !== 'uninitialized' && this.status !== 'error') {
       return;
@@ -88,12 +85,6 @@ class MREmu {
     }
   }
 
-  /**
-   * Asynchronously loads a .vxp / .vre / .mre file buffer into the emulator.
-   * @param {File|ArrayBuffer} fileOrBuffer File object or binary ArrayBuffer
-   * @param {string} [filename='app.vxp'] File name
-   * @returns {Promise<boolean>} Success status
-   */
   async load(fileOrBuffer, filename = 'app.vxp') {
     if (this.status === 'uninitialized') {
       await this.init();
@@ -118,7 +109,6 @@ class MREmu {
       throw new Error('Corrupt or empty file buffer.');
     }
 
-    // Allocate memory in WASM heap
     const ptr = this.module._malloc(uint8Array.length);
     this.module.HEAPU8.set(uint8Array, ptr);
 
@@ -140,9 +130,6 @@ class MREmu {
     }
   }
 
-  /**
-   * Starts or resumes emulator main loop execution and rendering.
-   */
   start() {
     if (this.status === 'running') return;
 
@@ -152,9 +139,6 @@ class MREmu {
     }
   }
 
-  /**
-   * Pauses emulator execution and cancels animation frame rendering.
-   */
   pause() {
     if (this.status !== 'running') return;
 
@@ -165,52 +149,30 @@ class MREmu {
     }
   }
 
-  /**
-   * Resets the emulator instance.
-   */
   reset() {
     this.pause();
     this.imageData = null;
+    this.pixelUint32Buffer = null;
     this.activeFileName = null;
     this.status = 'ready';
   }
 
-  /**
-   * Sends keydown or keyup event to emulated application.
-   * @param {number} keycode MRE keycode (e.g. 1=UP, 2=DOWN, 5=OK)
-   * @param {number} eventType 0 = DOWN, 1 = UP
-   */
   setKey(keycode, eventType = 0) {
-    this._bindWasmFunctions();
     if (this._sendKey) {
       this._sendKey(keycode, eventType);
     }
   }
 
-  /**
-   * Sends touch/pen screen event.
-   * @param {number} x X coordinate
-   * @param {number} y Y coordinate
-   * @param {number} eventType 1 = TAP/DOWN, 2 = MOVE, 3 = RELEASE/UP
-   */
   setPen(x, y, eventType) {
-    this._bindWasmFunctions();
     if (this._sendPen) {
       this._sendPen(x, y, eventType);
     }
   }
 
-  /**
-   * Sets audio output volume scale.
-   * @param {number} vol Volume ratio [0.0, 1.0]
-   */
   setVolume(vol) {
     this.volume = Math.max(0.0, Math.min(1.0, vol));
   }
 
-  /**
-   * Initializes Web Audio context on user gesture.
-   */
   enableAudio() {
     if (this.audioEnabled) return;
 
@@ -233,10 +195,11 @@ class MREmu {
       if (bufPtr && self.status === 'running') {
         const heap16 = self.module.HEAP16;
         const startIdx = bufPtr >> 1;
+        const vol = self.volume;
 
         for (let i = 0; i < bufferSize; i++) {
-          outputL[i] = ((heap16[startIdx + i * 2] || 0) / 32768.0) * self.volume;
-          outputR[i] = ((heap16[startIdx + i * 2 + 1] || 0) / 32768.0) * self.volume;
+          outputL[i] = ((heap16[startIdx + i * 2] || 0) / 32768.0) * vol;
+          outputR[i] = ((heap16[startIdx + i * 2 + 1] || 0) / 32768.0) * vol;
         }
       } else {
         outputL.fill(0);
@@ -248,10 +211,6 @@ class MREmu {
     this.audioEnabled = true;
   }
 
-  /**
-   * Returns current emulator execution status.
-   * @returns {string} Status string
-   */
   getStatus() {
     return this.status;
   }
@@ -272,10 +231,12 @@ class MREmu {
         self.canvas.width = width;
         self.canvas.height = height;
         self.imageData = null;
+        self.pixelUint32Buffer = null;
       }
 
       if (!self.imageData) {
         self.imageData = ctx.createImageData(width, height);
+        self.pixelUint32Buffer = new Uint32Array(self.imageData.data.buffer);
       }
 
       const bufPtr = self._getBuffer ? self._getBuffer() : 0;
@@ -283,13 +244,14 @@ class MREmu {
         const numPixels = width * height;
         const heap16 = self.module.HEAPU16;
         const startIdx = bufPtr >> 1;
-        const data32 = new Uint32Array(self.imageData.data.buffer);
+        const data32 = self.pixelUint32Buffer;
 
+        // Zero-allocation loop with fast bitwise shifts
         for (let i = 0; i < numPixels; i++) {
           const rgb565 = heap16[startIdx + i];
-          const r = ((rgb565 >> 11) & 0x1F) * 255 / 31;
-          const g = ((rgb565 >> 5) & 0x3F) * 255 / 63;
-          const b = (rgb565 & 0x1F) * 255 / 31;
+          const r = ((rgb565 >> 11) & 0x1F) * 8;
+          const g = ((rgb565 >> 5) & 0x3F) * 4;
+          const b = (rgb565 & 0x1F) * 8;
           data32[i] = (0xFF << 24) | (b << 16) | (g << 8) | r;
         }
 
