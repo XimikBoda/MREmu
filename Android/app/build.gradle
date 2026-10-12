@@ -9,7 +9,7 @@ android {
     defaultConfig {
         applicationId = 'com.ximikboda.mremu'
         minSdkVersion 27
-        targetSdkVersion 30
+        targetSdkVersion 36
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static'
