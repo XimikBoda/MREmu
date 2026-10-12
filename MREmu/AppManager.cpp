@@ -11,7 +11,6 @@ extern bool show_error;
 
 void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
 {
-	std::lock_guard lock(launch_queue_mutex);
 	launch_queue.push({ path, local, conf });
 }
 
@@ -33,12 +32,7 @@ void AppManager::launch_apps()
 	if (!launch_queue.size())
 		return;
 
-	launch_el launch_data;
-	{
-		std::lock_guard lock(launch_queue_mutex);
-		launch_data = launch_queue.front();
-		launch_queue.pop();
-	}
+	launch_el launch_data = launch_queue.front();
 
 	std::shared_ptr<App> app;
 
@@ -99,7 +93,6 @@ void AppManager::launch_apps()
 
 void AppManager::add_app_for_close(int id)
 {
-	std::lock_guard lock(close_queue_mutex);
 	close_queue.push({ id });
 }
 
@@ -108,12 +101,7 @@ void AppManager::close_apps()
 	if (!close_queue.size())
 		return;
 
-	close_el close_data;
-	{
-		std::lock_guard lock(close_queue_mutex);
-		close_data = close_queue.front();
-		close_queue.pop();
-	}
+	close_el close_data = close_queue.front();
 
 	int app_id = -1;
 
@@ -134,19 +122,13 @@ void AppManager::close_apps()
 
 void AppManager::add_keyboard_event(int event, int keycode)
 {
-	std::lock_guard lock(keyboard_events_queue_mutex);
 	keyboard_events_queue.push({ event, keycode });
 }
 
 void AppManager::process_keyboard_events()
 {
 	while (keyboard_events_queue.size()) {
-		keyboard_event_el ke;
-		{
-			std::lock_guard lock(keyboard_events_queue_mutex);
-			ke = keyboard_events_queue.front();
-			keyboard_events_queue.pop();
-		}
+		keyboard_event_el ke = keyboard_events_queue.front();
 
 		current_work_app_id = active_app_id;
 
@@ -161,19 +143,13 @@ void AppManager::process_keyboard_events()
 
 void AppManager::add_pen_event(int event, int x, int y)
 {
-	std::lock_guard lock(pen_events_queue_mutex);
 	pen_events_queue.push({ event, x, y });
 }
 
 void AppManager::process_pen_events()
 {
 	while (pen_events_queue.size()) {
-		pen_event_el pe;
-		{
-			std::lock_guard lock(pen_events_queue_mutex);
-			pe = pen_events_queue.front();
-			pen_events_queue.pop();
-		}
+		pen_event_el pe = pen_events_queue.front();
 
 		current_work_app_id = active_app_id;
 
@@ -189,19 +165,13 @@ void AppManager::process_pen_events()
 void AppManager::add_message_event(int phandle, unsigned int msg_id,
 	int wparam, int lparam, int phandle_sender)
 {
-	std::lock_guard lock(message_events_queue_mutex);
 	message_events_queue.push({ phandle, msg_id, wparam, lparam, phandle_sender });
 }
 
 void AppManager::process_message_events()
 {
 	while (message_events_queue.size()) {
-		message_event_el me;
-		{
-			std::lock_guard lock(message_events_queue_mutex);
-			me = message_events_queue.front();
-			message_events_queue.pop();
-		}
+		message_event_el me = message_events_queue.front();
 
 		int app_id = -1;
 
@@ -225,19 +195,13 @@ void AppManager::process_message_events()
 
 void AppManager::add_system_event(int phandle, int message, int param)
 {
-	std::lock_guard lock(system_events_queue_mutex);
 	system_events_queue.push({ phandle, message, param });
 }
 
 void AppManager::process_system_events()
 {
 	while (system_events_queue.size()) {
-		system_event_el se;
-		{
-			std::lock_guard lock(system_events_queue_mutex);
-			se = system_events_queue.front();
-			system_events_queue.pop();
-		}
+		system_event_el se = system_events_queue.front();
 
 		int app_id = -1;
 

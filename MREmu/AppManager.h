@@ -2,7 +2,7 @@
 #include "App.h"
 #include <mutex>
 #include <filesystem>
-#include <queue>
+#include "Queue.h"
 #include "NativeApps/Menu/AppSelector.h"
 
 namespace fs = std::filesystem;
@@ -42,23 +42,12 @@ struct system_event_el {
 };
 
 class AppManager {
-	std::queue<launch_el> launch_queue;
-	std::mutex launch_queue_mutex;
-
-	std::queue<close_el> close_queue;
-	std::mutex close_queue_mutex;
-
-	std::queue<keyboard_event_el> keyboard_events_queue;
-	std::mutex keyboard_events_queue_mutex;
-
-	std::queue<pen_event_el> pen_events_queue;
-	std::mutex pen_events_queue_mutex;
-
-	std::queue<message_event_el> message_events_queue;
-	std::mutex message_events_queue_mutex;
-
-	std::queue<system_event_el> system_events_queue;
-	std::mutex system_events_queue_mutex;
+	Queue<launch_el> launch_queue;
+	Queue<close_el> close_queue;
+	Queue<keyboard_event_el> keyboard_events_queue;
+	Queue<pen_event_el> pen_events_queue;
+	Queue<message_event_el> message_events_queue;
+	Queue<system_event_el> system_events_queue;
 
 	void fix_mtone_wireless();
 public:
