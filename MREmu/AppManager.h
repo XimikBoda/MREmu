@@ -44,6 +44,11 @@ class AppManager {
 	Queue<message_event_el> message_events_queue;
 	Queue<system_event_el> system_events_queue;
 
+	std::mutex events_mutex;
+	std::condition_variable events_cv;
+
+	bool is_all_events_empty();
+
 	friend MreTags* get_tags_by_mem_adr(size_t offset_mem); //TODO: remove this
 
 	std::vector<std::shared_ptr<App>> apps;
@@ -51,27 +56,29 @@ class AppManager {
 	int current_work_app_id = -1; // only for app theard 
 
 	void fix_mtone_wireless();
+
+	void process_launch_app(launch_el launch_data);
+
+	void process_keyboard_event(keyboard_event_el ke);
+	void process_pen_event(pen_event_el pe);
+
+	void process_message_event(message_event_el me);
+	void process_system_event(system_event_el se);
 public:
 	std::mutex active_app_mutex;
 
 	void add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf = 0);
-	void launch_apps();
 
 	void close_app(int id, bool soft);
 	void close_apps();
 
 	void add_keyboard_event(int event, int keycode);
-	void process_keyboard_events();
-
 	void add_pen_event(int event, int x, int y);
-	void process_pen_events();
 
 	void add_message_event(int phandle, unsigned int msg_id,
 		int wparam, int lparam, int phandle_sender);
-	void process_message_events();
 
 	void add_system_event(int phandle, int message, int param);
-	void process_system_events();
 
 	void update(size_t delta_ms);
 

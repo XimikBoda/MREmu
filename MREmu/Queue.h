@@ -5,22 +5,23 @@
 template<typename T>
 class Queue {
 	std::queue<T> q;
-	std::mutex m;
 public:
-	void push(const T &item) {
+	//void push(const T &item) {
+	//	q.push(item);
+	//}
+
+	void push(std::mutex &m, const T &item) {
 		std::lock_guard lock(m);
 		q.push(item);
 	}
 
 	T front() {
-		std::lock_guard lock(m);
 		T item = q.front();
 		q.pop();
 		return item;
 	}
 
-	size_t size() {
-		std::lock_guard lock(m);
-		return q.size();
+	bool empty() {
+		return q.empty();
 	}
 };

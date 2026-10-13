@@ -9,11 +9,6 @@
 extern std::string error_message;
 extern bool show_error;
 
-void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
-{
-	launch_queue.push({ path, local, conf });
-}
-
 void AppManager::fix_mtone_wireless() {
 	auto app = get_active_app();
 
@@ -27,13 +22,14 @@ void AppManager::fix_mtone_wireless() {
 	}
 }
 
-void AppManager::launch_apps()
+void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
 {
-	if (!launch_queue.size())
-		return;
+	launch_queue.push(events_mutex, { path, local, conf });
+	events_cv.notify_one();
+}
 
-	launch_el launch_data = launch_queue.front();
-
+void AppManager::process_launch_app(launch_el launch_data)
+{
 	std::shared_ptr<App> app;
 
 	if (launch_data.conf) {
@@ -129,113 +125,128 @@ void AppManager::close_apps()
 
 void AppManager::add_keyboard_event(int event, int keycode)
 {
-	keyboard_events_queue.push({ event, keycode });
+	keyboard_events_queue.push(events_mutex, { event, keycode });
+	events_cv.notify_one();
 }
 
-void AppManager::process_keyboard_events()
+void AppManager::process_keyboard_event(keyboard_event_el ke)
 {
-	while (keyboard_events_queue.size()) {
-		keyboard_event_el ke = keyboard_events_queue.front();
+	current_work_app_id = active_app_id;
 
-		current_work_app_id = active_app_id;
+	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
+		return;
 
-		if (current_work_app_id < 0 || current_work_app_id >= apps.size())
-			return;
-
-		App& cur_app = *apps[current_work_app_id];
-		if (cur_app.io.key_handler)
-			cur_app.run(cur_app.io.key_handler, ke.event, ke.keycode);
-	}
+	App& cur_app = *apps[current_work_app_id];
+	if (cur_app.io.key_handler)
+		cur_app.run(cur_app.io.key_handler, ke.event, ke.keycode);
 }
 
 void AppManager::add_pen_event(int event, int x, int y)
 {
-	pen_events_queue.push({ event, x, y });
+	pen_events_queue.push(events_mutex, { event, x, y });
+	events_cv.notify_one();
 }
 
-void AppManager::process_pen_events()
+void AppManager::process_pen_event(pen_event_el pe)
 {
-	while (pen_events_queue.size()) {
-		pen_event_el pe = pen_events_queue.front();
+	current_work_app_id = active_app_id;
 
-		current_work_app_id = active_app_id;
+	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
+		return;
 
-		if (current_work_app_id < 0 || current_work_app_id >= apps.size())
-			return;
-
-		App& cur_app = *apps[current_work_app_id];
-		if (cur_app.io.pen_handler)
-			cur_app.run(cur_app.io.pen_handler, pe.event, pe.x, pe.y);
-	}
+	App& cur_app = *apps[current_work_app_id];
+	if (cur_app.io.pen_handler)
+		cur_app.run(cur_app.io.pen_handler, pe.event, pe.x, pe.y);
 }
 
 void AppManager::add_message_event(int phandle, unsigned int msg_id,
 	int wparam, int lparam, int phandle_sender)
 {
-	message_events_queue.push({ phandle, msg_id, wparam, lparam, phandle_sender });
+	message_events_queue.push(events_mutex, { phandle, msg_id, wparam, lparam, phandle_sender });
+	events_cv.notify_one(); // TODO: Do I need it here
 }
 
-void AppManager::process_message_events()
+void AppManager::process_message_event(message_event_el me)
 {
-	while (message_events_queue.size()) {
-		message_event_el me = message_events_queue.front();
+	int app_id = -1;
 
-		int app_id = -1;
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->system_callbacks.ph_app_id == me.phandle) {
+			app_id = i;
+			break;
+		}
 
-		for (int i = 0; i < apps.size(); ++i)
-			if (apps[i]->system_callbacks.ph_app_id == me.phandle) {
-				app_id = i;
-				break;
-			}
+	if (app_id == -1)
+		return;
 
-		if (app_id == -1)
-			continue;
+	current_work_app_id = app_id;
 
-		current_work_app_id = app_id;
-
-		App *cur_app = apps[current_work_app_id].get();
-		if (cur_app && cur_app->system_callbacks.msg_proc)
-			cur_app->run(cur_app->system_callbacks.msg_proc,
-				me.phandle_sender, me.msg_id, me.wparam, me.lparam);
-	}
+	App *cur_app = apps[current_work_app_id].get();
+	if (cur_app && cur_app->system_callbacks.msg_proc)
+		cur_app->run(cur_app->system_callbacks.msg_proc,
+			me.phandle_sender, me.msg_id, me.wparam, me.lparam);
 }
 
 void AppManager::add_system_event(int phandle, int message, int param)
 {
-	system_events_queue.push({ phandle, message, param });
+	system_events_queue.push(events_mutex, { phandle, message, param });
+	events_cv.notify_one(); // TODO: here too
 }
 
-void AppManager::process_system_events()
+void AppManager::process_system_event(system_event_el se)
 {
-	while (system_events_queue.size()) {
-		system_event_el se = system_events_queue.front();
+	int app_id = -1;
 
-		int app_id = -1;
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->system_callbacks.ph_app_id == se.phandle) {
+			app_id = i;
+			break;
+		}
 
-		for (int i = 0; i < apps.size(); ++i)
-			if (apps[i]->system_callbacks.ph_app_id == se.phandle) {
-				app_id = i;
-				break;
-			}
+	if (app_id == -1)
+		return;
 
-		if (app_id == -1)
-			continue;
+	current_work_app_id = app_id;
 
-		current_work_app_id = app_id;
+	App& cur_app = *apps[current_work_app_id];
+	if (cur_app.system_callbacks.sysevt)
+		cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
+}
 
-		App& cur_app = *apps[current_work_app_id];
-		if (cur_app.system_callbacks.sysevt)
-			cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
-	}
+bool AppManager::is_all_events_empty() {
+	return launch_queue.empty() &&
+		keyboard_events_queue.empty() && pen_events_queue.empty() &&
+		message_events_queue.empty() && system_events_queue.empty();
+}
+
+template<typename T, typename F>
+void run_queue(Queue<T>& q, std::unique_lock<std::mutex>& lock, F f) {
+	if (q.empty())
+		return;
+
+	Queue<T> copy_q;
+	std::swap(copy_q, q);
+
+	lock.unlock();
+	while (!copy_q.empty())
+		f(copy_q.front());
+	lock.lock();
 }
 
 void AppManager::update(size_t delta_ms) {
-	launch_apps();
-	process_system_events();
-	process_keyboard_events();
-	process_pen_events();
-	process_message_events();
+	std::unique_lock lock(events_mutex);
+	events_cv.wait(lock, [this] { return !is_all_events_empty(); });
+
+	run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
+	run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
+	run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
+	run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
+	run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
+
+
+	lock.unlock();
 	close_apps();
+
 	for (int i = 0; i < apps.size(); ++i) {
 		current_work_app_id = i;
 		bool active = active_app_id == current_work_app_id;
