@@ -214,6 +214,25 @@ void AppManager::process_system_event(system_event_el se)
 		cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
 }
 
+sf::Time AppManager::get_time_for_nearest_timer()
+{
+	sf::Time nearst = sf::milliseconds(INT32_MAX);
+
+	for (int i = 0; i < apps.size(); ++i) {
+		App* cur_app = apps[current_work_app_id].get();
+
+		if (!cur_app)
+			continue;
+
+		sf::Time nearst_for_app = apps[i]->timer.get_time_for_nearest();
+
+		if (nearst > nearst_for_app)
+			nearst = nearst_for_app;
+	}
+
+	return nearst;
+}
+
 bool AppManager::is_all_events_empty() {
 	return launch_queue.empty() &&
 		keyboard_events_queue.empty() && pen_events_queue.empty() &&
@@ -221,7 +240,7 @@ bool AppManager::is_all_events_empty() {
 }
 
 template<typename T, typename F>
-void run_queue(Queue<T>& q, std::unique_lock<std::mutex>& lock, F f) {
+static void run_queue(Queue<T>& q, std::unique_lock<std::mutex>& lock, F f) {
 	if (q.empty())
 		return;
 
@@ -238,8 +257,10 @@ void AppManager::loop() {
 	while (running) {
 		GDB::update(); //TODO
 
+		auto wait_time = std::chrono::microseconds(get_time_for_nearest_timer().asMicroseconds());
+
 		std::unique_lock lock(events_mutex);
-		events_cv.wait(lock, [this] { return !is_all_events_empty() || !running; });
+		events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
 
 		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
 		run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
@@ -258,7 +279,7 @@ void AppManager::loop() {
 			if (!cur_app)
 				continue;
 
-			apps[i]->timer.update(1, cur_app);//active
+			apps[i]->timer.update(cur_app);
 			apps[i]->sock.update(cur_app);
 		}
 	}

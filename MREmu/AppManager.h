@@ -68,6 +68,8 @@ class AppManager {
 	void process_message_event(message_event_el me);
 	void process_system_event(system_event_el se);
 
+	sf::Time get_time_for_nearest_timer();
+
 	void loop();
 public:
 	void start();

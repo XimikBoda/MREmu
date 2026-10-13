@@ -5,34 +5,89 @@
 
 #include "../App.h"
 
-void MREngine::Timer::update(size_t delta_ms, App* cur_app)
+extern sf::Clock global_clock;
+
+void MREngine::Timer::set_active(bool active)
 {
-	if (!delta_ms)
-		delta_ms = 1;
+	if (this->active == active)
+		return;
+
+	this->active = active;
+
+	auto cur = global_clock.getElapsedTime();
+
 	for (int i = 0; i < gui_timers.size(); ++i)
 		if (gui_timers.is_active(i)) {
-			auto& el = gui_timers[i];
-			el.cur_val += delta_ms;
-			if (el.cur_val >= el.time) {
-				el.cur_val = 0;
-				cur_app->run(el.adr, i + 1);
-			}
+			auto& t = gui_timers[i];
+
+			if (active) 
+				t.last_point = cur - (t.pause_point - t.last_point);
+			else
+				t.pause_point = cur;
 		}
+}
+
+sf::Time MREngine::Timer::get_time_for_nearest()
+{
+	auto cur = global_clock.getElapsedTime();
+
+	sf::Time nearst = sf::milliseconds(INT32_MAX);
+
+	if(active)
+		for (int i = 0; i < gui_timers.size(); ++i)
+			if (gui_timers.is_active(i)) {
+				auto& t = gui_timers[i];
+				
+				sf::Time next_point = t.last_point + t.interval;
+				sf::Time time_to_next = next_point - cur;
+
+				if (nearst > time_to_next)
+					nearst = time_to_next;
+			}
+
 	for (int i = 0; i < timers.size(); ++i)
 		if (timers.is_active(i)) {
-			auto& el = timers[i];
-			el.cur_val += delta_ms;
-			if (el.cur_val >= el.time) {
-				el.cur_val = 0;
-				cur_app->run(el.adr, i + 1);
+			auto& t = timers[i];
+
+			sf::Time next_point = t.last_point + t.interval;
+			sf::Time time_to_next = next_point - cur;
+
+			if (nearst > time_to_next)
+				nearst = time_to_next;
+		}
+
+	return nearst;
+}
+
+void MREngine::Timer::update(App* cur_app)
+{
+	auto cur = global_clock.getElapsedTime();
+
+	if (active)
+		for (int i = 0; i < gui_timers.size(); ++i)
+			if (gui_timers.is_active(i)) {
+				auto& t = gui_timers[i];
+				if (t.last_point + t.interval <= cur) {
+					t.last_point = cur;
+					cur_app->run(t.adr, i + 1);
+				}
+			}
+
+	for (int i = 0; i < timers.size(); ++i)
+		if (timers.is_active(i)) {
+			auto& t = timers[i];
+			if (t.last_point + t.interval <= cur) {
+				t.last_point = cur;
+				cur_app->run(t.adr, i + 1);
 			}
 		}
 }
 
-int MREngine::Timer::create(size_t time, VM_TIMERPROC_T adr, bool gui)
+int MREngine::Timer::create(uint32_t time, VM_TIMERPROC_T adr, bool gui)
 {
 	auto& tim = gui ? gui_timers : timers;
-	int i = tim.push({ time, 0, adr });
+	auto cur = global_clock.getElapsedTime();
+	int i = tim.push({ adr, sf::milliseconds(time), cur, cur });
 	return i + 1;
 }
 
