@@ -73,10 +73,14 @@ void AppManager::launch_apps()
 
 	apps.push_back(app);
 
-	active_app_id = apps.size() - 1;
-	current_work_app_id = apps.size() - 1;
+	{
+		std::lock_guard lock(active_app_mutex);
 
-	apps[current_work_app_id]->resources.file_context = &(apps[current_work_app_id]->file_context); //todo
+		active_app_id = apps.size() - 1;
+		current_work_app_id = apps.size() - 1;
+
+		apps[current_work_app_id]->resources.file_context = &(apps[current_work_app_id]->file_context); //todo
+	}
 
 	static int ph_app_id = 0;
 	ph_app_id++;
@@ -109,6 +113,8 @@ void AppManager::close_apps()
 		auto& state = apps[i]->state;
 
 		if (state == App::HardClosing) {
+			std::lock_guard lock(active_app_mutex);
+
 			apps.erase(apps.begin() + i);
 
 			if (active_app_id > i)

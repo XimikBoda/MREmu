@@ -254,8 +254,25 @@ int main(int argc, char** argv) {
 
 		graphic.update_screen();
 
+		{
+			screen_sp.setTexture(graphic.screen_tex, true);
+			win_device.draw(screen_sp);
+		}
+
+		keyboard.draw(&win_device);
+
 #ifndef ANDROID
+		if (ImGui::Begin("Fps")) {
+			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
+		}
+		ImGui::End();
+
+		Cpu::imgui_REG();
+
+		keyboard.imgui_keyboard();
 		graphic.imgui_screen();
+
+		std::lock_guard lock(appManager.active_app_mutex);
 		App* active_app = appManager.get_active_app();
 		if (active_app) {
 			active_app->graphic.imgui_layers();
@@ -276,25 +293,7 @@ int main(int argc, char** argv) {
 		}
 		ImGui::End();
 
-		if (ImGui::Begin("Fps")) {
-			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
-		}
-		ImGui::End();
-#endif
 
-		{
-			screen_sp.setTexture(graphic.screen_tex, true);
-			win_device.draw(screen_sp);
-		}
-
-#ifndef ANDROID
-		Cpu::imgui_REG();
-
-		keyboard.imgui_keyboard();
-#endif
-		keyboard.draw(&win_device);
-
-#ifndef ANDROID
 		ImGui::SFML::Render(win_debug);
 		win_debug.display();
 		win_debug.clear();

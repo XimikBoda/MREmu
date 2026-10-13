@@ -44,11 +44,15 @@ class AppManager {
 	Queue<message_event_el> message_events_queue;
 	Queue<system_event_el> system_events_queue;
 
+	friend MreTags* get_tags_by_mem_adr(size_t offset_mem); //TODO: remove this
+
+	std::vector<std::shared_ptr<App>> apps;
+	int active_app_id = -1; // can be acces from another theard
+	int current_work_app_id = -1; // only for app theard 
+
 	void fix_mtone_wireless();
 public:
-	std::vector<std::shared_ptr<App>> apps;
-	int active_app_id = -1;
-	int current_work_app_id = -1;
+	std::mutex active_app_mutex;
 
 	void add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf = 0);
 	void launch_apps();
