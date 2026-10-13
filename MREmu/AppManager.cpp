@@ -3,6 +3,7 @@
 #include "ArmApp.h"
 #include "DLLApp.h"
 #include "NativeApp.h"
+#include "GDB.h"
 #include <string>
 #include <vmcert.h>
 
@@ -233,31 +234,45 @@ void run_queue(Queue<T>& q, std::unique_lock<std::mutex>& lock, F f) {
 	lock.lock();
 }
 
-void AppManager::update(size_t delta_ms) {
-	std::unique_lock lock(events_mutex);
-	events_cv.wait(lock, [this] { return !is_all_events_empty(); });
+void AppManager::loop() {
+	while (running) {
+		GDB::update(); //TODO
 
-	run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
-	run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
-	run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
-	run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
-	run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
+		std::unique_lock lock(events_mutex);
+		events_cv.wait(lock, [this] { return !is_all_events_empty() || !running; });
 
+		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
+		run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
+		run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
+		run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
+		run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
 
-	lock.unlock();
-	close_apps();
+		lock.unlock();
+		close_apps();
 
-	for (int i = 0; i < apps.size(); ++i) {
-		current_work_app_id = i;
-		bool active = active_app_id == current_work_app_id;
-		App* cur_app = apps[current_work_app_id].get();
+		for (int i = 0; i < apps.size(); ++i) {
+			current_work_app_id = i;
+			bool active = active_app_id == current_work_app_id;
+			App* cur_app = apps[current_work_app_id].get();
 
-		if (!cur_app)
-			continue;
+			if (!cur_app)
+				continue;
 
-		apps[i]->timer.update(delta_ms, cur_app);//active
-		apps[i]->sock.update(cur_app);
+			apps[i]->timer.update(1, cur_app);//active
+			apps[i]->sock.update(cur_app);
+		}
 	}
+}
+
+void AppManager::start() {
+	running = true;
+	loop_thread = std::thread([this]() { loop(); });
+}
+
+void AppManager::stop() {
+	running = false;
+	events_cv.notify_one();
+	loop_thread.join();
 }
 
 App* AppManager::get_active_app()

@@ -49,6 +49,9 @@ class AppManager {
 
 	bool is_all_events_empty();
 
+	bool running = false;
+	std::thread loop_thread;
+
 	friend MreTags* get_tags_by_mem_adr(size_t offset_mem); //TODO: remove this
 
 	std::vector<std::shared_ptr<App>> apps;
@@ -64,7 +67,12 @@ class AppManager {
 
 	void process_message_event(message_event_el me);
 	void process_system_event(system_event_el se);
+
+	void loop();
 public:
+	void start();
+	void stop();
+
 	std::mutex active_app_mutex;
 
 	void add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf = 0);
@@ -79,8 +87,6 @@ public:
 		int wparam, int lparam, int phandle_sender);
 
 	void add_system_event(int phandle, int message, int param);
-
-	void update(size_t delta_ms);
 
 	App* get_active_app();
 	App* get_current_work_app_id();

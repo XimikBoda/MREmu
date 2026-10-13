@@ -27,8 +27,6 @@
 
 sf::Clock global_clock;
 
-bool work = true;
-
 std::string error_message = "";
 bool show_error = false;
 
@@ -56,21 +54,6 @@ Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thi
     env->ReleaseStringUTFChars(j_path, path_cstr);
 }
 #endif
-
-
-void mre_main(AppManager* appManager_p) {
-	AppManager& appManager = *appManager_p;
-
-	sf::Clock deltaClock;
-	while (work) {
-		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
-
-		GDB::update();
-		appManager.update(delta_ms);
-
-		sf::sleep(sf::milliseconds(1000 / 120));
-	}
-}
 
 int main(int argc, char** argv) {
     std::string app_path = "";
@@ -157,7 +140,7 @@ int main(int argc, char** argv) {
 	if (GDB::gdb_mode)
 		GDB::cpu_state = GDB::Stop;
 
-	std::thread second_thread(mre_main, &appManager);
+	appManager.start();
 
 	Keyboard keyboard;
 	Touch touch;
@@ -303,8 +286,7 @@ int main(int argc, char** argv) {
 		win_device.clear(sf::Color::Black);
 	}
 
-	work = false;
-	second_thread.join();
+	appManager.stop();
 
 #ifndef ANDROID
 	ImGui::SFML::Shutdown();
