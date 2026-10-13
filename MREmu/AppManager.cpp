@@ -91,33 +91,34 @@ void AppManager::launch_apps()
 	add_system_event(ph_app_id, VM_MSG_PAINT, 0);
 }
 
-void AppManager::add_app_for_close(int id)
+void AppManager::close_app(int id, bool soft)
 {
-	close_queue.push({ id });
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->system_callbacks.ph_app_id == id) {
+			auto& state = apps[i]->state;
+			
+			App::State close_state = soft ? App::SoftClosing : App::HardClosing;
+			if (state < close_state)
+				state = close_state;
+		}
 }
 
 void AppManager::close_apps()
 {
-	if (!close_queue.size())
-		return;
+	for (int i = 0; i < apps.size(); ++i){
+		auto& state = apps[i]->state;
 
-	close_el close_data = close_queue.front();
+		if (state == App::HardClosing) {
+			apps.erase(apps.begin() + i);
 
-	int app_id = -1;
+			if (active_app_id > i)
+				active_app_id--;
+			else if (active_app_id == i)
+				active_app_id = apps.size() - 1;
 
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == close_data.app_id)
-			app_id = i;
-
-	if (app_id == -1)
-		return;
-
-	apps.erase(apps.begin() + app_id);
-
-	if (active_app_id > app_id)
-		active_app_id--;
-	else if (active_app_id == app_id)
-		active_app_id = apps.size() - 1;
+			--i;
+		}
+	}
 }
 
 void AppManager::add_keyboard_event(int event, int keycode)
@@ -224,11 +225,11 @@ void AppManager::process_system_events()
 
 void AppManager::update(size_t delta_ms) {
 	launch_apps();
-	close_apps();
 	process_system_events();
 	process_keyboard_events();
 	process_pen_events();
 	process_message_events();
+	close_apps();
 	for (int i = 0; i < apps.size(); ++i) {
 		current_work_app_id = i;
 		bool active = active_app_id == current_work_app_id;

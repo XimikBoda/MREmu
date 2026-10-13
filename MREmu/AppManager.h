@@ -13,10 +13,6 @@ struct launch_el {
 	const nativeapp_conf* conf = 0;
 };
 
-struct close_el {
-	int app_id;
-};
-
 struct keyboard_event_el {
 	int event;
 	int keycode;
@@ -43,7 +39,6 @@ struct system_event_el {
 
 class AppManager {
 	Queue<launch_el> launch_queue;
-	Queue<close_el> close_queue;
 	Queue<keyboard_event_el> keyboard_events_queue;
 	Queue<pen_event_el> pen_events_queue;
 	Queue<message_event_el> message_events_queue;
@@ -58,7 +53,7 @@ public:
 	void add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf = 0);
 	void launch_apps();
 
-	void add_app_for_close(int id);
+	void close_app(int id, bool soft);
 	void close_apps();
 
 	void add_keyboard_event(int event, int keycode);
