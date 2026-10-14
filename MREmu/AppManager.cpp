@@ -10,6 +10,8 @@
 extern std::string error_message;
 extern bool show_error;
 
+extern AppManager* g_appManager;
+
 void AppManager::fix_mtone_wireless() {
 	auto app = get_active_app();
 
@@ -214,16 +216,70 @@ void AppManager::process_system_event(system_event_el se)
 		cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
 }
 
+void AppManager::add_sock_event(sock_event se)
+{
+	if (g_appManager) {
+		g_appManager->sock_events_queue.push(g_appManager->events_mutex, { se });
+		g_appManager->events_cv.notify_one();
+	}
+}
+
+void AppManager::process_sock_event(sock_event se)
+{
+	int app_id = -1;
+
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->system_callbacks.ph_app_id == se.phandle) {
+			app_id = i;
+			break;
+		}
+
+	if (app_id == -1)
+		return;
+
+	current_work_app_id = app_id;
+
+	App& cur_app = *apps[current_work_app_id];
+	if (se.callback)
+		cur_app.run(se.callback, se.handle, se.event);
+}
+
+void AppManager::add_dns_event(dns_event de)
+{
+	if (g_appManager) {
+		g_appManager->dns_events_queue.push(g_appManager->events_mutex, { de });
+		g_appManager->events_cv.notify_one();
+	}
+}
+
+void AppManager::process_dns_event(dns_event de)
+{
+	int app_id = -1;
+
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->system_callbacks.ph_app_id == de.phandle) {
+			app_id = i;
+			break;
+		}
+
+	if (app_id == -1)
+		return;
+
+	current_work_app_id = app_id;
+
+	static vm_soc_dns_result* g_result = (vm_soc_dns_result*)Memory::shared_malloc(sizeof(vm_soc_dns_result));
+	*g_result = de.result;
+
+	App& cur_app = *apps[current_work_app_id];
+	if (de.callback)
+		cur_app.run(de.callback, g_result);
+}
+
 sf::Time AppManager::get_time_for_nearest_timer()
 {
 	sf::Time nearst = sf::milliseconds(INT32_MAX);
 
 	for (int i = 0; i < apps.size(); ++i) {
-		App* cur_app = apps[current_work_app_id].get();
-
-		if (!cur_app)
-			continue;
-
 		sf::Time nearst_for_app = apps[i]->timer.get_time_for_nearest();
 
 		if (nearst > nearst_for_app)
@@ -236,7 +292,8 @@ sf::Time AppManager::get_time_for_nearest_timer()
 bool AppManager::is_all_events_empty() {
 	return launch_queue.empty() &&
 		keyboard_events_queue.empty() && pen_events_queue.empty() &&
-		message_events_queue.empty() && system_events_queue.empty();
+		message_events_queue.empty() && system_events_queue.empty() &&
+		sock_events_queue.empty() && dns_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -265,13 +322,13 @@ void AppManager::loop() {
 		if(wait_time_ms > 0)
 			event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
 
-		if (event) {
-			run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
-			run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
-			run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
-			run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
-			run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
-		}
+		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
+		run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
+		run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
+		run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
+		run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
+		run_queue(sock_events_queue, lock, [this](sock_event data) { process_sock_event(data); });
+		run_queue(dns_events_queue, lock, [this](dns_event data) { process_dns_event(data); });
 
 		lock.unlock();
 
@@ -284,7 +341,6 @@ void AppManager::loop() {
 				continue;
 
 			apps[i]->timer.update(cur_app);
-			apps[i]->sock.update(cur_app);
 		}
 
 		close_apps();
@@ -317,8 +373,6 @@ App* AppManager::get_current_work_app_id()
 	else
 		return &*apps[current_work_app_id];
 }
-
-extern AppManager* g_appManager;
 
 App* get_cur_app() {
 	App* curr_app = 0;

@@ -1427,6 +1427,37 @@ namespace Bridge {
 					read_arg(uc, 2)
 				));
 		}},
+		{FUNCN(vm_udp_create), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_create(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					(void (*)(VMINT, VMINT))read_arg(uc, 2),
+					read_arg(uc, 3)
+				));
+		}},
+		{FUNCN(vm_udp_sendto), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_sendto(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2),
+					(vm_sockaddr_struct*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+				));
+		}},
+		{FUNCN(vm_udp_recvfrom), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_recvfrom(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2),
+					(vm_sockaddr_struct*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+				));
+		}},
+		{FUNCN(vm_udp_close), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_close(read_arg(uc, 0)));
+		}},
 
 		// Sensor
 		{FUNCN(vm_srv_sensor_is_available), [](uc_engine* uc) {

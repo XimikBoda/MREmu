@@ -102,6 +102,7 @@ int main(int argc, char** argv) {
 	MREngine::CharSet::init();
 	MREngine::AppAudio::init();
 	MREngine::Graphic graphic;
+	MREngine::NetworkManager nm;
 
 #ifndef ANDROID
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");

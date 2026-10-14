@@ -1,58 +1,285 @@
-#include <SFML/Network.hpp>
 #include "../Memory.h"
 #include "../Bridge.h"
 #include <cstring>
 //#include "../Cpu.h"
 #include "Sock.h"
-//#include <vmsock.h>
+
 #include "../App.h"
+#include "../AppManager.h"
 
-void MREngine::AppSock::update(App* app){ 
-    for (int i = 0; i < tcps.size(); ++i)
-        if (tcps.is_active(i)) {
-            auto& tcp = tcps[i];
+MREngine::NetworkManager* g_networkManager = 0;
 
-            if (!tcp.is_connected && tcp.soc->getRemotePort()) {
-                tcp.is_connected = true;
-                app->run(tcp.callback, i, VM_TCP_EVT_CONNECTED);
-            }
+//// TCP
 
-            if (tcp.is_connected) {
-                if (tcp.receive_tmp_buf_pos != SOCK_TMP_BUF_SIZE) {
-                    size_t recived = 0;
-                    tcp.soc->setBlocking(false);
-                    auto res = tcp.soc->receive(tcp.receive_tmp_buf + tcp.receive_tmp_buf_pos, 
-                        SOCK_TMP_BUF_SIZE - tcp.receive_tmp_buf_pos, recived);
-
-                    tcp.receive_tmp_buf_pos += recived;
-
-                    if(recived)
-                        app->run(tcp.callback, i, VM_TCP_EVT_CAN_READ);
-                }
-            }
-
-           /* switch (res)
-            {
-            case sf::Socket::Done:
-                break;
-            case sf::Socket::NotReady:
-                break;
-            case sf::Socket::Partial:
-                break;
-            case sf::Socket::Disconnected:
-                if (!tcp.is_disconnected) {
-                    Bridge::run_cpu(tcp.callback, 2, i, VM_TCP_EVT_PIPE_BROKEN);
-                }
-                tcp.is_disconnected = true;
-                break;
-            case sf::Socket::Error:
-                break;
-            default:
-                break;
-            }*/
-            /**/
-        }
+void MREngine::TcpSock::push_event(int event) {
+    AppManager::add_sock_event({ callback, phandle, handle, event});
 }
+
+MREngine::TcpSock::TcpSock(asio::io_context& ctx, void (*c)(int, int), int app_handle) 
+    : socket(ctx), resolver(ctx), callback(c), phandle(app_handle){}
+
+void MREngine::TcpSock::connect(const std::string& host, const std::string& port) {
+    auto self = shared_from_this();
+
+    resolver.async_resolve(host, port,
+        [self, this](const asio::error_code& ec, asio::ip::tcp::resolver::results_type results) {
+            if (ec == asio::error::operation_aborted) return;
+
+            if (ec) {
+                push_event(VM_TCP_EVT_HOST_NOT_FOUND);
+                return;
+            }
+
+            asio::async_connect(socket, results,
+                [self, this](const asio::error_code& ec, const asio::ip::tcp::endpoint&) {
+                    if (ec == asio::error::operation_aborted) return;
+
+                    if (!ec) {
+                        asio::error_code ec;
+                        socket.non_blocking(true, ec);
+
+                        push_event(VM_TCP_EVT_CONNECTED);
+
+                        wait_for_read();
+                        wait_for_write();
+                    }
+                    else 
+                        push_event(VM_TCP_EVT_PIPE_BROKEN);
+                });
+        });
+}
+
+int MREngine::TcpSock::read(void* buffer, size_t length) {
+    asio::error_code ec;
+    size_t bytes_read = socket.read_some(asio::buffer(buffer, length), ec);
+
+    if (ec == asio::error::would_block) {
+        wait_for_read();
+        return 0;
+    }
+
+    if (ec) return -1;
+
+    if (bytes_read < length)
+        wait_for_read();
+
+    return bytes_read;
+}
+
+int MREngine::TcpSock::write(void* buffer, size_t length) {
+    asio::error_code ec;
+    size_t bytes_write = socket.write_some(asio::buffer(buffer, length), ec);
+
+    if (ec == asio::error::would_block) { 
+        wait_for_write();
+        return 0; 
+    }
+
+    if (ec) return -1;
+
+    if (bytes_write < length)
+        wait_for_write();
+
+    return bytes_write;
+}
+
+void MREngine::TcpSock::wait_for_read() {
+    if (is_read_waiting) return;
+    is_read_waiting = true;
+
+    auto self = shared_from_this();
+    socket.async_wait(asio::socket_base::wait_read,
+        [self, this](const asio::error_code& ec) {
+            is_read_waiting = false;
+
+            if (ec == asio::error::operation_aborted) return;
+
+            if (!ec) 
+                push_event(VM_TCP_EVT_CAN_READ);
+            else if (ec == asio::error::eof) 
+                push_event(VM_TCP_EVT_PIPE_CLOSED);
+            else 
+                push_event(VM_TCP_EVT_PIPE_BROKEN);
+        });
+}
+
+void MREngine::TcpSock::wait_for_write() {
+    if (is_write_waiting) return;
+    is_write_waiting = true;
+
+    auto self = shared_from_this();
+    socket.async_wait(asio::socket_base::wait_write,
+        [self, this](const asio::error_code& ec) {
+            is_write_waiting = false;
+
+            if (ec == asio::error::operation_aborted) return;
+
+            if (!ec) 
+                push_event(VM_TCP_EVT_CAN_WRITE);
+            else
+                push_event(VM_TCP_EVT_PIPE_BROKEN);
+        });
+}
+
+void MREngine::TcpSock::close() {
+    auto self = shared_from_this();
+    asio::post(socket.get_executor(), [self, this]() {
+        asio::error_code ec;
+        socket.close(ec);
+        });
+}
+
+//// UDP
+
+static asio::ip::udp::endpoint mre_to_asio_endpoint(const vm_sockaddr_struct* mre_addr) {
+    asio::ip::address_v4::bytes_type bytes;
+    std::memcpy(bytes.data(), mre_addr->addr, 4);
+
+    return asio::ip::udp::endpoint(asio::ip::address_v4(bytes), mre_addr->port);
+}
+
+static void asio_to_mre_endpoint(const asio::ip::udp::endpoint& asio_ep, vm_sockaddr_struct* mre_addr) {
+    auto bytes = asio_ep.address().to_v4().to_bytes();
+    std::memcpy(mre_addr->addr, bytes.data(), 4);
+    mre_addr->port = asio_ep.port();
+    mre_addr->addr_len = 4;
+}
+
+void MREngine::UdpSock::push_event(int event) {
+    AppManager::add_sock_event({ callback, phandle, handle, event });
+}
+
+MREngine::UdpSock::UdpSock(asio::io_context& ctx, void (*c)(int, int), int app_handle)
+    : socket(ctx), callback(c), phandle(app_handle) {
+}
+
+bool MREngine::UdpSock::create(int port, int loopback) {
+    asio::error_code ec;
+
+    socket.open(asio::ip::udp::v4(), ec);
+    if (ec) return false;
+
+    socket.set_option(asio::socket_base::reuse_address(true), ec);
+
+    auto addr = loopback ? asio::ip::address_v4::loopback() : asio::ip::address_v4::any();
+
+    socket.bind(asio::ip::udp::endpoint(addr, port), ec);
+    if (ec) return false;
+
+    socket.non_blocking(true, ec);
+    if (ec) return false;
+
+    wait_for_read();
+    wait_for_write();
+
+    return true;
+}
+
+int MREngine::UdpSock::sendto(const void* buf, size_t len, const vm_sockaddr_struct* addr) {
+    auto asio_ep = mre_to_asio_endpoint(addr);
+
+        wait_for_write();
+    if (bytes_written < len) {
+    }
+    asio::ip::udp::endpoint sender_ep;
+    size_t bytes_read = socket.receive_from(asio::buffer(buf, len), sender_ep, 0, ec);
+        return 0;
+
+    if (ec) return -1;
+
+    if (addr) {
+        asio_to_mre_endpoint(sender_ep, addr);
+    }
+
+    wait_for_read();
+
+    return bytes_read;
+}
+
+void MREngine::UdpSock::wait_for_read() {
+    if (is_read_waiting) return;
+    is_read_waiting = true;
+
+    auto self = shared_from_this();
+    socket.async_wait(asio::socket_base::wait_read,
+        [self, this](const asio::error_code& ec) {
+            is_read_waiting = false;
+
+            if (ec == asio::error::operation_aborted) return;
+
+            if (!ec)
+                push_event(VM_UDP_EVT_READ);
+            else if (ec == asio::error::eof)
+                push_event(VM_UDP_EVT_PIPE_CLOSED);
+            else
+                push_event(VM_UDP_EVT_PIPE_BROKEN);
+        });
+}
+
+void MREngine::UdpSock::wait_for_write() {
+    if (is_write_waiting) return;
+    is_write_waiting = true;
+
+    auto self = shared_from_this();
+    socket.async_wait(asio::socket_base::wait_write,
+        [self, this](const asio::error_code& ec) {
+            is_write_waiting = false;
+
+            if (ec == asio::error::operation_aborted) return;
+
+            if (!ec)
+                push_event(VM_UDP_EVT_WRITE);
+            else
+                push_event(VM_UDP_EVT_PIPE_BROKEN);
+        });
+}
+
+void MREngine::UdpSock::close() {
+    auto self = shared_from_this();
+    asio::post(socket.get_executor(), [self, this]() {
+        asio::error_code ec;
+        socket.close(ec);
+        });
+}
+
+MREngine::NetworkManager::NetworkManager() : work_guard(asio::make_work_guard(io_ctx)) {
+    asio_thread = std::thread([this]() {
+        io_ctx.run();
+        });
+
+    g_networkManager = this;
+}
+
+MREngine::NetworkManager::~NetworkManager() {
+    work_guard.reset();
+    io_ctx.stop();
+    if (asio_thread.joinable()) {
+        asio_thread.join();
+    }
+}
+
+asio::io_context& MREngine::NetworkManager::get_context() {
+    return io_ctx;
+}
+
+static void fill_dns_result(vm_soc_dns_result* result, const std::vector<asio::ip::address_v4>& ips, VMINT error_cause) {
+    result->error_cause = error_cause;
+
+    if (error_cause == VM_E_SOC_SUCCESS && !ips.empty()) {
+        result->num = std::min<int>(VM_SOC_DNS_MAX_ADDR, ips.size());
+
+        for (int i = 0; i < result->num; ++i) {
+            auto bytes = ips[i].to_bytes();
+            std::memcpy(&result->address[i], bytes.data(), 4);
+        }
+    }
+    else {
+        result->num = 0;
+    }
+}
+
+
+// MRE API
 
 VMINT vm_is_support_wifi(void) {
 	return 1;
@@ -68,51 +295,65 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
     VMINT(*callback)(vm_soc_dns_result*)) 
 {
     if (host == 0 || result == 0)
-        return VM_E_SOC_ERROR;
+        return VM_E_SOC_INVAL;
 
-    sf::IpAddress ip(host);
-    uint32_t iip = ip.toInteger();
+    std::string host_str(host);
+    asio::error_code ec;
 
-    if(iip==0)
-        return VM_E_SOC_ERROR;
+    asio::ip::address_v4 direct_ip = asio::ip::make_address_v4(host_str, ec);
+    if (!ec) {
+        fill_dns_result(result, { direct_ip }, VM_E_SOC_SUCCESS);
+        return VM_E_SOC_SUCCESS;
+    }
 
-    //memcpy(result->address, &iip, 4);
-    for (int i = 0; i < 4; ++i)
-        ((unsigned char*)result->address)[3-i] = ((unsigned char*)&iip)[i];
-    result->num = 1;
-    result->error_cause = VM_E_SOC_SUCCESS;
+    int phandle = vm_pmng_get_current_handle();
+    
+    auto resolver = std::make_shared<asio::ip::tcp::resolver>(g_networkManager->get_context());
 
-    return VM_E_SOC_SUCCESS;
+    resolver->async_resolve(host_str, "",
+        [phandle, callback, resolver](const asio::error_code& ec, asio::ip::tcp::resolver::results_type results) {
+            if (ec == asio::error::operation_aborted) return;
+
+            dns_event event_data;
+            event_data.callback = callback;
+            event_data.phandle = phandle;
+
+            if (!ec) {
+                std::vector<asio::ip::address_v4> ips;
+                for (auto& res : results)
+                    if (res.endpoint().address().is_v4())
+                        ips.push_back(res.endpoint().address().to_v4());
+
+                fill_dns_result(&event_data.result, ips, VM_E_SOC_SUCCESS);
+            }
+            else
+                fill_dns_result(&event_data.result, {}, VM_E_SOC_ERROR);
+
+            AppManager::add_dns_event(event_data);
+        });
+
+    return VM_E_SOC_WOULDBLOCK;
 }
 
 VMINT vm_tcp_connect(const char* host, const VMINT port, const VMINT apn,
-    void (*callback)(VMINT handle, VMINT event)) {
-
-    MREngine::tcp_el tcp = { std::make_shared<sf::TcpSocket>(), callback };
-
-    tcp.soc->setBlocking(true);
-    auto res = tcp.soc->connect(host, port);
-    tcp.soc->setBlocking(false);
-
-    switch (res){
-    case sf::Socket::Disconnected:
-    case sf::Socket::Error:
-        return -1;
-        break;
-    }
-
-    //std::size_t dummy;
-    //auto res1 = tcp.soc->receive(&dummy, 0, dummy);
-
+    void (*callback)(VMINT handle, VMINT event)) 
+{
+    std::shared_ptr<MREngine::TcpSock> tcp = std::make_shared<MREngine::TcpSock>(g_networkManager->get_context(), callback, vm_pmng_get_current_handle());
+    
     MREngine::AppSock& app_sock = get_current_app_sock();
-    return app_sock.tcps.push(tcp);
+    int tcp_id = app_sock.tcps.push(tcp);
+    
+    tcp->handle = tcp_id;
+    tcp->connect(host, std::to_string(port));
+
+    return tcp_id;
 }
 
 void vm_tcp_close(VMINT handle) {
     MREngine::AppSock& app_sock = get_current_app_sock();
 
     if (app_sock.tcps.is_active(handle))
-        app_sock.tcps[handle].soc->disconnect();
+        app_sock.tcps[handle]->close();
 
     app_sock.tcps.remove(handle);
 }
@@ -125,20 +366,7 @@ VMINT vm_tcp_read(VMINT handle, void* buf, VMINT len) {
 
     auto& tcp = app_sock.tcps[handle];
 
-    size_t from_buf = std::min<size_t>(len, tcp.receive_tmp_buf_pos);
-    if (from_buf) {
-        memcpy(buf, tcp.receive_tmp_buf, from_buf);
-
-        if (from_buf != tcp.receive_tmp_buf_pos)
-            memmove(tcp.receive_tmp_buf, tcp.receive_tmp_buf + from_buf, tcp.receive_tmp_buf_pos - from_buf);
-
-        tcp.receive_tmp_buf_pos -= from_buf;
-    }
-
-    size_t recived = 0;
-    auto res = tcp.soc->receive((char*)buf + from_buf, len - from_buf, recived);
-
-    return recived + from_buf;
+    return tcp->read(buf, len);
 }
 
 VMINT vm_tcp_write(VMINT handle, void* buf, VMINT len) {
@@ -149,10 +377,52 @@ VMINT vm_tcp_write(VMINT handle, void* buf, VMINT len) {
 
     auto& tcp = app_sock.tcps[handle];
 
-    size_t writed = 0;
-   // tcp.soc->setBlocking(true);
-    auto res = tcp.soc->send(buf, len, writed);
-    //tcp.soc->setBlocking(false);
+    return tcp->write(buf, len);
+}
 
-    return writed;
+VMINT vm_udp_create(VMINT port, VMINT apn, void (*callback)(VMINT hdl, VMINT event), VMINT loopback) {
+    std::shared_ptr<MREngine::UdpSock> udp = std::make_shared<MREngine::UdpSock>(g_networkManager->get_context(), callback, vm_pmng_get_current_handle());
+
+    if (!udp->create(port, loopback)) {
+        return -1;
+    }
+
+    MREngine::AppSock& app_sock = get_current_app_sock();
+    int udp_id = app_sock.udps.push(udp);
+
+    udp->handle = udp_id;
+
+    return udp_id;
+}
+
+VMINT vm_udp_sendto(VMINT hdl, const void* buf, VMINT32 len, const vm_sockaddr_struct* addr) {
+    MREngine::AppSock& app_sock = get_current_app_sock();
+
+    if (!app_sock.udps.is_active(hdl))
+        return -1;
+
+    auto& udp = app_sock.udps[hdl];
+
+    return udp->sendto(buf, len, addr);
+}
+
+VMINT vm_udp_recvfrom(VMINT hdl, void* buf, VMINT32 len, vm_sockaddr_struct* addr) {
+    MREngine::AppSock& app_sock = get_current_app_sock();
+
+    if (!app_sock.udps.is_active(hdl))
+        return -1;
+
+    auto& udp = app_sock.udps[hdl];
+
+    return udp->recvfrom(buf, len, addr);
+}
+
+VMINT vm_udp_close(VMINT hdl) {
+    MREngine::AppSock& app_sock = get_current_app_sock();
+
+    if (app_sock.udps.is_active(hdl))
+        app_sock.udps[hdl]->close();
+
+    app_sock.udps.remove(hdl);
+    return 0;
 }
