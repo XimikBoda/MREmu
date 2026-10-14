@@ -256,11 +256,14 @@ static void run_queue(Queue<T>& q, std::unique_lock<std::mutex>& lock, F f) {
 void AppManager::loop() {
 	while (running) {
 		GDB::update(); //TODO
+		bool event = false;
 
-		auto wait_time = std::chrono::microseconds(get_time_for_nearest_timer().asMicroseconds());
+		auto wait_time_ms = get_time_for_nearest_timer().asMicroseconds();
+		auto wait_time = std::chrono::microseconds(wait_time_ms);
 
 		std::unique_lock lock(events_mutex);
-		bool event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
+		if(wait_time_ms > 0)
+			event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
 
 		if (event) {
 			run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
