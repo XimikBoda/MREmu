@@ -176,14 +176,35 @@ bool MREngine::UdpSock::create(int port, int loopback) {
 }
 
 int MREngine::UdpSock::sendto(const void* buf, size_t len, const vm_sockaddr_struct* addr) {
+    asio::error_code ec;
     auto asio_ep = mre_to_asio_endpoint(addr);
 
+    size_t bytes_written = socket.send_to(asio::buffer(buf, len), asio_ep, 0, ec);
+
+    if (ec == asio::error::would_block) {
         wait_for_write();
-    if (bytes_written < len) {
-    }
-    asio::ip::udp::endpoint sender_ep;
-    size_t bytes_read = socket.receive_from(asio::buffer(buf, len), sender_ep, 0, ec);
         return 0;
+    }
+
+    if (ec) return -1; 
+
+    if (bytes_written < len) {
+        wait_for_write();
+    }
+
+    return bytes_written;
+}
+
+int MREngine::UdpSock::recvfrom(void* buf, size_t len, vm_sockaddr_struct* addr) {
+    asio::error_code ec;
+    asio::ip::udp::endpoint sender_ep;
+
+    size_t bytes_read = socket.receive_from(asio::buffer(buf, len), sender_ep, 0, ec);
+
+    if (ec == asio::error::would_block) {
+        wait_for_read();
+        return 0;
+    }
 
     if (ec) return -1;
 

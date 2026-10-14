@@ -44,6 +44,7 @@ class AppManager {
 	Queue<message_event_el> message_events_queue;
 	Queue<system_event_el> system_events_queue;
 	Queue<sock_event> sock_events_queue;
+	Queue<dns_event> dns_events_queue;
 
 	std::mutex events_mutex;
 	std::condition_variable events_cv;
@@ -71,6 +72,7 @@ class AppManager {
 
 	void process_sock_event(sock_event se);
 	void process_dns_event(dns_event de);
+
 	sf::Time get_time_for_nearest_timer();
 
 	void loop();
@@ -93,7 +95,9 @@ public:
 
 	void add_system_event(int phandle, int message, int param);
 
+	static void add_sock_event(sock_event se);
 	static void add_dns_event(dns_event de);
+
 	App* get_active_app();
 	App* get_current_work_app_id();
 };

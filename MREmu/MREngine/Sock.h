@@ -47,6 +47,8 @@ namespace MREngine {
         void (*callback)(VMINT handle, VMINT event);
         bool is_read_waiting = false;
         bool is_write_waiting = false;
+
+        void push_event(int event);
     public:
         int handle;
         UdpSock(asio::io_context& ctx, void (*c)(int, int), int phandle);
@@ -67,6 +69,11 @@ namespace MREngine {
         ItemsMng<std::shared_ptr<TcpSock>> tcps;
         ItemsMng<std::shared_ptr<UdpSock>> udps;
     };
+
+    class NetworkManager {
+        asio::io_context io_ctx;
+
+        asio::executor_work_guard<asio::io_context::executor_type> work_guard;
 
         std::thread asio_thread;
 
