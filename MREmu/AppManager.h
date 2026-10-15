@@ -67,6 +67,8 @@ class AppManager {
 	void process_keyboard_event(keyboard_event_el ke);
 	void process_pen_event(pen_event_el pe);
 
+	int find_app_id_by_phandle(int phandle);
+
 	void process_message_event(message_event_el me);
 	void process_system_event(system_event_el se);
 

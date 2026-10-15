@@ -169,20 +169,23 @@ void AppManager::add_message_event(int phandle, unsigned int msg_id,
 	events_cv.notify_one(); // TODO: Do I need it here
 }
 
-void AppManager::process_message_event(message_event_el me)
-{
+int AppManager::find_app_id_by_phandle(int phandle) {
 	int app_id = -1;
 
 	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == me.phandle) {
+		if (apps[i]->system_callbacks.ph_app_id == phandle) {
 			app_id = i;
 			break;
 		}
 
-	if (app_id == -1)
-		return;
+	return -1;
+}
 
-	current_work_app_id = app_id;
+void AppManager::process_message_event(message_event_el me)
+{
+	current_work_app_id = find_app_id_by_phandle(me.phandle);
+	if (current_work_app_id == -1)
+		return;
 
 	App *cur_app = apps[current_work_app_id].get();
 	if (cur_app && cur_app->system_callbacks.msg_proc)
@@ -198,18 +201,9 @@ void AppManager::add_system_event(int phandle, int message, int param)
 
 void AppManager::process_system_event(system_event_el se)
 {
-	int app_id = -1;
-
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == se.phandle) {
-			app_id = i;
-			break;
-		}
-
-	if (app_id == -1)
+	current_work_app_id = find_app_id_by_phandle(se.phandle);
+	if (current_work_app_id == -1)
 		return;
-
-	current_work_app_id = app_id;
 
 	App& cur_app = *apps[current_work_app_id];
 	if (cur_app.system_callbacks.sysevt)
@@ -226,18 +220,9 @@ void AppManager::add_sock_event(sock_event se)
 
 void AppManager::process_sock_event(sock_event se)
 {
-	int app_id = -1;
-
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == se.phandle) {
-			app_id = i;
-			break;
-		}
-
-	if (app_id == -1)
+	current_work_app_id = find_app_id_by_phandle(se.phandle);
+	if (current_work_app_id == -1)
 		return;
-
-	current_work_app_id = app_id;
 
 	App& cur_app = *apps[current_work_app_id];
 	if (se.callback)
@@ -254,18 +239,9 @@ void AppManager::add_dns_event(dns_event de)
 
 void AppManager::process_dns_event(dns_event de)
 {
-	int app_id = -1;
-
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == de.phandle) {
-			app_id = i;
-			break;
-		}
-
-	if (app_id == -1)
+	current_work_app_id = find_app_id_by_phandle(de.phandle);
+	if (current_work_app_id == -1)
 		return;
-
-	current_work_app_id = app_id;
 
 	static vm_soc_dns_result* g_result = (vm_soc_dns_result*)Memory::shared_malloc(sizeof(vm_soc_dns_result));
 	*g_result = de.result;
