@@ -178,7 +178,7 @@ int AppManager::find_app_id_by_phandle(int phandle) {
 			break;
 		}
 
-	return -1;
+	return app_id;
 }
 
 void AppManager::process_message_event(message_event_el me)

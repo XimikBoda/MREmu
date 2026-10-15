@@ -26,13 +26,14 @@ const fs::path base_path = "./";
 
 void MREngine::IO::init()
 {
+	std::error_code ec;
 #ifdef ANDROID
-	fs::create_directory(base_path);
+	fs::create_directories(base_path, ec);
 #endif
-	fs::create_directory(base_path / fs::path("fs").make_preferred());
-	fs::create_directory(base_path / fs::path("fs/e").make_preferred());
-	fs::create_directory(base_path / fs::path("fs/c").make_preferred());
-	fs::create_directory(base_path / fs::path("fs/d").make_preferred());
+	fs::create_directories(base_path / fs::path("fs").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/e").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/c").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/d").make_preferred(), ec);
 }
 
 
@@ -162,11 +163,15 @@ void vm_reg_pen_callback(vm_pen_handler_t handler) {
 }
 
 VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
+	if (!filename)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	fs::path path = path_from_emu(filename);
 
 	std::string fmode;
+	std::string fmode2;
 
 	switch (mode) {
 	case MODE_READ:
@@ -174,27 +179,40 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		break;
 	case MODE_WRITE:
 		fmode = "r+b";
+		fmode2 = "w+b";
 		break;
 	case MODE_CREATE_ALWAYS_WRITE:
 		fmode = "w+b";
 		break;
 	case MODE_APPEND:
 		fmode = "a+b";
+		fmode2 = "w+b";
 		break;
 	default:
 		return -1;
 	}
 
+	std::error_code ec;
+	if (mode != MODE_READ) 
+		fs::create_directories(path.parent_path(), ec); // This is right way?
+
 #ifdef _WIN32
 	std::wstring wfmode(fmode.begin(), fmode.end());
 	FILE* f = _wfopen(path.wstring().c_str(), wfmode.c_str());
+	if (!f && fmode2.size()) {
+		std::wstring wfmode(fmode2.begin(), fmode2.end());
+		f = _wfopen(path.wstring().c_str(), wfmode.c_str());
+	}
 #else
 	FILE* f = fopen(path.string().c_str(), fmode.c_str());
+	if (!f && fmode2.size()) {
+		f = fopen(path.string().c_str(), fmode2.c_str());
+	}
 #endif
 
 	if (!f) {
-		spdlog::warn("vm_file_open({}, {}) = -1", path.string(), mode);
-		return -1;
+		spdlog::warn("vm_file_open({}, {}) = -2", path.string(), mode);
+		return -2;
 	}
 
 	return io.files.push(f);
@@ -215,13 +233,10 @@ void vm_file_close(VMFILE handle) {
 VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (!io.files.is_active(handle) || !io.files[handle])
+	if (!io.files.is_active(handle) || !io.files[handle] || !data || !nread)
 		return -1;
 
 	FILE* f = io.files[handle];
-
-	if (!f)
-		return -1;
 
 	size_t read_bytes = fread(data, 1, length, f);
 	*nread = (VMUINT)read_bytes;
@@ -232,7 +247,7 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (!io.files.is_active(handle) || !io.files[handle])
+	if (!io.files.is_active(handle) || !io.files[handle] || !data || !written)
 		return -1;
 
 	FILE* f = io.files[handle];
@@ -308,7 +323,7 @@ VMINT vm_file_is_eof(VMFILE handle) {
 VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (!io.files.is_active(handle) || !io.files[handle])
+	if (!io.files.is_active(handle) || !io.files[handle] || !file_size)
 		return -1;
 
 	FILE* f = io.files[handle];

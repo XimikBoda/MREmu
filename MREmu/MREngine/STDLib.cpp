@@ -68,6 +68,7 @@ VMINT vm_dyn_array_del_all(vm_dyn_array_t* array) {
 		return -1;
 
 	array->count = 0;
+	return 0;
 }
 
 void vm_free_dyn_array(vm_dyn_array_t* array) {
