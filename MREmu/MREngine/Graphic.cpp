@@ -789,6 +789,94 @@ void vm_graphic_fill_polygon(VMINT handle, vm_graphic_point* point, VMINT npoint
 				buf16_dst[sy * layer.w + sx] = color;
 }
 
+static int map_value(int ab, int ae, int bb, int be, int bv) {
+	return (bv - bb) * (ae - ab) / (be - bb) + ab;
+}
+
+static uint16_t map_color16(uint16_t bc, uint16_t ec, int ib, int ie, int iv) {
+	if (ib == ie)
+		return bc;
+
+	int bcr5 = (bc & VM_COLOR_RED) >> 11;
+	int ecr5 = (ec & VM_COLOR_RED) >> 11;
+	int bcg6 = (bc & VM_COLOR_GREEN) >> 5;
+	int ecg6 = (ec & VM_COLOR_GREEN) >> 5;
+	int bcb5 = (bc & VM_COLOR_BLUE);
+	int ecb5 = (ec & VM_COLOR_BLUE);
+
+	int r5 = map_value(bcr5, ecr5, ib, ie, iv);
+	int g6 = map_value(bcg6, ecg6, ib, ie, iv);
+	int b5 = map_value(bcb5, ecb5, ib, ie, iv);
+
+	if (r5 < 0) r5 = 0; else if (r5 > 31) r5 = 31;
+	if (g6 < 0) g6 = 0; else if (g6 > 63) g6 = 63;
+	if (b5 < 0) b5 = 0; else if (b5 > 31) b5 = 31;
+
+	return (uint16_t)((r5 << 11) | (g6 << 5) | b5);
+}
+
+void vm_graphic_gradient_paint_rect(VMINT handle, VMINT x1, VMINT y1, VMINT x2, VMINT y2, vm_graphic_color color_start, vm_graphic_color color_end, vm_graphic_gp_style style) {
+	auto& layers = get_current_app_graphic().layers;
+
+	if (handle < 0 || handle >= layers.size())
+		return;
+
+	auto& layer = layers[handle];
+	unsigned short* buf16_dst = (unsigned short*)layer.buf;
+
+	MREngine::RenderBox b(x1, y1, x2, y2);
+
+	b.clip(layer);
+	b.clip(get_current_app_graphic().clip);
+	b.clip(layer.clip);
+
+	uint16_t c1 = color_start.vm_color_565, c2 = color_end.vm_color_565;
+
+	int min_v = 0, max_v = 0;
+	switch (style) {
+	case VM_GDI_GP_HOR:
+		min_v = x1, max_v = x2;
+		for (int sx = b.st_x; sx < b.end_x; ++sx) {
+			uint16_t color = map_color16(c1, c2, min_v, max_v, sx);
+			for (int sy = b.st_y; sy < b.end_y; ++sy)
+				buf16_dst[sy * layer.w + sx] = color;
+		}
+		break;
+	case VM_GDI_GP_VER:
+		min_v = y1, max_v = y2;
+		for (int sy = b.st_y; sy < b.end_y; ++sy) {
+			uint16_t color = map_color16(c1, c2, min_v, max_v, sy);
+			for (int sx = b.st_x; sx < b.end_x; ++sx)
+				buf16_dst[sy * layer.w + sx] = color;
+		}
+		break;
+	case VM_GDI_GP_DIA:
+	case VM_GDI_GP_DIA_INV:
+		min_v = x1 + y1, max_v = x2 + y2;
+		if (style == VM_GDI_GP_DIA_INV)
+			std::swap(min_v, max_v);
+
+		for (int sy = b.st_y; sy < b.end_y; ++sy)
+			for (int sx = b.st_x; sx < b.end_x; ++sx) {
+				int v = sx + sy;
+				buf16_dst[sy * layer.w + sx] = map_color16(c1, c2, min_v, max_v, v);
+			}
+		break;
+	case VM_GDI_GP_FLIP:
+		min_v = y1, max_v = (y1 + y2) / 2; 
+
+		for (int sy = b.st_y; sy < b.end_y; ++sy) {
+			uint16_t color = map_color16(c1, c2, min_v, max_v, std::abs(sy - max_v));
+			for (int sx = b.st_x; sx < b.end_x; ++sx)
+				buf16_dst[sy * layer.w + sx] = color;
+		}
+		break;
+	default:
+		return;
+	}
+}
+
+
 VM_GDI_RESULT vm_graphic_get_layer_clip(VMINT handle, clip_rect* curcliprect) {
 	auto& layers = get_current_app_graphic().layers;
 
@@ -831,6 +919,10 @@ void vm_graphic_reset_clip(void) {
 void vm_graphic_flush_screen(void) {
 	void add_system_event(int phandle, int message, int param);
 	add_system_event(vm_pmng_get_current_handle(), VM_MSG_PAINT, 0);
+}
+
+VMINT vm_graphic_get_blt_layer_count(void) {
+	return get_current_app_graphic().layers.size();
 }
 
 VMINT vm_graphic_is_r2l_state(void) {

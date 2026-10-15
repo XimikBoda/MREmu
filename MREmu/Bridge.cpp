@@ -98,6 +98,12 @@ namespace Bridge {
 			return top_sp(uc, ind - 4);
 	}
 
+	uint64_t read_arg_64(uc_engine* uc, int ind1, int ind2) {
+		uint64_t val1 = (uint64_t)read_arg(uc, ind1);
+		uint64_t val2 = (uint64_t)read_arg(uc, ind2);
+		return (val2 << 32) | val1;
+	}
+
 #define FUNCN(name) #name, (void*)name
 #define FUNCN_FIX(name) #name, (void*)name##_FIX
 
@@ -759,6 +765,17 @@ namespace Bridge {
 				(vm_graphic_point*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 				read_arg(uc, 2));
 		}},
+		{FUNCN(vm_graphic_gradient_paint_rect), [](uc_engine* uc) {
+			vm_graphic_gradient_paint_rect(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				(vm_graphic_color)read_arg_64(uc, 5, 6),
+				(vm_graphic_color)read_arg_64(uc, 7, 8),
+				(vm_graphic_gp_style)read_arg(uc, 9));
+		}},
 		{FUNCN(vm_graphic_get_layer_clip), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_graphic_get_layer_clip(
@@ -786,6 +803,9 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_graphic_flush_screen), [](uc_engine* uc) {
 			vm_graphic_flush_screen();
+		}},
+		{FUNCN(vm_graphic_get_blt_layer_count), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_blt_layer_count());
 		}},
 		{FUNCN(vm_graphic_is_r2l_state), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_is_r2l_state());
@@ -1146,6 +1166,13 @@ namespace Bridge {
 			vm_free_dyn_array(
 				(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))
 			);
+		}},
+		{FUNCN(vm_safe_wstrcpy), [](uc_engine* uc) {
+			write_ret(uc,vm_safe_wstrcpy(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
 		}},
 		{FUNCN(vm_wstrlen), [](uc_engine* uc) {
 			write_ret(uc,vm_wstrlen(

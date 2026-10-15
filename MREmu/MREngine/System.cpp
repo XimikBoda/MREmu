@@ -2,6 +2,7 @@
 #include "IO.h"
 #include "CharSet.h"
 #include "../Memory.h"
+#include "../Log.h"
 #include <vmsys.h>
 #include <string>
 #include <cstring>
@@ -79,20 +80,26 @@ malloc_stat_t* vm_get_malloc_stat(void) {
 }
 
 void* vm_malloc(int size) {
-	return Memory::app_malloc(size);
+	auto prt = Memory::app_malloc(size);
+	if(!prt)
+		spdlog::warn("vm_malloc({}) = 0", size);
+	return prt;
 }
 
 void* vm_calloc(int size) {
 	void* adr = vm_malloc(size);
 	if (adr)
 		memset(adr, 0, size);
-
-	//printf("vm_calloc(%d) -> %#016x\n", size, adr);
+	else
+		spdlog::warn("vm_calloc({}) = 0", size);
 	return adr;
 }
 
 void* vm_realloc(void* p, int size) {
-	return Memory::app_realloc(p, size);
+	auto prt = Memory::app_realloc(p, size);
+	if (!prt)
+		spdlog::warn("vm_realloc({}, {}) = 0", p, size);
+	return prt;
 }
 
 void vm_free(void* ptr) {
