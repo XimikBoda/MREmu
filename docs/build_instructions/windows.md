@@ -7,15 +7,16 @@ The project relies on several third-party libraries. Most dependencies are inclu
 **System requirements:**
 - CMake 3.8+
 - A C++20 compatible compiler (MSVC)
-- System libraries required by SFML (OpenGL, OpenAL, etc.)
+- System libraries required by SFML (OpenGL, etc.)
 - [Git](https://git-scm.com/) for cloning the repo
 
 ### Prerequisites
 
 - [Visual Studio](https://visualstudio.microsoft.com/downloads/) 2019 or newer with the "Desktop development with C++" workload
-- [CMake](https://cmake.org/download/)
-- [OpenAL 1.1 Windows Installer](https://www.openal.org/downloads/)
+- [CMake](https://cmake.org/download/) (also installed with Visual Studio, but make sure `cmake` is available in your terminal)
 - [MediaTek MRE SDK 3.0](https://github.com/raspiduino/mre-sdk/releases/download/1.0.0/MRE_SDK_3.0.00.20_Normal_Eng.zip)
+
+> Note: OpenAL is bundled with SFML under `deps/SFML/extlibs`, so a separate OpenAL SDK is **not** required. The runtime `openal32.dll` is needed to run the emulator and is copied in a step below.
 
 ## Build Instructions
 
@@ -37,7 +38,9 @@ git submodule update --init --recursive
 The emulator engine requires the MediaTek MRE SDK headers (`vm*.h`) to compile. You must download the SDK and set the `MRE_SDK` environment variable.
 
 1. Download [MRE SDK 3.0](https://github.com/raspiduino/mre-sdk/releases/download/1.0.0/MRE_SDK_3.0.00.20_Normal_Eng.zip) and install it to `C:\MRE_SDK`.
-2. Then just set the `MRE_SDK` environment variable pointing to the SDK directory and make sure the specified directory contains an `include` folder. 
+2. Then set the `MRE_SDK` environment variable pointing to the SDK directory and make sure the specified directory contains an `include` folder.
+
+After setting the variable, restart your terminal / Visual Studio so the new value is picked up before configuring the project. 
 <br>
 <br>
 (Win + R opens Run dialog > `sysdm.cpl` > Advanced > Enviornment Variables > Then under System Variables click New... > Set variable name to `MRE_SDK` and value to `C:\MRE_SDK` )
@@ -62,10 +65,18 @@ cmake --build . --config Release
 
 **4. Run the emulator**
 
-If the build succeeds, you'll see the executable inside `bin` directory located at the project root.
+When using the default Visual Studio multi-config generator (the commands above), the executable is placed under `bin\Release`:
 ```cmd
-bin\MREmu.exe
+bin\Release\MREmu.exe
 ```
+
+Before running, make sure the OpenAL runtime is available:
+
+```cmd
+copy deps\SFML\extlibs\bin\x86\openal32.dll bin\Release\
+```
+
+If you configure with a single-config generator such as Ninja (for example via the CMake presets), the executable may instead be at `bin\MREmu.exe`.
 
 ## Troubleshooting
 
