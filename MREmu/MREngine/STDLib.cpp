@@ -79,6 +79,17 @@ void vm_free_dyn_array(vm_dyn_array_t* array) {
 	}
 }
 
+VMINT vm_safe_wstrcpy(VMWSTR dest, VMINT size, VMWSTR src) {
+	if (dest == 0 || src == 0)
+		return -1;
+
+	int count = 0;
+	for (count = 0; (dest[count] = src[count]) && count < size; ++count);
+	if (count == size)
+		dest[--count] = 0;
+	return count;
+}
+
 VMINT vm_wstrlen(VMWSTR s) {
 	if (s == 0)
 		return -1;

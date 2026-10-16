@@ -18,6 +18,12 @@ namespace fs = std::filesystem;
 class App
 {
 public:
+	enum State{
+		Runned,
+		SoftClosing,
+		HardClosing
+	};
+
 	std::vector<unsigned char> file_context;
 
 	fs::path path;
@@ -28,6 +34,8 @@ public:
 	size_t offset_mem;
 	size_t mem_size;
 	size_t segments_size;
+
+	State state = Runned; // todo
 
 	std::string app_name;
 
@@ -52,6 +60,11 @@ public:
 	auto run(Func func, Args... args) {
 		Log::set_module(app_name);
 
-		return Bridge::run<from_hook>(is_native(), func, std::forward<Args>(args)...);
+		if (state != HardClosing) // TODO: potential issue here
+			return Bridge::run<from_hook>(is_native(), func, std::forward<Args>(args)...);
+		else {
+			using RetType = decltype(func(std::forward<Args>(args)...));
+			return RetType();
+		}
 	}
 };

@@ -173,6 +173,7 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	spdlog::info("vm_file_open: {} -> {}, mode={}", UCS2_to_path(filename).string(), path.string(), mode);
 
 	std::string fmode;
+	std::string fmode2;
 
 	switch (mode) {
 	case MODE_READ:
@@ -180,12 +181,14 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		break;
 	case MODE_WRITE:
 		fmode = "r+b";
+		fmode2 = "w+b";
 		break;
 	case MODE_CREATE_ALWAYS_WRITE:
 		fmode = "w+b";
 		break;
 	case MODE_APPEND:
 		fmode = "a+b";
+		fmode2 = "w+b";
 		break;
 	default:
 		return -1;
@@ -199,17 +202,20 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 #ifdef _WIN32
 	std::wstring wfmode(fmode.begin(), fmode.end());
 	FILE* f = _wfopen(path.wstring().c_str(), wfmode.c_str());
-	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
-		f = _wfopen(path.wstring().c_str(), L"w+b");
+	if (!f && fmode2.size()) {
+		std::wstring wfmode(fmode2.begin(), fmode2.end());
+		f = _wfopen(path.wstring().c_str(), wfmode.c_str());
+	}
 #else
 	FILE* f = fopen(path.string().c_str(), fmode.c_str());
-	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
-		f = fopen(path.string().c_str(), "w+b");
+	if (!f && fmode2.size()) {
+		f = fopen(path.string().c_str(), fmode2.c_str());
+	}
 #endif
 
 	if (!f) {
-		spdlog::warn("vm_file_open({}, {}) = -1", path.string(), mode);
-		return -1;
+		spdlog::warn("vm_file_open({}, {}) = -2", path.string(), mode);
+		return -2;
 	}
 
 	return (VMFILE)io.files.push(f);
@@ -236,7 +242,7 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (!io.files.is_active(handle) || !io.files[handle])
+	if (!io.files.is_active(handle) || !io.files[handle] || !data || !nread)
 		return -1;
 
 	FILE* f = io.files[handle];
@@ -253,7 +259,7 @@ VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (!io.files.is_active(handle) || !io.files[handle])
+	if (!io.files.is_active(handle) || !io.files[handle] || !data || !written)
 		return -1;
 
 	FILE* f = io.files[handle];
@@ -344,7 +350,7 @@ VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
 
 	MREngine::AppIO& io = get_current_app_io();
 
-	if (!io.files.is_active(handle) || !io.files[handle])
+	if (!io.files.is_active(handle) || !io.files[handle] || !file_size)
 		return -1;
 
 	FILE* f = io.files[handle];
@@ -846,4 +852,12 @@ VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size
 	*buf_size = tag_size;
 
 	return GET_TAG_TRUE;
+}
+fs::path get_current_app_real_path() {
+	return get_current_app_path();
+}
+
+std::string get_current_app_name() {
+	fs::path p = get_current_app_path();
+	return p.stem().string();
 }

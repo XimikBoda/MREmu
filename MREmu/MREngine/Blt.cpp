@@ -3,6 +3,10 @@
 #include "Blt.h"
 #include <vmgraph.h>
 #include <cstring>
+#include <SFML/System/Clock.hpp>
+#include <SFML/System/Sleep.hpp>
+
+extern sf::Clock global_clock;
 
 using MREngine::graphic;
 
@@ -172,6 +176,14 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 	for (int i = 0; i < count; ++i)
 		if (layer_handles[i] < 0 || layer_handles[i] >= gr.layers.size())
 			return -1;
+
+	{
+		uint64_t millis = (uint64_t)global_clock.getElapsedTime().asMicroseconds(); // TODO
+		const int fps = 30, frame_delay = 1000000 / fps;
+		uint64_t now = millis % frame_delay;
+
+		sf::sleep(sf::microseconds(frame_delay - now));
+	}
 
 	for (int sy = 0; sy < graphic->height; ++sy)
 		for (int sx = 0; sx < graphic->width; ++sx)

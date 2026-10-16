@@ -111,7 +111,7 @@ bool work = true;
 
 static std::mutex g_error_mutex;
 std::string error_message = "";
-std::atomic<bool> show_error = false;
+bool show_error = false;
 std::atomic<bool> g_request_hard_reset = false;
 
 void trigger_hard_reset_with_error(const std::string& err_msg) {
@@ -146,21 +146,6 @@ Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thi
     env->ReleaseStringUTFChars(j_path, path_cstr);
 }
 #endif
-
-
-void mre_main(AppManager* appManager_p) {
-	AppManager& appManager = *appManager_p;
-
-	sf::Clock deltaClock;
-	while (work) {
-		uint32_t delta_ms = deltaClock.restart().asMilliseconds();
-
-		GDB::update();
-		appManager.update(delta_ms);
-
-		sf::sleep(sf::milliseconds(1000 / 120));
-	}
-}
 
 int main(int argc, char** argv) {
     std::string app_path = "";
@@ -212,6 +197,7 @@ int main(int argc, char** argv) {
 	MREngine::AppAudio::init();
 	MREngine::SystemTextBox::init();
 	MREngine::Graphic graphic;
+	MREngine::NetworkManager nm;
 
 #ifndef ANDROID
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
@@ -256,7 +242,7 @@ int main(int argc, char** argv) {
 	if (GDB::gdb_mode)
 		GDB::cpu_state = GDB::Stop;
 
-	std::thread second_thread(mre_main, &appManager);
+	appManager.start();
 
 	Keyboard keyboard;
 	Touch touch;
@@ -388,8 +374,6 @@ int main(int argc, char** argv) {
 
 			work = false;
 			Cpu::stop();
-			if (second_thread.joinable())
-				second_thread.join();
 
 			appManager.reset();
 
@@ -422,7 +406,6 @@ int main(int argc, char** argv) {
 			appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
 
 			work = true;
-			second_thread = std::thread(mre_main, &appManager);
 		}
 
 #ifndef ANDROID
@@ -497,8 +480,25 @@ int main(int argc, char** argv) {
 
 		graphic.update_screen();
 
+		{
+			screen_sp.setTexture(graphic.screen_tex, true);
+			win_device.draw(screen_sp);
+		}
+
+		keyboard.draw(&win_device);
+
 #ifndef ANDROID
+		if (ImGui::Begin("Fps")) {
+			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
+		}
+		ImGui::End();
+
+		Cpu::imgui_REG();
+
+		keyboard.imgui_keyboard();
 		graphic.imgui_screen();
+
+		std::lock_guard lock(appManager.active_app_mutex);
 		App* active_app = appManager.get_active_app();
 		if (active_app) {
 			active_app->graphic.imgui_layers();
@@ -588,9 +588,9 @@ int main(int argc, char** argv) {
 	}
 
 	DragAndDrop::cleanup();
-
+ 
+	appManager.stop();
 	work = false;
-	second_thread.join();
 
 #ifndef ANDROID
 	ImGui::SFML::Shutdown();

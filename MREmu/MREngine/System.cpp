@@ -2,7 +2,9 @@
 #include "IO.h"
 #include "CharSet.h"
 #include "../Memory.h"
+#include "../Log.h"
 #include <vmsys.h>
+#include <vmtel.h>
 #include <string>
 #include <cstring>
 #include <filesystem>
@@ -96,20 +98,26 @@ malloc_stat_t* vm_get_malloc_stat(void) {
 }
 
 void* vm_malloc(int size) {
-	return Memory::app_malloc(size);
+	auto prt = Memory::app_malloc(size);
+	if(!prt)
+		spdlog::warn("vm_malloc({}) = 0", size);
+	return prt;
 }
 
 void* vm_calloc(int size) {
 	void* adr = vm_malloc(size);
 	if (adr)
 		memset(adr, 0, size);
-
-	//printf("vm_calloc(%d) -> %#016x\n", size, adr);
+	else
+		spdlog::warn("vm_calloc({}) = 0", size);
 	return adr;
 }
 
 void* vm_realloc(void* p, int size) {
-	return Memory::app_realloc(p, size);
+	auto prt = Memory::app_realloc(p, size);
+	if (!prt)
+		spdlog::warn("vm_realloc({}, {}) = 0", p, size);
+	return prt;
 }
 
 void vm_free(void* ptr) {
@@ -183,4 +191,10 @@ VMBOOL vm_appmgr_is_installed(VMWSTR path, vm_install_id install_id) {
 VMINT vm_appmgr_get_installed_list(VMINT flag, vm_install_id* install_id_list, VMUINT* num) {
 	*num = 0;
 	return 0; // tmp
+}
+
+VMINT vm_open_wap_url(VMWSTR url) {
+	auto u8str = ucs2_to_utf8(url);
+	spdlog::info("vm_open_wap_url(\"{}\")", (const char*)u8str.c_str());
+	return 0;
 }

@@ -17,7 +17,7 @@ set(SOURCES
 						"Keyboard.cpp" "Keyboard.h"
 						"Touch.cpp" "Touch.h"
 						"Log.cpp" "Log.h" 
-						"miniz.c" "miniz.h" "mutex_wrapper.h"
+						"miniz.c" "miniz.h" "mutex_wrapper.h" "Queue.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
 						"DragAndDrop.cpp" "DragAndDrop.h"
 )

@@ -18,3 +18,5 @@ add_subdirectory(spdlog)
 
 set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures") 
 add_subdirectory(unicorn) 
+
+add_subdirectory(asio.cmake) 

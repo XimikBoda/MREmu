@@ -8,8 +8,8 @@ android {
 
     defaultConfig {
         applicationId = 'com.ximikboda.mremu'
-        minSdkVersion 28
-        targetSdkVersion 30
+        minSdkVersion 21
+        targetSdkVersion 36
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static'
@@ -17,7 +17,7 @@ android {
             }
         }
         ndk {
-            abiFilters 'arm64-v8a'
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
         }
     }
     buildTypes {

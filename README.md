@@ -16,6 +16,8 @@ For platform-specific dependencies and build instructions, see:
 - [Dear ImGui](https://github.com/ocornut/imgui)
 - [ImGui-SFML](https://github.com/SFML/imgui-sfml)
 - [Capstone](https://github.com/capstone-engine/capstone)
+- [asio](https://github.com/chriskohlhoff/asio)
+- [asio.cmake](https://github.com/OlivierLDff/asio.cmake)
 - [ELFIO](https://github.com/serge1/ELFIO)
 - [CmdParser](https://github.com/FlorianRappl/CmdParser)
 - [libADLMIDI](https://github.com/Wohlstand/libADLMIDI)

@@ -36,6 +36,7 @@
 #include <vmbitstream.h>
 #include <vmsensor.h>
 #include <vmio.h>
+#include <vmtel.h>
 
 VMINT vm_get_cache_free_space(vm_cache_t* cache) {
 	return 16 * 1024 * 1024;
@@ -103,6 +104,12 @@ namespace Bridge {
 			return read_reg(uc, UC_ARM_REG_R0 + ind);
 		else
 			return top_sp(uc, ind - 4);
+	}
+
+	uint64_t read_arg_64(uc_engine* uc, int ind1, int ind2) {
+		uint64_t val1 = (uint64_t)read_arg(uc, ind1);
+		uint64_t val2 = (uint64_t)read_arg(uc, ind2);
+		return (val2 << 32) | val1;
 	}
 
 #define FUNCN(name) #name, (void*)name
@@ -199,6 +206,11 @@ namespace Bridge {
 					read_arg(uc, 0),
 					(vm_install_id*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+		}},
+		{FUNCN(vm_open_wap_url), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_open_wap_url(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 		{FUNCN(vm_app_log), [](uc_engine* uc) {
 			vm_app_log(
@@ -484,12 +496,7 @@ namespace Bridge {
 		{FUNCN(vm_wifi_is_connected), [](uc_engine* uc) {
 			write_ret(uc, vm_wifi_is_connected());
 		}},
-		{"vm_tcp_wifi_connected", (void*)vm_tcp_wifi_connected, [](uc_engine* uc) {
-			write_ret(uc, vm_tcp_wifi_connected());
-		}},
-		{FUNCN(vm_soc_get_last_error), [](uc_engine* uc) {
-			write_ret(uc, vm_soc_get_last_error());
-		}},
+
 		{FUNCN(vm_soc_get_host_by_name), [](uc_engine* uc) {
 			write_ret(uc, vm_soc_get_host_by_name(
 				read_arg(uc, 0),
@@ -871,6 +878,17 @@ namespace Bridge {
 				(vm_graphic_point*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 				read_arg(uc, 2));
 		}},
+		{FUNCN(vm_graphic_gradient_paint_rect), [](uc_engine* uc) {
+			vm_graphic_gradient_paint_rect(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3),
+				read_arg(uc, 4),
+				(vm_graphic_color)read_arg_64(uc, 5, 6),
+				(vm_graphic_color)read_arg_64(uc, 7, 8),
+				(vm_graphic_gp_style)read_arg(uc, 9));
+		}},
 		{FUNCN(vm_graphic_get_layer_clip), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_graphic_get_layer_clip(
@@ -898,6 +916,9 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_graphic_flush_screen), [](uc_engine* uc) {
 			vm_graphic_flush_screen();
+		}},
+		{FUNCN(vm_graphic_get_blt_layer_count), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_blt_layer_count());
 		}},
 		{FUNCN(vm_graphic_is_r2l_state), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_is_r2l_state());
@@ -1075,6 +1096,10 @@ namespace Bridge {
 				read_arg(uc, 6),
 				read_arg(uc, 7)
 			));
+		}},
+		{FUNCN(vm_graphic_get_char_baseline_alllang), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_char_baseline_alllang(
+				read_arg(uc, 0)));
 		}},
 
 
@@ -1258,6 +1283,13 @@ namespace Bridge {
 			vm_free_dyn_array(
 				(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))
 			);
+		}},
+		{FUNCN(vm_safe_wstrcpy), [](uc_engine* uc) {
+			write_ret(uc,vm_safe_wstrcpy(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
+				));
 		}},
 		{FUNCN(vm_wstrlen), [](uc_engine* uc) {
 			write_ret(uc,vm_wstrlen(
@@ -1493,6 +1525,84 @@ namespace Bridge {
 		{FUNCN(mremu_media_stop), [](uc_engine* uc) {
 			mremu_media_stop();
 		}},
+
+ 
+		// Sock
+		{FUNCN(vm_is_support_wifi), [](uc_engine* uc) {
+			write_ret(uc, vm_is_support_wifi());
+		}},
+		{FUNCN(vm_wifi_is_connected), [](uc_engine* uc) {
+			write_ret(uc, vm_wifi_is_connected());
+		}},
+		{FUNCN(vm_soc_get_host_by_name), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_soc_get_host_by_name(
+					read_arg(uc, 0),
+					(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+					(VMINT(*)(vm_soc_dns_result*))read_arg(uc, 3)
+				));
+		}},
+		{FUNCN(vm_tcp_connect), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_tcp_connect(
+					(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					read_arg(uc, 1),
+					read_arg(uc, 2),
+					(void (*)(VMINT, VMINT))read_arg(uc, 3)
+				));
+		}},
+		{FUNCN(vm_tcp_close), [](uc_engine* uc) {
+			vm_tcp_close(read_arg(uc, 0));
+		}},
+		{FUNCN(vm_tcp_read), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_tcp_read(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2)
+				));
+		}},
+		{FUNCN(vm_tcp_write), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_tcp_write(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2)
+				));
+		}},
+		{FUNCN(vm_udp_create), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_create(
+					read_arg(uc, 0),
+					read_arg(uc, 1),
+					(void (*)(VMINT, VMINT))read_arg(uc, 2),
+					read_arg(uc, 3)
+				));
+		}},
+		{FUNCN(vm_udp_sendto), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_sendto(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2),
+					(vm_sockaddr_struct*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+				));
+		}},
+		{FUNCN(vm_udp_recvfrom), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_recvfrom(
+					read_arg(uc, 0),
+					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					read_arg(uc, 2),
+					(vm_sockaddr_struct*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+				));
+		}},
+		{FUNCN(vm_udp_close), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_udp_close(read_arg(uc, 0)));
+		}},
+
 
 		// Sensor
 		{FUNCN(vm_srv_sensor_is_available), [](uc_engine* uc) {

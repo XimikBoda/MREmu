@@ -37,5 +37,5 @@ void vm_start_app_with_para(const VMWCHAR* filepath, VMINT parent_app_handle, VM
 }
 
 void vm_exit_app(void) {
-	g_appManager->add_app_for_close(vm_pmng_get_current_handle());
+	g_appManager->close_app(vm_pmng_get_current_handle(), false);
 }
