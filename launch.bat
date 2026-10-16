@@ -177,16 +177,17 @@ if not exist "%ANDROID_DIR%\gradlew.bat" goto android_fail
 if not exist "%ANDROID_DIR%\local.properties" goto android_fail
 
 set "JAVA_HOME="
-if exist "C:\Program Files\Android\Android Studio\jbr" set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
-if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" set "JAVA_HOME="
+for /d %%D in ("%USERPROFILE%\.gradle\jdks\*21*") do if not defined JAVA_HOME if exist "%%D\bin\java.exe" set "JAVA_HOME=%%D"
+for /d %%D in ("%USERPROFILE%\.jdks\*21*") do if not defined JAVA_HOME if exist "%%D\bin\java.exe" set "JAVA_HOME=%%D"
+for /d %%D in ("C:\Program Files\Eclipse Adoptium\jdk-21*") do if not defined JAVA_HOME if exist "%%D\bin\java.exe" set "JAVA_HOME=%%D"
+for /d %%D in ("C:\Program Files\Java\jdk-21*") do if not defined JAVA_HOME if exist "%%D\bin\java.exe" set "JAVA_HOME=%%D"
+if not defined JAVA_HOME if exist "C:\Program Files\Android\Android Studio\jbr\bin\java.exe" set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
 if not defined JAVA_HOME if defined ANDROID_STUDIO if exist "%ANDROID_STUDIO%\jbr\bin\java.exe" set "JAVA_HOME=%ANDROID_STUDIO%\jbr"
 if not defined JAVA_HOME (
   for /f "delims=" %%I in ('where java 2^>nul') do (
-    set "JAVA_HOME=%%~dpI.."
-    goto android_java_found
+    if not defined JAVA_HOME set "JAVA_HOME=%%~dpI.."
   )
 )
-:android_java_found
 if not defined JAVA_HOME goto android_fail
 if not exist "%JAVA_HOME%\bin\java.exe" goto android_fail
 
