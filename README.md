@@ -8,6 +8,7 @@ For platform-specific dependencies and build instructions, see:
 
 - [Building on Linux](docs/build_instructions/linux.md)
 - [Building on Windows](docs/build_instructions/windows.md)
+- [Building on Android](docs/build_instructions/android.md)
 
 ## Credits for Dependencies
 - [QEMU](https://github.com/qemu/qemu)
