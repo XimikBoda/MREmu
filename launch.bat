@@ -9,6 +9,7 @@ rem     [3] -> run Release
 rem     [4] -> run Debug
 rem     [5] -> clean build artifacts
 rem     [6] -> reconfigure + build Release
+rem     [7] -> Android build menu
 setlocal
 
 set "ROOT=%~dp0"
@@ -39,6 +40,7 @@ echo   [3] Run Release
 echo   [4] Run Debug
 echo   [5] Clean
 echo   [6] Reconfigure + build Release
+echo   [7] Android build menu
 echo.
 set "choice="
 set /p "choice=Choose 0-6: "
@@ -51,8 +53,9 @@ if "%choice%"=="3" goto run_release
 if "%choice%"=="4" goto run_debug
 if "%choice%"=="5" goto clean
 if "%choice%"=="6" goto reconfigure
+if "%choice%"=="7" goto android_menu
 if defined once (
-  echo Unknown option "%~1". Use 0, 1, 2, 3, 4, 5 or 6.
+  echo Unknown option "%~1". Use 0, 1, 2, 3, 4, 5, 6 or 7.
   exit /b 1
 )
 goto menu
@@ -135,6 +138,127 @@ if exist "deps\SFML\extlibs\bin\x86\openal32.dll" (
   copy /y "deps\SFML\extlibs\bin\x86\openal32.dll" "bin\%~1\" >nul
 )
 exit /b 0
+
+:android_menu
+call :android_checks
+if errorlevel 1 (
+  if defined once exit /b 1
+  goto menu
+)
+
+echo.
+echo   Android - what do you want to do?
+echo   [0] Back
+echo   [1] Build Debug APK
+echo   [2] Build Release APK
+echo   [3] Install Debug APK
+echo   [4] Clean
+echo.
+set "achoice="
+set /p "achoice=Choose 0-4: "
+set "achoice=%achoice: =%"
+if "%achoice%"=="0" (
+  if defined once exit /b 0
+  goto menu
+)
+if "%achoice%"=="1" goto android_debug
+if "%achoice%"=="2" goto android_release
+if "%achoice%"=="3" goto android_install
+if "%achoice%"=="4" goto android_clean
+if defined once (
+  echo Unknown Android option "%achoice%".
+  exit /b 1
+)
+goto android_menu
+
+:android_checks
+set "ANDROID_DIR=%ROOT%Android"
+if not exist "%ANDROID_DIR%\gradlew.bat" goto android_fail
+if not exist "%ANDROID_DIR%\local.properties" goto android_fail
+
+set "JAVA_HOME="
+if exist "C:\Program Files\Android\Android Studio\jbr" set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
+if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" set "JAVA_HOME="
+if not defined JAVA_HOME if defined ANDROID_STUDIO if exist "%ANDROID_STUDIO%\jbr\bin\java.exe" set "JAVA_HOME=%ANDROID_STUDIO%\jbr"
+if not defined JAVA_HOME (
+  for /f "delims=" %%I in ('where java 2^>nul') do (
+    set "JAVA_HOME=%%~dpI.."
+    goto android_java_found
+  )
+)
+:android_java_found
+if not defined JAVA_HOME goto android_fail
+if not exist "%JAVA_HOME%\bin\java.exe" goto android_fail
+
+set "PATH=%JAVA_HOME%\bin;%PATH%"
+java -version >nul 2>&1
+if errorlevel 1 goto android_fail
+exit /b 0
+
+:android_fail
+echo.
+echo Android build prerequisites not met.
+echo   - Need Android\gradlew.bat
+echo   - Need Android\local.properties with sdk.dir set
+echo   - Need Java, such as Android Studio JBR or JAVA_HOME
+echo.
+exit /b 1
+
+:android_debug
+cd /d "%ANDROID_DIR%"
+call gradlew.bat assembleDebug
+set "ANDROID_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%ANDROID_RC%"=="0" (
+  echo Android Debug build failed.
+  if defined once exit /b %ANDROID_RC%
+  goto android_menu
+)
+echo Android Debug APK build succeeded.
+if defined once exit /b 0
+goto android_menu
+
+:android_release
+cd /d "%ANDROID_DIR%"
+call gradlew.bat assembleRelease
+set "ANDROID_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%ANDROID_RC%"=="0" (
+  echo Android Release build failed.
+  if defined once exit /b %ANDROID_RC%
+  goto android_menu
+)
+echo Android Release APK build succeeded.
+if defined once exit /b 0
+goto android_menu
+
+:android_install
+cd /d "%ANDROID_DIR%"
+call gradlew.bat installDebug
+set "ANDROID_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%ANDROID_RC%"=="0" (
+  echo Android install failed.
+  if defined once exit /b %ANDROID_RC%
+  goto android_menu
+)
+echo Android Debug APK installed.
+if defined once exit /b 0
+goto android_menu
+
+:android_clean
+cd /d "%ANDROID_DIR%"
+call gradlew.bat clean
+set "ANDROID_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%ANDROID_RC%"=="0" (
+  echo Android clean failed.
+  if defined once exit /b %ANDROID_RC%
+  goto android_menu
+)
+echo Android build cleaned.
+if defined once exit /b 0
+goto android_menu
 
 :done
 echo.
