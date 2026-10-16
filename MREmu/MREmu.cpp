@@ -203,12 +203,11 @@ int main(int argc, char** argv) {
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	ImGui::SFML::Init(win_debug);
-	win_debug.setFramerateLimit(60);
-	win_device.setFramerateLimit(60);
-	//win_debug.setVerticalSyncEnabled(true);
+	win_debug.setVerticalSyncEnabled(true);
+	win_device.setVerticalSyncEnabled(true);
 #else
 	sf::RenderWindow win_device(sf::VideoMode::getDesktopMode(), "MREmu");
-	win_device.setFramerateLimit(60);
+	win_device.setVerticalSyncEnabled(true);
 
 	while (win_device.isOpen()) {
 		sf::Event event;
@@ -492,8 +491,6 @@ int main(int argc, char** argv) {
 			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
 		}
 		ImGui::End();
-
-		Cpu::imgui_REG();
 
 		keyboard.imgui_keyboard();
 		graphic.imgui_screen();
