@@ -4,6 +4,7 @@
 #include "../Memory.h"
 #include "../Log.h"
 #include <vmsys.h>
+#include <vmtel.h>
 #include <string>
 #include <cstring>
 #include <filesystem>
@@ -159,4 +160,10 @@ VMBOOL vm_appmgr_is_installed(VMWSTR path, vm_install_id install_id) {
 VMINT vm_appmgr_get_installed_list(VMINT flag, vm_install_id* install_id_list, VMUINT* num) {
 	*num = 0;
 	return 0; // tmp
+}
+
+VMINT vm_open_wap_url(VMWSTR url) {
+	auto u8str = ucs2_to_utf8(url);
+	spdlog::info("vm_open_wap_url(\"{}\")", (const char*)u8str.c_str());
+	return 0;
 }

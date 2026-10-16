@@ -32,6 +32,7 @@
 #include <vmmm.h>
 #include <vmbitstream.h>
 #include <vmsensor.h>
+#include <vmtel.h>
 
 
 VMINT vm_get_res_header();//tmp
@@ -188,6 +189,11 @@ namespace Bridge {
 					read_arg(uc, 0),
 					(vm_install_id*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
+		}},
+		{FUNCN(vm_open_wap_url), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_open_wap_url(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 		{FUNCN(vm_app_log), [](uc_engine* uc) {
 			vm_app_log(
@@ -983,6 +989,10 @@ namespace Bridge {
 				read_arg(uc, 6),
 				read_arg(uc, 7)
 			));
+		}},
+		{FUNCN(vm_graphic_get_char_baseline_alllang), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_char_baseline_alllang(
+				read_arg(uc, 0)));
 		}},
 
 

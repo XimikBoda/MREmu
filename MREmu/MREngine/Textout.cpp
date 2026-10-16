@@ -334,4 +334,6 @@ VMINT vm_graphic_get_highest_char_height_of_all_language(void);
 
 VMINT vm_graphic_get_char_height_alllang(VMINT size);
 
-VMINT vm_graphic_get_char_baseline_alllang(VMINT size);
+VMINT vm_graphic_get_char_baseline_alllang(VMINT size) {
+	return vm_graphic_get_character_height();
+}
