@@ -69,6 +69,10 @@ public:
 
 	KeyboardControl kc; // I don't remember why I separate this
 
+	// Lowest pixel row occupied by the on-screen keyboard. Anything below this in the
+	// device window is free space (used to place the Options button).
+	int m_bottom = 0;
+
 	sf::RenderTexture frontend_layer_left; // numpad
 	sf::RenderTexture frontend_layer_right; // dpad
 
@@ -90,4 +94,7 @@ public:
 	int find_key_by_pos(int px, int py);
 
 	void update_resize(int w, int h);
+
+	// Bottom edge of the keyboard, in device-window coordinates.
+	int bottom() const { return m_bottom; }
 };

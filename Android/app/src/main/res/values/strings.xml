@@ -2,4 +2,19 @@
 <resources>
     <string name="app_name">MREmu</string>
     <string name="title_activity_main">MainActivity</string>
+
+    <string name="about_title">About MREmu</string>
+    <string name="about_message">MREmu - MediaTek MRE / VRE emulator\n\nVXP files are read from:\n/sdcard/MREmu/fs/e/mre</string>
+
+    <string name="open_fs_folder">Open fs folder</string>
+
+    <string name="hard_reset_title">Hard Reset?</string>
+    <string name="hard_reset_message">This stops the running app, clears its memory and restarts the emulator back to the launcher.</string>
+    <string name="hard_reset_confirm">Reset</string>
+
+    <string name="clear_data_title">Clear user data?</string>
+    <string name="clear_data_message">This erases saved data, settings and caches from fs/c and fs/d. VXP files in fs/e/mre are kept.</string>
+    <string name="clear_data_confirm">Clear</string>
+
+    <string name="cancel">Cancel</string>
 </resources>

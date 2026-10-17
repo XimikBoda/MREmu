@@ -77,9 +77,27 @@ APK output:
 ## 4. Build and install from the launcher script
 
 `launch.bat` includes an Android submenu that performs the same checks and Gradle tasks
-(`[1]` Debug, `[2]` Release, `[3]` Install Debug, `[4]` Clean):
+(`[1]` Build Debug, `[2]` Build Release, `[3]` Install + Launch Debug,
+`[4]` Install + Launch Release, `[5]` Clean):
 
 ```bat
+launch.bat 7
+```
+
+Menu keys take effect as soon as they are pressed - there is no need to confirm with
+Enter. The whole flow can also be scripted by passing both choices as arguments:
+
+```bat
+launch.bat 7 4
+```
+
+The install options build the APK, push it to the connected device and then start
+`MainActivity` on it. The script locates `adb` via `sdk.dir` in `Android/local.properties`,
+then `ANDROID_SDK_ROOT` / `ANDROID_HOME`, then `%LOCALAPPDATA%\Android\Sdk`, then `PATH`.
+If more than one device is connected, set `ANDROID_SERIAL` first:
+
+```bat
+set ANDROID_SERIAL=<serial>
 launch.bat 7
 ```
 
@@ -90,6 +108,7 @@ Enable USB debugging on the phone, connect it, then:
 ```bat
 adb devices
 adb install -r Android\app\build\outputs\apk\release\app-release.apk
+adb shell am start -n com.ximikboda.mremu/.MainActivity
 ```
 
 ## Troubleshooting

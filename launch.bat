@@ -1,7 +1,7 @@
 @echo off
 rem MREmu launcher: configure, build, run, and clean using the
 rem Visual Studio (Win32 / x86) CMake generator.
-rem   Usage: launch.bat [0-6]   (no argument = interactive menu)
+rem   Usage: launch.bat [0-7] [android 0-5]   (no argument = interactive menu)
 rem     [0] -> exit
 rem     [1] -> build Release
 rem     [2] -> build Debug
@@ -10,7 +10,13 @@ rem     [4] -> run Debug
 rem     [5] -> clean build artifacts
 rem     [6] -> reconfigure + build Release
 rem     [7] -> Android build menu
+rem   Menu keys take effect immediately; no Enter key needed.
+rem   Pass a second argument to answer the Android menu non-interactively,
+rem   e.g. launch.bat 7 4 -> install + launch the Release APK.
 setlocal
+
+set "ANDROID_PACKAGE=com.ximikboda.mremu"
+set "ANDROID_ACTIVITY=com.ximikboda.mremu.MainActivity"
 
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
@@ -42,8 +48,17 @@ echo   [5] Clean
 echo   [6] Reconfigure + build Release
 echo   [7] Android build menu
 echo.
+choice /c:01234567 /n
+if errorlevel 9 goto prompt_menu
+set "choice=%errorlevel%"
+set /a choice-=1
+goto run_choice
+
+rem Fallback if choice is unavailable (e.g. very old Windows).
+:prompt_menu
 set "choice="
-set /p "choice=Choose 0-6: "
+set /p "choice=Choose 0-7: "
+goto run_choice
 
 :run_choice
 if "%choice%"=="0" goto done
@@ -151,11 +166,26 @@ echo   Android - what do you want to do?
 echo   [0] Back
 echo   [1] Build Debug APK
 echo   [2] Build Release APK
-echo   [3] Install Debug APK
-echo   [4] Clean
+echo   [3] Install + Launch Debug APK
+echo   [4] Install + Launch Release APK
+echo   [5] Clean
 echo.
+if not "%~2"=="" (
+  set "achoice=%~2"
+  goto run_achoice
+)
+choice /c:012345 /n
+if errorlevel 7 goto prompt_android
+set "achoice=%errorlevel%"
+set /a achoice-=1
+goto run_achoice
+
+rem Fallback if choice is unavailable.
+:prompt_android
 set "achoice="
-set /p "achoice=Choose 0-4: "
+set /p "achoice=Choose 0-5: "
+
+:run_achoice
 set "achoice=%achoice: =%"
 if "%achoice%"=="0" (
   if defined once exit /b 0
@@ -164,7 +194,8 @@ if "%achoice%"=="0" (
 if "%achoice%"=="1" goto android_debug
 if "%achoice%"=="2" goto android_release
 if "%achoice%"=="3" goto android_install
-if "%achoice%"=="4" goto android_clean
+if "%achoice%"=="4" goto android_install_release
+if "%achoice%"=="5" goto android_clean
 if defined once (
   echo Unknown Android option "%achoice%".
   exit /b 1
@@ -205,6 +236,72 @@ echo   - Need Java, such as Android Studio JBR or JAVA_HOME
 echo.
 exit /b 1
 
+rem Locate adb: local.properties sdk.dir, then ANDROID_SDK_ROOT/ANDROID_HOME, then PATH.
+:find_adb
+set "ADB="
+if defined ANDROID_SERIAL set "ADB_SERIAL=%ANDROID_SERIAL%"
+if exist "%ANDROID_DIR%\local.properties" (
+  for /f "usebackq tokens=1,* delims==" %%I in (`findstr /b /c:"sdk.dir" "%ANDROID_DIR%\local.properties"`) do (
+    if not defined ADB (
+      set "SDKDIR=%%J"
+      set "SDKDIR=%SDKDIR:\:=%"
+      if exist "%SDKDIR%\platform-tools\adb.exe" set "ADB=%SDKDIR%\platform-tools\adb.exe"
+    )
+  )
+)
+if not defined ADB if defined ANDROID_SDK_ROOT if exist "%ANDROID_SDK_ROOT%\platform-tools\adb.exe" set "ADB=%ANDROID_SDK_ROOT%\platform-tools\adb.exe"
+if not defined ADB if defined ANDROID_HOME if exist "%ANDROID_HOME%\platform-tools\adb.exe" set "ADB=%ANDROID_HOME%\platform-tools\adb.exe"
+if not defined ADB if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" set "ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
+if not defined ADB (
+  for /f "delims=" %%I in ('where adb 2^>nul') do if not defined ADB set "ADB=%%I"
+)
+exit /b 0
+
+rem Pick a device: honour ANDROID_SERIAL, otherwise require exactly one connected.
+:android_device
+set "ADB_ARGS="
+if defined ADB_SERIAL set "ADB_ARGS=-s %ADB_SERIAL%"
+set "DEVICES=%ADB% %ADB_ARGS% devices"
+set "DEVCOUNT=0"
+for /f "usebackq skip=1 tokens=1,2" %%A in (`%DEVICES%`) do (
+  if not "%%B"=="unauthorized" if not "%%B"=="offline" (
+    set /a DEVCOUNT+=1
+    if not defined ADB_SERIAL if not defined ADB_PICKED set "ADB_PICKED=%%A"
+  )
+)
+if "%DEVCOUNT%"=="0" (
+  echo.
+  echo No Android device connected. Connect the device with USB debugging enabled.
+  exit /b 1
+)
+if "%DEVCOUNT%"=="1" (
+  if defined ADB_SERIAL set "ADB_ARGS=-s %ADB_SERIAL%"
+) else (
+  echo.
+  echo %DEVCOUNT% devices connected. Set ANDROID_SERIAL to pick one, for example:
+  echo   set ANDROID_SERIAL=%ADB_PICKED%
+  exit /b 1
+)
+exit /b 0
+
+:android_launch
+echo.
+echo Launching MREmu on device...
+call :find_adb
+call :android_device
+if errorlevel 1 exit /b 1
+%ADB% %ADB_ARGS% shell am force-stop %ANDROID_PACKAGE% >nul 2>&1
+%ADB% %ADB_ARGS% shell am start -W -n %ANDROID_PACKAGE%/%ANDROID_ACTIVITY% >nul 2>&1
+set "LAUNCH_RC=%errorlevel%"
+if not "%LAUNCH_RC%"=="0" %ADB% %ADB_ARGS% shell monkey -p %ANDROID_PACKAGE% -c android.intent.category.LAUNCHER 1 >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo Failed to launch MREmu. Check that the device is unlocked and the app is installed.
+  exit /b 1
+)
+echo MREmu launched.
+exit /b 0
+
 :android_debug
 cd /d "%ANDROID_DIR%"
 call gradlew.bat assembleDebug
@@ -244,6 +341,22 @@ if not "%ANDROID_RC%"=="0" (
   goto android_menu
 )
 echo Android Debug APK installed.
+call :android_launch
+if defined once exit /b 0
+goto android_menu
+
+:android_install_release
+cd /d "%ANDROID_DIR%"
+call gradlew.bat installRelease
+set "ANDROID_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%ANDROID_RC%"=="0" (
+  echo Android Release install failed.
+  if defined once exit /b %ANDROID_RC%
+  goto android_menu
+)
+echo Android Release APK installed.
+call :android_launch
 if defined once exit /b 0
 goto android_menu
 

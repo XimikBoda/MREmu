@@ -105,6 +105,61 @@ static void clear_user_data(const fs::path& root_fs) {
 	fs::create_directories(root_fs / "e" / "mre", ec);
 }
 
+// ---------------------------------------------------------------------------
+// Options button
+//
+// The device window is taller than the emulated screen so the on-screen keyboard has
+// room. Whatever vertical space is left below the keyboard is free, so we centre a
+// small button there. Tapping it opens the native Android options dialog.
+// ---------------------------------------------------------------------------
+
+static sf::FloatRect options_button_rect(int win_w, int win_h, int keyboard_bottom) {
+	// The device window is scaled to the real window size, so size the button relative to
+	// the free band underneath the keyboard rather than in fixed pixels.
+	int free_h = win_h - keyboard_bottom;
+	if (free_h < 24)
+		return sf::FloatRect();
+
+	int h = std::min(72, free_h - 12);
+	if (h < 16)
+		h = free_h;
+	int w = h * 4;
+	if (w > win_w - 40)
+		w = win_w - 40;
+	if (w < 40)
+		w = std::min(40, win_w);
+
+	int left = (win_w - w) / 2;
+	// Centre it in the band, which keeps it clear of the system navigation bar.
+	int top = keyboard_bottom + (free_h - h) / 2;
+	return sf::FloatRect((float)left, (float)top, (float)w, (float)h);
+}
+
+static void draw_options_button(sf::RenderTarget& rt, const sf::FloatRect& r, bool pressed) {
+	if (r.width <= 0)
+		return;
+
+	sf::RectangleShape back(sf::Vector2f(r.width, r.height));
+	back.setPosition(r.left, r.top);
+	back.setFillColor(pressed ? sf::Color(90, 90, 96) : sf::Color(58, 58, 64));
+	back.setOutlineColor(sf::Color(150, 150, 158));
+	back.setOutlineThickness(1);
+	rt.draw(back);
+
+	// Three stacked dots, so the button reads as a menu without needing a font.
+	const float cx = r.left + r.width / 2.f;
+	const float cy = r.top + r.height / 2.f;
+	const float d = r.height / 8.f;
+	const float gap = r.height / 3.f;
+	for (int i = -1; i <= 1; ++i) {
+		sf::CircleShape dot(d);
+		dot.setOrigin(d, d);
+		dot.setPosition(cx, cy + i * gap);
+		dot.setFillColor(sf::Color(235, 235, 240));
+		rt.draw(dot);
+	}
+}
+
 sf::Clock global_clock;
 
 bool work = true;
@@ -129,9 +184,57 @@ void trigger_hard_reset_with_error(const std::string& err_msg) {
 
 std::atomic<int> storage_permission_state{0};
 
+static JavaVM* g_jvm = nullptr;
+static jobject g_activity = nullptr;
+
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+	g_jvm = vm;
+	return JNI_VERSION_1_6;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_ximikboda_mremu_MainActivity_notifyPermissionState(JNIEnv *env, jobject thiz, jboolean granted) {
+    // Keep a global ref so the render thread can call back into the activity later.
+    if (!g_activity)
+        g_activity = env->NewGlobalRef(thiz);
+
     storage_permission_state = granted ? 1 : -1;
+}
+
+// Called from the SFML render thread when the Options button is tapped. `thiz` is the
+// MainActivity instance, so we simply ask it to present the dialog on the UI thread.
+static void request_options_dialog() {
+	if (!g_jvm || !g_activity)
+		return;
+
+	JNIEnv* env = nullptr;
+	bool attached = false;
+	if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK) {
+		if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK)
+			return;
+		attached = true;
+	}
+
+	jclass cls = env->GetObjectClass(g_activity);
+	if (cls) {
+		jmethodID mid = env->GetMethodID(cls, "showOptionsDialogUi", "()V");
+		if (mid) {
+			env->CallVoidMethod(g_activity, mid);
+		}
+		else {
+			env->ExceptionClear();
+		}
+		env->DeleteLocalRef(cls);
+	}
+
+	if (attached)
+		g_jvm->DetachCurrentThread();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ximikboda_mremu_MainActivity_requestHardReset(JNIEnv *env, jobject thiz) {
+    // The main loop picks this up and performs the reset on the render thread.
+    g_request_hard_reset = true;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -145,6 +248,9 @@ Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thi
 
     env->ReleaseStringUTFChars(j_path, path_cstr);
 }
+#else
+// The options dialog is Android-only; desktop builds simply have no button.
+static void request_options_dialog() {}
 #endif
 
 int main(int argc, char** argv) {
@@ -262,6 +368,14 @@ int main(int argc, char** argv) {
 	int base_h = graphic.height + 208;
 	DragAndDrop::set_base_size(base_w, base_h);
 
+// Options button state. Declared before repaint_device() because that is where the
+	// button actually gets drawn (the main loop's own draws are discarded by
+	// repaint_device(), which redraws and presents the device window).
+#ifdef ANDROID
+	sf::FloatRect options_btn;
+	bool options_btn_pressed = false;
+#endif
+
 	float scale = 1.f;
 	sf::Sprite screen_sp(graphic.screen_tex);
 	touch.screen = &screen_sp;
@@ -311,6 +425,11 @@ int main(int argc, char** argv) {
 		}
 
 		keyboard.draw(&win_device);
+
+#ifdef ANDROID
+		draw_options_button(win_device, options_btn, options_btn_pressed);
+#endif
+
 		win_device.display();
 	};
 
@@ -356,6 +475,12 @@ int main(int argc, char** argv) {
 
 	update_screen_size(win_device.getSize().x, win_device.getSize().y);
 
+	// Recomputed every frame because the device window gets resized (and scaled) after startup.
+#ifdef ANDROID
+	options_btn = options_button_rect(
+		win_device.getSize().x, win_device.getSize().y, keyboard.bottom());
+#endif
+
 	sf::Clock fps;
 
 	sf::Clock deltaClock;
@@ -368,6 +493,10 @@ int main(int argc, char** argv) {
         && win_debug.isOpen()
 #endif
     ) {
+#ifdef ANDROID
+		options_btn = options_button_rect(
+			win_device.getSize().x, win_device.getSize().y, keyboard.bottom());
+#endif
 		if (g_request_hard_reset) {
 			g_request_hard_reset = false;
 
@@ -431,6 +560,38 @@ int main(int argc, char** argv) {
 			}
 			keyboard.event(event);
 			touch.sf_event(event);
+
+			// Options button: taps land below the emulated screen, so Touch ignores
+			// them. Handle them here before the rest of the input pipeline.
+#ifdef ANDROID
+			if (event.type == sf::Event::MouseButtonPressed &&
+				event.mouseButton.button == sf::Mouse::Button::Left) {
+				if (options_btn.contains((float)event.mouseButton.x, (float)event.mouseButton.y)) {
+					options_btn_pressed = true;
+					continue;
+				}
+			}
+			else if (event.type == sf::Event::MouseButtonReleased &&
+				event.mouseButton.button == sf::Mouse::Button::Left) {
+				if (options_btn_pressed &&
+					options_btn.contains((float)event.mouseButton.x, (float)event.mouseButton.y)) {
+					request_options_dialog();
+				}
+				options_btn_pressed = false;
+			}
+			else if (event.type == sf::Event::TouchBegan) {
+				if (options_btn.contains((float)event.touch.x, (float)event.touch.y))
+					options_btn_pressed = true;
+			}
+			else if (event.type == sf::Event::TouchEnded) {
+				if (options_btn_pressed &&
+					options_btn.contains((float)event.touch.x, (float)event.touch.y)) {
+					request_options_dialog();
+				}
+				options_btn_pressed = false;
+			}
+#endif
+
 			switch (event.type) {
 			case sf::Event::Closed:
 				DragAndDrop::save_window_state();

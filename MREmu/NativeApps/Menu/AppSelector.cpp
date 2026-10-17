@@ -14,6 +14,7 @@
 #include <vmstdlib.h>
 #include <vmtimer.h>
 #include <algorithm>
+#include <cmath>
 
 VMWSTR vm_ucs2_string(VMSTR s);
 extern AppManager* g_appManager;
@@ -30,7 +31,7 @@ namespace NativeApps::Menu::AppSelector {
 	int touch_last_y = 0;
 	bool touched = false;
 	int touch_time = 0;
-	
+
 	int marquee_offset = 0;
 	int marquee_timer_id = 0;
 	int marquee_state = 0;
@@ -65,6 +66,150 @@ namespace NativeApps::Menu::AppSelector {
 	void key_handler(VMINT event, VMINT keycode);
 	void pen_handler(VMINT event, VMINT x, VMINT y);
 	void timer_cb(VMINT tid);
+
+	// --- Scrolling with iOS-style overscroll ---------------------------
+	//
+	// scroll_raw is the *unbounded* offset, so it can go negative (above the
+	// first item) or past the end (below the last item). scroll_pos is the
+	// value actually used for drawing/hit-testing; sync_scroll() derives it
+	// from scroll_raw by applying the rubber-band curve while out of bounds.
+	// -------------------------------------------------------------------------
+
+	constexpr float kRubberC = 0.55f;     // Apple WWDC18 rubberband constant
+	constexpr float kDecel = 0.998f;       // UIScrollView.DecelerationRateNormal (per ms)
+	constexpr float kSpringW = 12.0f;      // critically damped spring, ~0.38s settle
+	constexpr float kFlingMinSpeed = 60.f; // px/s below this we don't fling
+	constexpr float kMaxFlingSpeed = 8000.f;
+	constexpr float kVelWindowMs = 100;    // finger paused > this => no fling
+	constexpr float kStopPx = 0.5f;
+	constexpr float kStopVel = 5.f;
+
+	float scroll_raw = 0.f;
+	float scroll_vel = 0.f;   // px/s, positive = content scrolls down
+	bool scroll_anim = false; // fling or spring in progress
+	VMINT scroll_timer_id = 0;
+
+	struct vel_sample { int y; VMUINT t; };
+	constexpr int kVelSamples = 6;
+	vel_sample vel_samples[kVelSamples] = {};
+	int vel_count = 0;
+
+	VMUINT last_anim_tick = 0;
+
+	float max_scroll_f() {
+		return std::max(0.f, (float)vxps.size() * b_h - h);
+	}
+
+	// Apple's rubberbanding curve: b(x, d, c) = (1 - 1/((x*c/d)+1)) * d
+	float rubber_band(float overshoot, float dimension) {
+		if (overshoot == 0.f || dimension <= 0.f)
+			return 0.f;
+		float s = overshoot < 0.f ? -1.f : 1.f;
+		float x = std::abs(overshoot);
+		return s * (1.f - 1.f / ((x * kRubberC / dimension) + 1.f)) * dimension;
+	}
+
+	void sync_scroll() {
+		float maxs = max_scroll_f();
+		if (scroll_raw < 0.f)
+			scroll_pos = (int)(-rubber_band(-scroll_raw, (float)h));
+		else if (scroll_raw > maxs)
+			scroll_pos = (int)(maxs + rubber_band(scroll_raw - maxs, (float)h));
+		else
+			scroll_pos = (int)scroll_raw;
+	}
+
+	void vel_reset(int y, VMUINT t) {
+		vel_samples[0] = { y, t };
+		vel_count = 1;
+	}
+
+	void vel_add(int y, VMUINT t) {
+		if (vel_count <= 0) { vel_reset(y, t); return; }
+		int n = vel_count < kVelSamples ? vel_count : kVelSamples;
+		for (int i = n - 1; i > 0; --i)
+			vel_samples[i] = vel_samples[i - 1];
+		vel_samples[0] = { y, t };
+		if (vel_count < kVelSamples) vel_count++;
+	}
+
+	// Returns scroll velocity in px/s, or 0 when the finger paused before lifting.
+	float vel_release() {
+		if (vel_count < 2) return 0.f;
+
+		const vel_sample& newest = vel_samples[0];
+		const vel_sample& oldest = vel_samples[vel_count - 1];
+		float dt = (float)(newest.t - oldest.t);
+		if (dt <= 0.f || dt > kVelWindowMs)
+			return 0.f;
+
+		// Finger moving up (y decreasing) scrolls content down, hence the minus.
+		float v = -(float)(newest.y - oldest.y) / dt * 1000.f;
+		if (std::abs(v) < kFlingMinSpeed) return 0.f;
+		return std::max(-kMaxFlingSpeed, std::min(kMaxFlingSpeed, v));
+	}
+
+	void stop_scroll_anim() {
+		scroll_anim = false;
+		scroll_vel = 0.f;
+		if (scroll_timer_id) {
+			vm_delete_timer(scroll_timer_id);
+			scroll_timer_id = 0;
+		}
+	}
+
+	// Critically damped spring back to `target`. No overshoot, matching iOS.
+	bool spring_step(float dt_ms) {
+		float maxs = max_scroll_f();
+		float target = 0.f;
+		if (scroll_raw > maxs) target = maxs;
+
+		float dt = std::min(dt_ms, 100.f) / 1000.f; // 1/10s hitch guard
+		float x = scroll_raw - target;
+		float v = scroll_vel;
+
+		float a = -2.f * kSpringW * v - kSpringW * kSpringW * x;
+		v += a * dt;
+		x += v * dt;
+
+		if (std::abs(x) < kStopPx && std::abs(v) < kStopVel) {
+			scroll_raw = target;
+			scroll_vel = 0.f;
+			return false; // settled
+		}
+
+		scroll_raw = target + x;
+		scroll_vel = v;
+		return true;
+	}
+
+	// Closed-form exponential decay, frame-rate independent.
+	void fling_step(float dt_ms) {
+		float maxs = max_scroll_f();
+		float dt = std::min(dt_ms, 100.f);
+
+		scroll_raw += scroll_vel * (1.f - std::pow(kDecel, dt)) / (-std::log(kDecel) * 1000.f);
+		scroll_vel *= std::pow(kDecel, dt);
+
+		// Hitting an edge mid-fling hands over to the spring.
+		if (scroll_raw < 0.f || scroll_raw > maxs) {
+			scroll_vel = 0.f;
+			return;
+		}
+		if (std::abs(scroll_vel) < 1.f) {
+			scroll_vel = 0.f;
+			scroll_anim = false;
+		}
+	}
+
+	void scroll_timer_cb(VMINT tid);
+
+	void start_scroll_anim() {
+		scroll_anim = true;
+		last_anim_tick = vm_get_tick_count();
+		if (!scroll_timer_id)
+			scroll_timer_id = vm_create_timer(16, scroll_timer_cb);
+	}
 
 	static const char* get_t9_chars(int keycode) {
 		switch (keycode) {
@@ -110,6 +255,9 @@ namespace NativeApps::Menu::AppSelector {
 		confirm_sheet.hide();
 		m_i = 0;
 		scroll_pos = 0;
+		scroll_raw = 0.f;
+		scroll_vel = 0.f;
+		stop_scroll_anim();
 		touched = false;
 		reset_marquee();
 		trigger_scrollbar();
@@ -542,6 +690,33 @@ namespace NativeApps::Menu::AppSelector {
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
 
+	void scroll_timer_cb(VMINT tid) {
+		if (touched) {
+			// Finger took the list back mid-animation.
+			scroll_anim = false;
+			scroll_vel = 0.f;
+			scroll_timer_id = 0;
+			return;
+		}
+
+		VMUINT now = vm_get_tick_count();
+		float dt = (float)(now - last_anim_tick);
+		last_anim_tick = now;
+
+		bool settling = spring_step(dt);
+		if (!settling)
+			fling_step(dt);
+
+		sync_scroll();
+
+		if (!settling && scroll_vel == 0.f) {
+			scroll_anim = false;
+			scroll_timer_id = 0;
+		}
+
+		draw();
+	}
+
 	void timer_cb(VMINT tid) {
 		if (!layer_buf || vxps.empty() || touched)
 			return;
@@ -722,24 +897,25 @@ namespace NativeApps::Menu::AppSelector {
 		trigger_scrollbar();
 		switch (event) {
 			case VM_PEN_EVENT_TAP:
-				m_i = (y + scroll_pos) / b_h;
+				// Grabbing a moving list stops it dead, like iOS.
+				stop_scroll_anim();
+				scroll_raw = (float)scroll_pos;
 				touch_start_y = y;
 				touch_last_y = y;
 				touched = true;
 				touch_time = vm_get_tick_count();
+				vel_reset(y, vm_get_tick_count());
 				break;
 			case VM_PEN_EVENT_MOVE:
 			case VM_PEN_EVENT_REPEAT:
 			case VM_PEN_EVENT_DOUBLE_CLICK:
 				if (touched) {
-					scroll_pos += touch_last_y - y;
+					scroll_raw += touch_last_y - y;
 					touch_last_y = y;
-
-					if (scroll_pos < 0)
-						scroll_pos = 0;
-
-					if (scroll_pos > (int)vxps.size() * b_h - h)
-						scroll_pos = (int)vxps.size() * b_h - h;
+					// Unbounded here on purpose - the rubber band is applied in
+					// sync_scroll() so the list resists instead of hard-stopping.
+					sync_scroll();
+					vel_add(y, vm_get_tick_count());
 				}
 				break;
 			case VM_PEN_EVENT_LONG_TAP: {
@@ -755,9 +931,12 @@ namespace NativeApps::Menu::AppSelector {
 				break;
 			}
 			case VM_PEN_EVENT_RELEASE:
-			case VM_PEN_EVENT_ABORT:
+			case VM_PEN_EVENT_ABORT: {
+				float fling = vel_release();
 				touched = false;
-				if (std::abs(touch_start_y - y) < b_h / 2 && vm_get_tick_count() - touch_time < 150) {
+
+				// A tap is a short, near-stationary press; anything else is a scroll.
+				if (std::abs(touch_start_y - y) < b_h / 2 && vm_get_tick_count() - touch_time < 250) {
 					int tapped = (touch_start_y + scroll_pos) / b_h;
 					if (tapped >= 0 && tapped < (int)vxps.size()) {
 						m_i = tapped;
@@ -765,6 +944,7 @@ namespace NativeApps::Menu::AppSelector {
 							current_dir = vxps[m_i].path;
 							m_i = 0;
 							scroll_pos = 0;
+							scroll_raw = 0.f;
 							scan();
 							reset_marquee();
 							trigger_scrollbar();
@@ -776,8 +956,21 @@ namespace NativeApps::Menu::AppSelector {
 							vm_start_app((VMWSTR)vxps[m_i].path.c_str(), 0, 0);
 						}
 					}
+					break;
+				}
+
+				// Out of bounds => spring back. In bounds with velocity => coast.
+				scroll_vel = fling;
+				float maxs = max_scroll_f();
+				if (scroll_raw < 0.f || scroll_raw > maxs) {
+					scroll_vel = 0.f; // spring back takes over
+					start_scroll_anim();
+				}
+				else if (fling != 0.f) {
+					start_scroll_anim();
 				}
 				break;
+			}
 		}
 
 		if (m_i < 0)

@@ -2,6 +2,7 @@
 #include "Keyboard.h"
 #include <vmio.h>
 #include <vector>
+#include <algorithm>
 #include <SFML/Graphics.hpp>
 
 #include "imgui.h"
@@ -390,6 +391,8 @@ void Keyboard::update_resize(int win_w, int win_h) {
 		left = { (screen_x - size.x) / 2, y, size.x, size.y };
 		right = { screen_x + screen_w, y, size.x, size.y };
 	}
+
+	m_bottom = std::max(left.top + left.height, right.top + right.height);
 
 	{
 		int w = left.width, h = left.height;
