@@ -112,6 +112,11 @@ bool ArmApp::preparation()
 					zi_size = psec->get_size();
 				}
 				if (psec->get_name() == "ER_RO" || psec->get_name() == "ER_RW") {
+					// Capture where this section actually lands, before the
+					// increment below, so headless inspection can compare it with
+					// entry_point.
+					uint32_t sec_off = current_offset;
+
 					if (current_offset + psec->get_size() > mem_size) {
 						spdlog::error("Segment loading error, {} bytes required, but {} allocated",
 							current_offset + psec->get_size(), mem_size);
@@ -125,6 +130,7 @@ bool ArmApp::preparation()
 
 					if (psec->get_name() == "ER_RO") {
 						er_ro_vaddr = psec->get_address();
+						code_load_offset = sec_off;
 					}
 					if (psec->get_name() == "ER_RW") {
 						rw_size = psec->get_size();
@@ -132,7 +138,12 @@ bool ArmApp::preparation()
 				}
 			}
 
-			entry_point = offset_mem + (elf.get_entry() - er_ro_vaddr);
+			// ER_RO was copied to mem_location + code_load_offset, but this used to be
+		// computed as if it had landed at buffer offset 0. With the 0x8000 ADS
+		// base that points 32 KB *below* the loaded code, so execution had to slide
+		// through that much zero padding first. Add code_load_offset so entry really
+		// is the first byte of ER_RO.
+		entry_point = offset_mem + code_load_offset + (elf.get_entry() - er_ro_vaddr);
 
 			segments_size = current_offset;
 		}

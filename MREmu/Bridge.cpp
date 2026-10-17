@@ -1775,7 +1775,13 @@ namespace Bridge {
 		return run_cpu(entry, 0);
 	}
 
-	int run_cpu(uint32_t adr, int n, ...) {
+	static uint64_t g_step_limit = 0;
+
+void set_step_limit(uint64_t instructions) { g_step_limit = instructions; }
+
+uint32_t get_pc() { return read_reg(uc, UC_ARM_REG_PC); }
+
+int run_cpu(uint32_t adr, int n, ...) {
 		va_list factor;
 
 		va_start(factor, n);
@@ -1795,7 +1801,7 @@ namespace Bridge {
 		write_reg(uc, UC_ARM_REG_CPSR, cpsr);
 
 		if (!GDB::gdb_mode) {
-			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, 0);
+			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, g_step_limit);
 			if (err) {
 				std::string reg_dump = Cpu::dumpREG(uc);
 				std::string app_name = Cpu::get_app_name();

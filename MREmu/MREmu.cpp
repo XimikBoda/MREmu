@@ -1,5 +1,6 @@
 #include <iostream>
 #include <thread>
+#include <fstream>
 
 #include "imgui.h"
 #include "imgui-SFML.h"
@@ -269,6 +270,181 @@ Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thi
 static void request_options_dialog() {}
 #endif
 
+#ifndef ANDROID
+// ---------------------------------------------------------------------------
+// Headless inspection
+// ---------------------------------------------------------------------------
+//   MREmu.exe --inspect <vxp> [--json report.json] [--screen shot.png] [--steps N]
+//
+// Runs the same loader the GUI runs, reports the loader's own decisions as JSON,
+// and optionally executes the app for a bounded number of instructions before
+// dumping the emulated screen. No window is created, so this is usable from
+// scripts and CI. This exists because the GUI's failure reasons live in an ImGui
+// panel and stdout is block-buffered when redirected, so neither is observable
+// to an automated caller.
+//
+// Exit codes: 0 prepared (and executed, if --steps given), 1 preparation failed,
+// 2 execution error, 3 usage or file error.
+static std::string json_escape(const std::string& in)
+{
+	std::string out;
+	for (char c : in) {
+		if (c == '"' || c == '\\') out += '\\';
+		if ((unsigned char)c < 0x20) { out += ' '; continue; }
+		out += c;
+	}
+	return out;
+}
+
+static int run_inspection(MREngine::Graphic& graphic,
+	const std::string& app_path_in, bool path_is_local_in,
+	const std::string& json_path, const std::string& screen_path,
+	int steps)
+{
+	std::vector<std::string> f;
+	auto S = [&](const char* k, const std::string& v) {
+		f.push_back("\"" + std::string(k) + "\":\"" + json_escape(v) + "\"");
+	};
+	auto N = [&](const char* k, unsigned long long v) {
+		f.push_back("\"" + std::string(k) + "\":" + std::to_string(v));
+	};
+	auto B = [&](const char* k, bool v) {
+		f.push_back("\"" + std::string(k) + "\":" + (v ? "true" : "false"));
+	};
+
+	int rc = 0;
+	auto trace = [&](const char* m) { std::cerr << "[inspect] " << m << std::endl; };
+	trace("begin");
+	S("mode", "inspect");
+	S("path", app_path_in);
+	B("path_is_local", path_is_local_in);
+	N("requested_steps", (unsigned long long)(steps > 0 ? steps : 0));
+
+	fs::path p(app_path_in);
+	bool exists = false;
+	try { exists = fs::exists(p); } catch (...) {}
+	B("file_exists", exists);
+
+	bool fmt_ok = false;
+	try { fmt_ok = ArmApp::check_format(p, path_is_local_in); } catch (...) {}
+	trace("check_format done");
+	B("check_format", fmt_ok);
+
+	ArmApp app;
+	trace("ArmApp constructed");
+	bool loaded = false, prep = false, ran = false, threw = false;
+	std::string exmsg;
+
+	if (!exists) { rc = 3; }
+	else if (!fmt_ok) { rc = 3; }
+	else {
+		try {
+			loaded = app.load_from_file(p, path_is_local_in);
+		} catch (const std::exception& e) { threw = true; exmsg = e.what(); }
+		catch (...) { threw = true; exmsg = "unknown exception"; }
+		B("load_from_file", loaded);
+		trace("load_from_file done");
+
+		if (loaded && !threw) {
+			try { prep = app.preparation(); }
+			catch (const std::exception& e) { threw = true; exmsg = e.what(); }
+			catch (...) { threw = true; exmsg = "unknown exception"; }
+			trace("preparation done");
+			B("preparation", prep);
+			if (!prep && !threw) rc = 1;
+		}
+		else if (!loaded && !threw) { rc = 3; }
+
+		// Loader facts, reported even when preparation failed so a failure is
+		// diagnosable rather than just "invalid ELF".
+		S("app_name", app.app_name);
+		B("is_ads", app.is_ads);
+		B("is_vre_ads", app.tags.is_vre_ads());
+		B("is_zipped", app.is_zipped);
+		N("ram_kb_tag", (unsigned long long)app.tags.get_ram());
+		N("mem_size", (unsigned long long)app.mem_size);
+		N("offset_mem", (unsigned long long)app.offset_mem);
+		N("segments_size", (unsigned long long)app.segments_size);
+		N("rw_size", (unsigned long long)app.rw_size);
+		N("zi_size", (unsigned long long)app.zi_size);
+		N("code_load_offset", (unsigned long long)app.code_load_offset);
+		N("entry_point", (unsigned long long)app.entry_point);
+
+		// The whole point: does entry_point actually point at the loaded code?
+		long long expected = (long long)(app.offset_mem + app.code_load_offset);
+		long long delta = (long long)app.entry_point - expected;
+		f.push_back("\"entry_delta_vs_code_load\":" + std::to_string(delta));
+		B("entry_matches_code_load", delta == 0);
+
+		B("vm_res_present", app.resources.vm_res_size != 0);
+		N("vm_res_size", (unsigned long long)app.resources.vm_res_size);
+		N("vm_res_offset", (unsigned long long)app.resources.vm_res_offset);
+
+		// Tag table exactly as the loader parsed it.
+		std::string tj = "\"tags\":{";
+		bool first = true;
+		for (const auto& kv : app.tags.raw_tags) {
+			if (!first) tj += ",";
+			first = false;
+			unsigned long long v = 0;
+			const std::vector<uint8_t>& pl = kv.second;
+			if (pl.size() == 4)
+				v = (unsigned long long)pl[0] | ((unsigned long long)pl[1] << 8) |
+					((unsigned long long)pl[2] << 16) | ((unsigned long long)pl[3] << 24);
+			tj += "\"" + std::to_string(kv.first) + "\":{\"size\":" +
+				std::to_string(pl.size()) + ",\"u32\":" + std::to_string(v) + "}";
+		}
+		tj += "}";
+		f.push_back(tj);
+
+		if (prep && steps > 0 && !threw) {
+			Bridge::set_step_limit((uint64_t)steps);
+			try { app.start(); ran = true; }
+			catch (const std::exception& e) { threw = true; exmsg = e.what(); rc = 2; }
+			catch (...) { threw = true; exmsg = "unknown exception"; rc = 2; }
+			Bridge::set_step_limit(0);
+
+			uint32_t pc = Bridge::get_pc();
+			N("pc_after_run", (unsigned long long)pc);
+			long long walked = (long long)pc - (long long)app.entry_point;
+			f.push_back("\"entry_to_pc_delta\":" + std::to_string(walked));
+			B("pc_left_entry_region", walked != 0);
+		}
+
+		B("executed", ran);
+		B("threw", threw);
+		S("exception", exmsg);
+	}
+
+	if (!screen_path.empty()) {
+		try {
+			graphic.update_screen();
+			sf::Image img = graphic.screen_tex.copyToImage();
+			B("screen_written", img.saveToFile(screen_path));
+			S("screen_path", screen_path);
+		} catch (const std::exception& e) {
+			B("screen_written", false);
+			S("screen_error", e.what());
+		}
+	}
+
+	std::string out = "{";
+	for (size_t i = 0; i < f.size(); i++) {
+		if (i) out += ",";
+		out += f[i];
+	}
+	out += "}";
+
+	// Always to stdout so it is visible even when no --json was requested.
+	std::cout << out << std::endl;
+	if (!json_path.empty()) {
+		std::ofstream fo(json_path, std::ios::binary);
+		if (fo.is_open()) fo << out;
+	}
+	return rc;
+}
+#endif
+
 int main(int argc, char** argv) {
     std::string app_path = "";
     bool path_is_local = false;
@@ -283,6 +459,10 @@ int main(int argc, char** argv) {
 		parser.set_optional<bool>("l", "path_is_local", false, "Set to run from local filesystem");
 		parser.set_optional<bool>("g", "gdb", false, "Set to run gdb server");
 		parser.set_optional<int>("p", "gdb_port", 1234, "Port for gdb server");
+		parser.set_optional<bool>("i", "inspect", false, "Headless mode: load and report the VXP, then exit (no window)");
+		parser.set_optional<std::string>("j", "json", "", "Write the inspection report to this JSON file");
+		parser.set_optional<std::string>("s", "screen", "", "Write the emulated screen to this PNG file");
+		parser.set_optional<int>("n", "steps", 0, "With --inspect: execute at most N instructions (0 = do not execute)");
 	}
 	parser.run_and_exit_if_error();
 	app_path = parser.get<std::string>("");
@@ -295,6 +475,14 @@ int main(int argc, char** argv) {
 
 	GDB::gdb_mode = parser.get<bool>("g");
 	GDB::gdb_port = parser.get<int>("p");
+
+	// cmdparser keys get() on the SHORT name (that is why the existing code uses
+	// "l" and "p" rather than the long names). Querying a long name misses the
+	// map, inserts an undefined entry and then crashes casting it.
+	bool inspect_mode = parser.get<bool>("i");
+	std::string inspect_json = parser.get<std::string>("j");
+	std::string inspect_screen = parser.get<std::string>("s");
+	int inspect_steps = parser.get<int>("n");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
 #else
@@ -322,6 +510,14 @@ int main(int argc, char** argv) {
 	MREngine::NetworkManager nm;
 
 #ifndef ANDROID
+	// Headless inspection runs before any window is created. SFML window creation
+	// is the part that needs a display, and --inspect has to work on a machine
+	// that has none.
+	if (inspect_mode) {
+		return run_inspection(graphic, app_path, path_is_local,
+			inspect_json, inspect_screen, inspect_steps);
+	}
+
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	ImGui::SFML::Init(win_debug);

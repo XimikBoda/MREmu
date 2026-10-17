@@ -10,6 +10,12 @@ namespace Bridge {
 	int run_cpu(uint32_t adr, int n, ...);
 	int ads_start(uint32_t entry, uint32_t vm_get_sym_entry_p, uint32_t data_base, uint32_t heap_base, uint32_t heap_limit, uint32_t stack_size);
 
+	// Headless inspection support. set_step_limit bounds uc_emu_start to a fixed
+	// instruction count instead of running until an error or the idle handler.
+	// 0 means unlimited, which is the default and the only behaviour the GUI uses.
+	void set_step_limit(uint64_t instructions);
+	uint32_t get_pc();
+
 	template <typename T>
 	uint32_t prepare_emu_arg(T arg) {
 		if constexpr (std::is_pointer_v<T>) {
