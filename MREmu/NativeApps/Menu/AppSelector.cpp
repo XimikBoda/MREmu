@@ -158,11 +158,51 @@ namespace NativeApps::Menu::AppSelector {
 		}
 	}
 
-	// Critically damped spring back to `target`. No overshoot, matching iOS.
+	// Anything that moves scroll_pos directly must move scroll_raw with it. The
+	// animation timer derives scroll_pos from scroll_raw via sync_scroll(), so if
+	// only one of the two is set the next tick silently reverts the view.
+	void set_scroll_pos(int pos) {
+		stop_scroll_anim();
+		scroll_pos = pos;
+		scroll_raw = (float)scroll_pos;
+	}
+
+	// Brings the selected item fully into view with the smallest possible movement,
+	// clamped to the scrollable range.
+	void scroll_to_selection() {
+		float maxs = max_scroll_f();
+		if (maxs <= 0.f) {
+			set_scroll_pos(0);
+			return;
+		}
+
+		float item_top = (float)b_h * m_i;
+		float item_bottom = item_top + (float)b_h;
+
+		float target;
+		if (item_bottom > (float)h)   // below the fold: line its bottom up with the edge
+			target = item_bottom - (float)h;
+		else if (item_top < 0.f)      // above the top: line its top up with the edge
+			target = item_top;
+		else                          // already fully visible, leave it alone
+			target = (float)scroll_pos;
+
+		set_scroll_pos((int)std::max(0.f, std::min(target, maxs)));
+	}
+
+	// Critically damped spring back to the nearest in-bounds offset. No overshoot,
+	// matching iOS. Returns true only while it still has work to do, so an
+	// in-bounds position reports settled immediately and lets the fling own the tick.
 	bool spring_step(float dt_ms) {
 		float maxs = max_scroll_f();
-		float target = 0.f;
-		if (scroll_raw > maxs) target = maxs;
+
+		// Nothing to settle while in bounds. Returning early is what keeps the
+		// spring from dragging a perfectly valid offset back to the top; the
+		// spring is a bounds-correction, not the resting position.
+		if (scroll_raw >= 0.f && scroll_raw <= maxs)
+			return false;
+
+		float target = scroll_raw < 0.f ? 0.f : maxs;
 
 		float dt = std::min(dt_ms, 100.f) / 1000.f; // 1/10s hitch guard
 		float x = scroll_raw - target;
@@ -254,10 +294,7 @@ namespace NativeApps::Menu::AppSelector {
 		details_sheet.hide();
 		confirm_sheet.hide();
 		m_i = 0;
-		scroll_pos = 0;
-		scroll_raw = 0.f;
-		scroll_vel = 0.f;
-		stop_scroll_anim();
+		set_scroll_pos(0);   // also cancels any leftover fling and its timer
 		touched = false;
 		reset_marquee();
 		trigger_scrollbar();
@@ -474,12 +511,7 @@ namespace NativeApps::Menu::AppSelector {
 			for (int i = 0; i < (int)vxps.size(); ++i) {
 				if (u16_to_u8(vxps[i].name) == last_saved) {
 					m_i = i;
-					if ((int)vxps.size() * b_h > h) {
-						if (b_h * m_i - scroll_pos + b_h > h)
-							scroll_pos = b_h * m_i + b_h - h;
-						if (b_h * m_i - scroll_pos < 0)
-							scroll_pos = b_h * m_i;
-					}
+					scroll_to_selection();
 					break;
 				}
 			}
@@ -691,11 +723,16 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	void scroll_timer_cb(VMINT tid) {
-		if (touched) {
-			// Finger took the list back mid-animation.
+		// vm_create_timer timers repeat until deleted, so every exit path here must
+		// delete it. Zeroing scroll_timer_id without deleting leaks a live 16ms timer
+		// that keeps stepping the animation and calling sync_scroll() forever, which
+		// drags the view back to a stale scroll_raw long after the fling is over.
+		if (!scroll_anim || touched) {
+			// Either the finger grabbed the list, or it was already stopped.
 			scroll_anim = false;
 			scroll_vel = 0.f;
 			scroll_timer_id = 0;
+			vm_delete_timer(tid);
 			return;
 		}
 
@@ -708,13 +745,12 @@ namespace NativeApps::Menu::AppSelector {
 			fling_step(dt);
 
 		sync_scroll();
-
-		if (!settling && scroll_vel == 0.f) {
-			scroll_anim = false;
-			scroll_timer_id = 0;
-		}
-
 		draw();
+
+		if (!scroll_anim) {
+			scroll_timer_id = 0;
+			vm_delete_timer(tid);
+		}
 	}
 
 	void timer_cb(VMINT tid) {
@@ -809,7 +845,7 @@ namespace NativeApps::Menu::AppSelector {
 						parent_dir = u"e:\\mre\\";
 					current_dir = parent_dir;
 					m_i = 0;
-					scroll_pos = 0;
+					set_scroll_pos(0);
 					scan();
 					reset_marquee();
 					trigger_scrollbar();
@@ -822,7 +858,7 @@ namespace NativeApps::Menu::AppSelector {
 					if (vxps[m_i].is_dir) {
 						current_dir = vxps[m_i].path;
 						m_i = 0;
-						scroll_pos = 0;
+						set_scroll_pos(0);
 						scan();
 						reset_marquee();
 						trigger_scrollbar();
@@ -869,13 +905,9 @@ namespace NativeApps::Menu::AppSelector {
 				DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
 		}
 
-		if ((int)vxps.size() * b_h > h) {
-			if (b_h * m_i - scroll_pos + b_h > h)
-				scroll_pos = b_h * m_i + b_h - h;
-
-			if (b_h * m_i - scroll_pos < 0)
-				scroll_pos = b_h * m_i;
-		}
+		// Keep the newly selected row on screen. Done on every key event so T9 jumps
+		// and wrap-around land on a visible item too.
+		scroll_to_selection();
 
 		draw();
 	}
@@ -899,7 +931,11 @@ namespace NativeApps::Menu::AppSelector {
 			case VM_PEN_EVENT_TAP:
 				// Grabbing a moving list stops it dead, like iOS.
 				stop_scroll_anim();
-				scroll_raw = (float)scroll_pos;
+				// Adopt the on-screen offset as the new raw one, but only when
+				// in bounds - copying a rubber-banded display offset back into
+				// scroll_raw would throw away the stretch the user is still holding.
+				if (scroll_raw >= 0.f && scroll_raw <= max_scroll_f())
+					scroll_raw = (float)scroll_pos;
 				touch_start_y = y;
 				touch_last_y = y;
 				touched = true;
@@ -943,8 +979,7 @@ namespace NativeApps::Menu::AppSelector {
 						if (vxps[m_i].is_dir) {
 							current_dir = vxps[m_i].path;
 							m_i = 0;
-							scroll_pos = 0;
-							scroll_raw = 0.f;
+							set_scroll_pos(0);
 							scan();
 							reset_marquee();
 							trigger_scrollbar();
