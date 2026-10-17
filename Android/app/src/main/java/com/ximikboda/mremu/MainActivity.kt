@@ -2,12 +2,14 @@ package com.ximikboda.mremu
 
 import android.Manifest
 import android.app.NativeActivity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.util.Log
 import android.content.Context
@@ -29,6 +31,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -46,6 +49,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -57,9 +61,9 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -80,6 +84,7 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.io.File
 import java.io.FileOutputStream
@@ -93,8 +98,10 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
     override val viewModelStore: ViewModelStore get() = viewModelStoreImpl
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
     companion object {
+        private const val TAG = "MREmu"
         private const val STORAGE_PERMISSION_CODE = 100
         private const val MANAGE_STORAGE_REQUEST_CODE = 101
+        private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage"
 
         init {
             System.loadLibrary("MREmu")
@@ -141,19 +148,43 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         dialog.show()
     }
 
+    /**
+     * Opens an emulator folder in the system file manager.
+     *
+     * The obvious intent for this, ACTION_VIEW with a resource/folder MIME type, is a
+     * bad fit: it is an implicit intent, so whichever third-party file manager the user
+     * happens to have installed wins it (Mixplorer on this device), and that app is
+     * free to ignore the document id and open its own root instead.
+     *
+     * ACTION_OPEN_DOCUMENT_TREE avoids both problems. File managers do not claim it -
+     * it is a DocumentsUI intent - so it reaches the system file manager regardless of
+     * what else is installed, and EXTRA_INITIAL_URI is the documented way to land on a
+     * specific folder. No setPackage() is used on purpose: the DocumentsUI package is
+     * com.android.documentsui on AOSP but com.google.android.documentsui on Google
+     * builds, and pinning either one throws on the other.
+     *
+     * Uri.fromFile() is not an option either: it builds a file:// URI, which StrictMode
+     * blocks for outgoing intents since targetSdk 24, so it never reaches any app. The
+     * folder is addressed through DocumentsContract instead, as "primary:" plus the path
+     * with the /sdcard prefix stripped, e.g. /sdcard/MREmu/fs/c -> primary:MREmu/fs/c.
+     * The tree form is used because DocumentsUI expects a tree URI when navigating to a
+     * directory.
+     */
     private fun openFolder(dir: File) {
         if (!dir.exists()) dir.mkdirs()
+
+        val docId = "primary:" + dir.absolutePath.removePrefix("/sdcard/").trimStart('/')
+        val treeUri = DocumentsContract.buildTreeDocumentUri(EXTERNAL_STORAGE_AUTHORITY, docId)
+
         try {
-            startActivity(Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(Uri.fromFile(dir), "resource/folder")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, treeUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             })
         } catch (e: Exception) {
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.fromFile(dir), "*/*"))
-            } catch (e2: Exception) {
-                Toast.makeText(this, "No app can open ${dir.absolutePath}", Toast.LENGTH_SHORT).show()
-            }
+            // Only reachable on a device with DocumentsUI removed or disabled.
+            Log.e(TAG, "Cannot open folder ${dir.absolutePath}", e)
+            Toast.makeText(this, getString(R.string.no_app_to_open_folder), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -219,7 +250,10 @@ private enum class OptionsPage(val title: String) {
                 onDismissRequest = { showSheet = false; onDismiss() },
                 sheetState = sheetState,
                 containerColor = Color(0xFF1B1B1F),
-                contentColor = Color.White
+                contentColor = Color.White,
+                // Empty handle: the grab bar is drawn by default and the close icon
+                // already sits in the header, so it was a duplicate affordance.
+                dragHandle = {}
             ) {
                 Column(Modifier.fillMaxWidth()) {
                     // Header: back/close on the left, big centred title, no divider.
@@ -255,19 +289,24 @@ private enum class OptionsPage(val title: String) {
                     AnimatedContent(
                         targetState = page,
                         transitionSpec = {
-                            // Forward = deeper in the stack (slide in from the right),
-                            // otherwise we are going back (slide in from the left).
-                            // No fade: a pure horizontal slide with an animated height.
+                            // Forward = deeper in the stack: the incoming page enters from
+                            // the right edge and the outgoing one leaves past the left edge.
+                            // Going back is the mirror. Both travel the full width so the two
+                            // pages swap completely, and clipping keeps a page from drawing
+                            // outside the sheet while it slides.
                             val goingForward = targetState.ordinal > initialState.ordinal
+                            // slideIn/OutHorizontally animate an IntOffset, so the tween
+                            // has to be typed to match or the spec is rejected.
+                            val spec = tween<IntOffset>(280, easing = FastOutSlowInEasing)
                             val enter = if (goingForward)
-                                slideInHorizontally(tween(300)) { it / 3 }
+                                slideInHorizontally(spec) { it }
                             else
-                                slideInHorizontally(tween(300)) { -it / 3 }
+                                slideInHorizontally(spec) { -it }
                             val exit = if (goingForward)
-                                slideOutHorizontally(tween(300)) { -it / 3 }
+                                slideOutHorizontally(spec) { -it }
                             else
-                                slideOutHorizontally(tween(300)) { it / 3 }
-                            (enter togetherWith exit).using(SizeTransform(clip = false))
+                                slideOutHorizontally(spec) { it }
+                            (enter togetherWith exit).using(SizeTransform(clip = true))
                         },
                         label = "optionsPage"
                     ) { p ->
@@ -297,13 +336,15 @@ private enum class OptionsPage(val title: String) {
 
                             OptionsPage.Folders -> {
                                 Column(Modifier.fillMaxWidth()) {
+                                    // These rows leave the app rather than open another page,
+                                    // so they get the external-link icon instead of a chevron.
                                     drives.forEach { drive ->
                                         OptionRow(
                                             icon = if (drive.label.endsWith("mre"))
                                                 Icons.Filled.Folder else Icons.Filled.SdStorage,
                                             label = drive.label,
                                             detail = drive.detail,
-                                            trailing = Icons.AutoMirrored.Filled.KeyboardArrowRight
+                                            trailing = Icons.AutoMirrored.Filled.OpenInNew
                                         ) {
                                             showSheet = false
                                             onOpenFolder(File(drive.path))
@@ -323,14 +364,9 @@ private enum class OptionsPage(val title: String) {
                                     )
                                     var armed by remember { mutableStateOf(false) }
                                     CheckRow("Reset the emulator now", armed) { armed = !armed }
-                                    Button(
-                                        onClick = { showSheet = false; onHardReset() },
-                                        enabled = armed,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 24.dp, vertical = 8.dp)
-                                    ) {
-                                        Text(stringResource(R.string.hard_reset_confirm))
+                                    DestructiveButton(stringResource(R.string.hard_reset_confirm), armed) {
+                                        showSheet = false
+                                        onHardReset()
                                     }
                                     Spacer(Modifier.height(16.dp))
                                 }
@@ -346,14 +382,9 @@ private enum class OptionsPage(val title: String) {
                                     )
                                     var armed by remember { mutableStateOf(false) }
                                     CheckRow("Erase everything on fs/c and fs/d", armed) { armed = !armed }
-                                    Button(
-                                        onClick = { showSheet = false; onClearUserData() },
-                                        enabled = armed,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 24.dp, vertical = 8.dp)
-                                    ) {
-                                        Text(stringResource(R.string.clear_data_confirm))
+                                    DestructiveButton(stringResource(R.string.clear_data_confirm), armed) {
+                                        showSheet = false
+                                        onClearUserData()
                                     }
                                     Spacer(Modifier.height(16.dp))
                                 }
@@ -367,10 +398,6 @@ private enum class OptionsPage(val title: String) {
                                         color = Color(0xFFC7C5D0),
                                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                                     )
-                                    OptionRow(Icons.Filled.SdStorage, "VXP folder", detail = "/sdcard/MREmu/fs/e/mre") {
-                                        showSheet = false
-                                        onOpenFolder(File("/sdcard/MREmu/fs/e/mre"))
-                                    }
                                     OptionRow(
                                         Icons.Filled.Info,
                                         "Version",
@@ -437,6 +464,32 @@ private enum class OptionsPage(val title: String) {
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Confirm button for a destructive action. Material's default disabled colours fade
+     * the button into the dark sheet, so the red is spelled out for both states: the
+     * button stays red and visible, only dimmed, and stays inert until the row's
+     * checkbox is ticked.
+     */
+    @Composable
+    private fun DestructiveButton(text: String, armed: Boolean, onClick: () -> Unit) {
+        val red = Color(0xFFC62828)
+        Button(
+            onClick = onClick,
+            enabled = armed,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = red,
+                contentColor = Color.White,
+                disabledContainerColor = red.copy(alpha = 0.30f),
+                disabledContentColor = Color.White.copy(alpha = 0.45f)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+        ) {
+            Text(text)
         }
     }
 
