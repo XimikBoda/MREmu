@@ -47,6 +47,7 @@ namespace Memory {
 	};
 
 	void init(size_t shared_memory_size);
+	void deinit();
 	void* shared_malloc(size_t size, bool allow_protected = false, size_t align = 8);
 	void shared_free(void* addr);
 

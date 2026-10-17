@@ -10,9 +10,13 @@
 #include "MREngine/Image.h"
 #include "MREngine/Resources.h"
 #include "MREngine/Log.h"
+#include "MREngine/System.h"
+#include "MREngine/SystemTextBox.h"
 
 #include "Cpu.h"
 #include "GDB.h"
+#include "MREmu.h"
+#include <atomic>
 #include <string>
 #include <iostream>
 #include <thread>
@@ -32,8 +36,12 @@
 #include <vmmm.h>
 #include <vmbitstream.h>
 #include <vmsensor.h>
+#include <vmio.h>
 #include <vmtel.h>
 
+VMINT vm_get_cache_free_space(vm_cache_t* cache) {
+	return 16 * 1024 * 1024;
+}
 
 VMINT vm_get_res_header();//tmp
 VMWSTR vm_ucs2_string(VMSTR s);
@@ -144,6 +152,16 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_free), [](uc_engine* uc) {
 			vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
+		}},
+		{FUNCN(vm_global_get_max_alloc_size), [](uc_engine* uc) {
+			write_ret(uc, vm_global_get_max_alloc_size());
+		}},
+		{FUNCN(vm_global_malloc), [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU(vm_global_malloc(read_arg(uc, 0))));
+		}},
+		{FUNCN(vm_global_free), [](uc_engine* uc) {
+			uint32_t arg0 = read_arg(uc, 0);
+			vm_global_free(arg0 ? (void*)ADDRESS_FROM_EMU(arg0) : NULL);
 		}},
 		{FUNCN(vm_reg_sysevt_callback), [](uc_engine* uc) {
 			vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
@@ -363,18 +381,65 @@ namespace Bridge {
 		{FUNCN(vm_get_removeable_driver), [](uc_engine* uc) {
 			write_ret(uc, vm_get_removable_driver());
 		}},
+		{"vm_get_removable_driver", NULL, [](uc_engine* uc) {
+			write_ret(uc, vm_get_removable_driver());
+		}},
 		{FUNCN(vm_get_system_driver), [](uc_engine* uc) {
 			write_ret(uc, vm_get_system_driver());
 		}},
 		{FUNCN(vm_get_disk_free_space), [](uc_engine* uc) {
-			write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+			uint32_t arg0 = read_arg(uc, 0);
+			write_ret(uc, vm_get_disk_free_space(arg0 ? (VMWSTR)ADDRESS_FROM_EMU(arg0) : NULL));
 		}},
 		{FUNCN(vm_get_disk_info), [](uc_engine* uc) {
+			uint32_t arg0 = read_arg(uc, 0);
+			uint32_t arg1 = read_arg(uc, 1);
 			write_ret(uc, vm_get_disk_info(
-				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(vm_fs_disk_info*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				arg0 ? (VMCHAR*)ADDRESS_FROM_EMU(arg0) : NULL,
+				arg1 ? (vm_fs_disk_info*)ADDRESS_FROM_EMU(arg1) : NULL,
 				(vm_fs_di_enum)read_arg(uc, 2)
 			));
+		}},
+		{FUNCN(vm_sys_file_open), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_open(
+				read_arg(uc, 0),
+				read_arg(uc, 1)
+			));
+		}},
+		{FUNCN(vm_sys_file_seek), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_seek(
+				read_arg(uc, 0),
+				read_arg(uc, 1),
+				read_arg(uc, 2)
+			));
+		}},
+		{FUNCN(vm_sys_file_read), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_read(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+			));
+		}},
+		{FUNCN(vm_sys_file_write), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_write(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2),
+				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))
+			));
+		}},
+		{FUNCN(vm_sys_file_close), [](uc_engine* uc) {
+			vm_sys_file_close(read_arg(uc, 0));
+		}},
+		{FUNCN(vm_sys_file_delete), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_delete());
+		}},
+		{FUNCN(vm_sys_file_get_space), [](uc_engine* uc) {
+			write_ret(uc, vm_sys_file_get_space());
+		}},
+		{FUNCN(vm_get_cache_free_space), [](uc_engine* uc) {
+			write_ret(uc, vm_get_cache_free_space((vm_cache_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 		{FUNCN(vm_is_support_keyborad), [](uc_engine* uc) {
 			write_ret(uc, vm_is_support_keyborad());
@@ -422,6 +487,49 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_sim_get_prefer_sim_card), [](uc_engine* uc) {
 			write_ret(uc, vm_sim_max_card_count());
+		}},
+
+
+		// Network & Sockets
+		{FUNCN(vm_is_support_wifi), [](uc_engine* uc) {
+			write_ret(uc, vm_is_support_wifi());
+		}},
+		{FUNCN(vm_wifi_is_connected), [](uc_engine* uc) {
+			write_ret(uc, vm_wifi_is_connected());
+		}},
+
+		{FUNCN(vm_soc_get_host_by_name), [](uc_engine* uc) {
+			write_ret(uc, vm_soc_get_host_by_name(
+				read_arg(uc, 0),
+				(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
+				(VMINT(*)(vm_soc_dns_result*))read_arg(uc, 3)
+			));
+		}},
+		{FUNCN(vm_tcp_connect), [](uc_engine* uc) {
+			write_ret(uc, vm_tcp_connect(
+				(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(void(*)(VMINT, VMINT))read_arg(uc, 3)
+			));
+		}},
+		{FUNCN(vm_tcp_read), [](uc_engine* uc) {
+			write_ret(uc, vm_tcp_read(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2)
+			));
+		}},
+		{FUNCN(vm_tcp_write), [](uc_engine* uc) {
+			write_ret(uc, vm_tcp_write(
+				read_arg(uc, 0),
+				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+				read_arg(uc, 2)
+			));
+		}},
+		{FUNCN(vm_tcp_close), [](uc_engine* uc) {
+			vm_tcp_close(read_arg(uc, 0));
 		}},
 
 
@@ -1419,7 +1527,7 @@ namespace Bridge {
 			mremu_media_stop();
 		}},
 
-
+ 
 		// Sock
 		{FUNCN(vm_is_support_wifi), [](uc_engine* uc) {
 			write_ret(uc, vm_is_support_wifi());
@@ -1496,6 +1604,7 @@ namespace Bridge {
 				vm_udp_close(read_arg(uc, 0)));
 		}},
 
+
 		// Sensor
 		{FUNCN(vm_srv_sensor_is_available), [](uc_engine* uc) {
 			vm_srv_sensor_is_available((vm_srv_sensor_type_enum)read_arg(uc, 0));
@@ -1510,6 +1619,44 @@ namespace Bridge {
 		}},
 		{FUNCN(strtoi), [](uc_engine* uc) {
 			write_ret(uc, strtoi((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+
+		// Input Text / Editor
+		{"vm_input_text", NULL, [](uc_engine* uc) {
+			uint32_t cb = read_arg(uc, 0);
+			write_ret(uc, MREngine::SystemTextBox::open(nullptr, 250, 1, cb));
+		}},
+		{"vm_input_text2", NULL, [](uc_engine* uc) {
+			VMWSTR def_str = (VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0));
+			VMINT def_input_method = read_arg(uc, 1);
+			uint32_t cb = read_arg(uc, 2);
+			write_ret(uc, MREngine::SystemTextBox::open(def_str, 250, def_input_method, cb));
+		}},
+		{"vm_input_text3", NULL, [](uc_engine* uc) {
+			VMWSTR def_str = (VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0));
+			VMINT max_size = read_arg(uc, 1);
+			VMINT input_method = read_arg(uc, 2);
+			uint32_t cb = read_arg(uc, 3);
+			write_ret(uc, MREngine::SystemTextBox::open(def_str, max_size, input_method, cb));
+		}},
+		{"vm_set_app_desired_input_mode", NULL, [](uc_engine* uc) {
+		}},
+		{"vm_input_close_screen", NULL, [](uc_engine* uc) {
+			MREngine::SystemTextBox::close_by_app();
+		}},
+		{"vm_input_move_cursor_to_start", NULL, [](uc_engine* uc) {
+			MREngine::SystemTextBox::move_cursor_to_start();
+		}},
+		{"vm_input_set_vk_default_enlarge", NULL, [](uc_engine* uc) {
+		}},
+		{"vm_input_set_editor_title", NULL, [](uc_engine* uc) {
+			VMWSTR title = (VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0));
+			if (title) {
+				MREngine::SystemTextBox::set_title((char16_t*)title);
+				write_ret(uc, 1);
+			} else {
+				write_ret(uc, 0);
+			}
 		}},
 
 
@@ -1574,14 +1721,111 @@ namespace Bridge {
 		return ret;
 	}
 
+	// VM call tracing state. Guarded by trace_mutex because the tracer runs on the
+	// emulator thread while MCP tool calls read from another.
+	static std::mutex trace_mutex;
+	static std::vector<TraceCall> trace_calls;
+	static bool trace_on = false;
+	// Cap so an agent can trace a long session without unbounded growth. Each record
+	// is ~28 bytes, so this is ~14 MB.
+	static const size_t TRACE_MAX = 500000;
+	// Calls seen but NOT recorded because the cap was reached. Without this an agent
+	// would read a short trace and wrongly conclude the app made few calls.
+	static std::atomic<uint64_t> g_trace_dropped{0};
+
+	// Run control. Plain atomics so an MCP thread can set them while the
+	// AppManager thread is the only one touching Unicorn inside run_cpu.
+	static std::atomic<bool> g_paused{false};
+	static std::atomic<uint64_t> g_step_budget{0};
+	static std::atomic<uint64_t> g_bounded_insns{0};
+	static std::atomic<uint64_t> vm_calls{0};
+
+	void set_paused(bool on) {
+		g_paused.store(on, std::memory_order_relaxed);
+		// Drop any half-spent step budget when pausing: a step is a deliberate,
+		// bounded action and should not silently resume later.
+		if (on) g_step_budget.store(0, std::memory_order_relaxed);
+	}
+	bool paused() { return g_paused.load(std::memory_order_relaxed); }
+	void set_step_budget(uint64_t n) { g_step_budget.store(n, std::memory_order_relaxed); }
+	uint64_t step_budget() { return g_step_budget.load(std::memory_order_relaxed); }
+	uint64_t bounded_instructions() { return g_bounded_insns.load(std::memory_order_relaxed); }
+	uint64_t vm_call_count() { return vm_calls.load(std::memory_order_relaxed); }
+
+	void set_trace_enabled(bool on) {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		trace_on = on;
+	}
+
+	bool trace_enabled() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		return trace_on;
+	}
+
+	bool dispatch_ready() { return func_ptr != nullptr && idle_p != 0; }
+
+std::vector<TraceCall> trace_snapshot() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		return trace_calls;
+	}
+
+	std::vector<std::string> trace_api_names() {
+		std::vector<std::string> n;
+		n.reserve(func_map.size());
+		for (auto& f : func_map)
+			n.push_back(f.name);
+		return n;
+	}
+
+	void trace_clear() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		trace_calls.clear();
+		g_trace_dropped.store(0, std::memory_order_relaxed);
+	}
+
+	uint64_t trace_dropped() { return g_trace_dropped.load(std::memory_order_relaxed); }
+
+	size_t trace_count() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		return trace_calls.size();
+	}
+
 	void bridge_hoock(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 		int ind = (address - ADDRESS_TO_EMU(func_ptr)) / 2;
 
-		if (ind > func_map.size())
+		if (ind > (int)func_map.size())
 			abort();
-		//if(ind) printf("--%s-- called -> ", func_map[ind].name.c_str());
+
+		// Always-on activity metric. This hook already runs for every VM call, so
+		// an atomic increment here is essentially free and gives tooling a signal
+		// that works even when the (much more expensive) tracer is off.
+		vm_calls.fetch_add(1, std::memory_order_relaxed);
+
+		bool want = false;
+		{
+			std::lock_guard<std::mutex> lk(trace_mutex);
+			want = trace_on;
+		}
+
+		TraceCall rec{};
+		if (want) {
+			rec.pc = read_reg(uc, UC_ARM_REG_PC);
+			rec.index = (uint32_t)ind;
+			rec.argc = 4;
+			for (int i = 0; i < 4; i++)
+				rec.args_in[i] = read_reg(uc, UC_ARM_REG_R0 + i);
+		}
+
 		func_map[ind].f(uc);
-		//if (ind) printf("%08x\n", read_arg(uc, 0));
+
+		if (want) {
+			rec.ret = read_reg(uc, UC_ARM_REG_R0);
+			std::lock_guard<std::mutex> lk(trace_mutex);
+			if (trace_calls.size() < TRACE_MAX)
+				trace_calls.push_back(rec);
+			else
+				g_trace_dropped.fetch_add(1, std::memory_order_relaxed);
+		}
 	}
 
 	void init() {
@@ -1629,7 +1873,13 @@ namespace Bridge {
 		return run_cpu(entry, 0);
 	}
 
-	int run_cpu(uint32_t adr, int n, ...) {
+	static uint64_t g_step_limit = 0;
+
+void set_step_limit(uint64_t instructions) { g_step_limit = instructions; }
+
+uint32_t get_pc() { return read_reg(uc, UC_ARM_REG_PC); }
+
+int run_cpu(uint32_t adr, int n, ...) {
 		va_list factor;
 
 		va_start(factor, n);
@@ -1644,13 +1894,60 @@ namespace Bridge {
 		//write_reg(uc, UC_ARM_REG_LR, (uint64_t)stack_p);
 		write_reg(uc, UC_ARM_REG_LR, (uint64_t)idle_p);
 
+		uint32_t cpsr = read_reg(uc, UC_ARM_REG_CPSR);
+		cpsr = (cpsr & ~(1L << 5)) | ((adr & 1) ? (1L << 5) : 0);
+		write_reg(uc, UC_ARM_REG_CPSR, cpsr);
+
 		if (!GDB::gdb_mode) {
-			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, 0);
-			if (err) {
-				spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
-				Cpu::printREG(uc);
-				while (1) {
-					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			const uint64_t idle_until = (uint64_t)idle_p & ~1ULL;
+			// Instructions one run_cpu invocation may execute when a step budget is active.
+			//
+			// The budget is deliberately spread over successive VM callbacks rather
+			// than spent inside one: executing many thousands of instructions inside a
+			// single timer/event callback reliably faults this VXP with
+			// UC_ERR_FETCH_UNMAPPED or UC_ERR_WRITE_UNMAPPED at a garbage PC, whereas
+			// one chunk per callback runs indefinitely. See README known issues.
+			const uint64_t RUN_CHUNK = 4096;
+
+			// Budget 0 keeps the original behaviour exactly: one uncounted run until
+			// the app returns to its idle handler. A non-zero budget runs at most
+			// RUN_CHUNK instructions in this invocation and leaves the remainder for
+			// the app's next callback, so a step never runs deeply inside one call.
+			uint64_t budget = g_step_budget.load(std::memory_order_relaxed);
+			uint64_t count = 0;
+
+			if (g_paused.load(std::memory_order_relaxed) && !budget)
+				return read_reg(uc, UC_ARM_REG_R0); // paused with nothing to do
+
+			if (budget) {
+				// An MCP step: at most one chunk per invocation, remainder carried
+				// over to the app's next callback.
+				count = budget < RUN_CHUNK ? budget : RUN_CHUNK;
+				g_bounded_insns.fetch_add(count, std::memory_order_relaxed);
+				g_step_budget.store(budget > count ? budget - count : 0,
+					std::memory_order_relaxed);
+			}
+			else {
+				// --inspect sets a limit for one deliberate run of the app's entry
+				// point. There is no callback to spread it over, so spend it here in
+				// one go, exactly as before.
+				count = g_step_limit;
+			}
+
+			{
+				uc_err err = uc_emu_start(uc, adr, idle_until, 0, count);
+				if (err) {
+					std::string reg_dump = Cpu::dumpREG(uc);
+					std::string app_name = Cpu::get_app_name();
+					std::string err_line = fmt::format("[{}] [error] uc_emu_start returned {} ({})\n",
+						app_name, (int)err, uc_strerror(err));
+					std::string full_err = err_line + reg_dump;
+
+					spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
+					printf("%s\n", reg_dump.c_str());
+
+					trigger_hard_reset_with_error(full_err);
+					return 0;
 				}
 			}
 		}

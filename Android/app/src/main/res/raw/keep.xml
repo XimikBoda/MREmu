@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The resource shrinker strips fonts that are only reached through R.font in
+  Compose Font() calls, but MainActivity still loads R.font.roboto_flex at
+  runtime. Pin it so the release build keeps the file.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@font/roboto_flex" />

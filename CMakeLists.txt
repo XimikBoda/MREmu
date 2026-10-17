@@ -24,13 +24,23 @@ if(CAPSTONE)
 endif()
 
 add_definitions(-DLIBICONV_PLUG)
-set(BUILD_SHARED_LIBS FALSE) 
-
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
 if (MSVC)
-    add_compile_options(/wd4828)
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:LIBCMTD")
+  add_compile_options(/wd4828)
+  set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:LIBCMTD")
+endif()
+
+set(BUILD_SHARED_LIBS FALSE) 
+
+# Use ccache when available to speed up C++ rebuilds (Android + desktop).
+if(NOT MSVC)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
+    message(STATUS "ccache found: ${CCACHE_PROGRAM}")
+  endif()
 endif()
 
 include_directories("include")

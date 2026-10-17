@@ -24,4 +24,9 @@ public:
 	bool empty() {
 		return q.empty();
 	}
+
+	void clear() {
+		std::queue<T> empty_q;
+		std::swap(q, empty_q);
+	}
 };

@@ -38,12 +38,20 @@ namespace MREngine {
 
 		vm_key_handler_t key_handler = 0;
 		vm_pen_handler_t pen_handler = 0;
+
+		AppIO() {
+			files.push(NULL); // Reserve index 0 so that file handles start at 1
+			find.push(find_el()); // Reserve index 0 so that find handles start at 1
+			find_ext.push(find_el()); // Reserve index 0 so that find_ext handles start at 1
+		}
 	};
 };
 
 
 MREngine::AppIO& get_current_app_io();
 fs::path get_current_app_path();
+fs::path get_current_app_real_path();
+std::string get_current_app_name();
 
 void add_keyboard_event(int event, int keycode);
 fs::path path_from_emu(fs::path path);

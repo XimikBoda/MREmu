@@ -26,6 +26,7 @@ public:
 private:
     JavaVM* vm_;
     jclass activityClass_;
+    jobject activityObject_;
     jmethodID vibrateMethod_;
     int isAvailable_;
 };

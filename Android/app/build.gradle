@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+// Which native ABIs to package. Override per build with e.g.
+//   gradlew assembleRelease -PmremuAbis=armeabi-v7a
+//   gradlew assembleRelease -PmremuAbis=arm64-v8a,armeabi-v7a
+// Defaults to arm64-v8a only, so everyday dev builds stay a single ABI (fast).
+def mremuAbis = (project.findProperty('mremuAbis') ?: 'arm64-v8a').toString()
+        .split(',').collect { it.trim() }.findAll { it }
 
 android {
     namespace "com.ximikboda.mremu"
@@ -17,13 +25,17 @@ android {
             }
         }
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            abiFilters(*mremuAbis)
         }
     }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'),
+            // R8 + resource shrinking is the single biggest APK win here: the app ships
+            // material-icons-extended (thousands of vector classes) and only a handful are
+            // used, so without minification the dex balloons to ~40 MB uncompressed.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
                     'proguard-rules.pro'
             signingConfig signingConfigs.debug
         }
@@ -33,6 +45,10 @@ android {
             version '3.22.1'
             path '../../CMakeLists.txt'
         }
+    }
+
+    buildFeatures {
+        compose true
     }
 
     android {
@@ -54,6 +70,16 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'androidx.appcompat:appcompat:1.0.2'
-    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
+
+    implementation platform('androidx.compose:compose-bom:2024.10.01')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.activity:activity-compose:1.9.3'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
 }

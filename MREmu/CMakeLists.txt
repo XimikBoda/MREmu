@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.8)
 
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
@@ -19,7 +19,16 @@ set(SOURCES
 						"Log.cpp" "Log.h" 
 						"miniz.c" "miniz.h" "mutex_wrapper.h" "Queue.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
+						"DragAndDrop.cpp" "DragAndDrop.h"
 )
+
+# Headless agent control. Desktop only: on Android the options sheet already drives
+# the app and there is no stdio transport to serve.
+if (NOT ANDROID)
+	list(APPEND SOURCES
+					"McpServer.cpp" "McpServer.h"
+					"McpHost.cpp")
+endif()
 
 if (ANDROID)
 	add_library(MREmu SHARED ${SOURCES})
@@ -44,6 +53,10 @@ target_link_libraries(MREmu spdlog)
 
 if(CAPSTONE)
 	target_link_libraries(MREmu capstone)
+endif()
+
+if(WIN32)
+	target_link_libraries(MREmu shell32 dwmapi)
 endif()
 
 if (ANDROID)
