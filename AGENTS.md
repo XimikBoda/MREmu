@@ -46,6 +46,7 @@ Append `--offline` to any Gradle command:
 5. **ABIs are restricted to `arm64-v8a`** in `Android/app/build.gradle`. Do not add more ABIs.
 6. **Configuration cache is enabled** (`org.gradle.configuration-cache=true` in `Android/gradle.properties`). Avoid editing build scripts in ways that invalidate the configuration cache unnecessarily.
 7. **Generated directories are gitignored** and must not be committed: `build/`, `.gradle/`, `.cxx/`, `Android/app/build`, `Android/app/.cxx`, `Android/.gradle`.
+8. **Ask the user with the harness `question` tool, never as plain text.** Any time a decision is needed — scope, trade-offs, which of several options, anything that would otherwise be typed as "which do you prefer?" — call the `question` tool rather than embedding a question in the response. Each question must offer a concrete set of options and mark the recommended one first with `(Recommended)`, stating the reasoning, so the user can accept it in one keystroke or override it without having to type anything. Do not also restate the question in prose alongside the tool call. Reserve prose for reporting findings, not for requesting decisions.
 
 ## Repository layout (top level)
 ```
