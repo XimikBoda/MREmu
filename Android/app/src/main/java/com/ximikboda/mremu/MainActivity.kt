@@ -1,7 +1,6 @@
 package com.ximikboda.mremu
 
 import android.Manifest
-import android.app.AlertDialog
 import android.app.NativeActivity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -30,11 +29,11 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +46,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Folder
@@ -55,11 +55,12 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -74,7 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
@@ -125,10 +126,10 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
             setContent {
                 MaterialTheme {
                     OptionsBottomSheet(
-                        onHardReset = { dialog.dismiss(); confirmHardReset() },
+                        onHardReset = { dialog.dismiss(); performHardReset() },
                         onOpenFolder = { dir -> dialog.dismiss(); openFolder(dir) },
-                        onClearUserData = { dialog.dismiss(); confirmClearUserData() },
-                        onAbout = { dialog.dismiss(); showAbout() },
+                        onClearUserData = { dialog.dismiss(); performClearUserData() },
+                        onAbout = { dialog.dismiss() },
                         onQuit = { dialog.dismiss(); finish() },
                         onDismiss = { dialog.dismiss() }
                     )
@@ -138,23 +139,6 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         dialog.setContentView(composeView)
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         dialog.show()
-    }
-
-    /** Sub-dialog listing every emulated drive, so a folder can be opened directly. */
-    private fun presentFsFolderDialog() {
-        val labels = arrayOf("fs/c  (internal)", "fs/d  (internal)", "fs/e  (external)", "fs/e/mre  (VXP)")
-        val paths = arrayOf(
-            File("/sdcard/MREmu/fs/c"),
-            File("/sdcard/MREmu/fs/d"),
-            File("/sdcard/MREmu/fs/e"),
-            File("/sdcard/MREmu/fs/e/mre")
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.open_fs_folder)
-            .setItems(labels) { _, which -> openFolder(paths[which]) }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun openFolder(dir: File) {
@@ -173,45 +157,47 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         }
     }
 
-    private fun confirmHardReset() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.hard_reset_title)
-            .setMessage(R.string.hard_reset_message)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.hard_reset_confirm) { _, _ ->
-                requestHardReset()
-                Toast.makeText(this, "Hard reset requested", Toast.LENGTH_SHORT).show()
+    /** Confirmation now happens on the Hard reset sheet page, so this only runs the reset. */
+    private fun performHardReset() {
+        requestHardReset()
+        Toast.makeText(this, "Hard reset requested", Toast.LENGTH_SHORT).show()
+    }
+
+    /** Confirmation now happens on the Clear user data sheet page, so this only clears. */
+    private fun performClearUserData() {
+        var removed = 0
+        for (drive in arrayOf("c", "d")) {
+            val root = File("/sdcard/MREmu/fs/$drive")
+            root.walkBottomUp().forEach { entry ->
+                if (entry != root && entry.isFile && entry.delete()) removed++
             }
-            .show()
+        }
+        Toast.makeText(this, "Cleared user data ($removed files)", Toast.LENGTH_SHORT).show()
     }
 
-    private fun confirmClearUserData() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.clear_data_title)
-            .setMessage(R.string.clear_data_message)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.clear_data_confirm) { _, _ ->
-                var removed = 0
-                for (drive in arrayOf("c", "d")) {
-                    val root = File("/sdcard/MREmu/fs/$drive")
-                    root.walkBottomUp().forEach { entry ->
-                        if (entry != root && entry.isFile && entry.delete()) removed++
-                    }
-                }
-                Toast.makeText(this, "Cleared user data ($removed files)", Toast.LENGTH_SHORT).show()
-            }
-            .show()
+    private fun appVersion(): String = try {
+        packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+    } catch (e: Exception) {
+        ""
     }
 
-    private fun showAbout() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.about_title)
-            .setMessage(R.string.about_message)
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
+private enum class OptionsPage(val title: String) {
+        Main("Options"),
+        Folders("Open FS folder"),
+        HardReset("Hard reset"),
+        ClearUserData("Clear user data"),
+        About("About")
     }
 
-    private enum class OptionsPage { Main, Folders }
+    /** Item details for the Open FS folder page. */
+    private data class Drive(val label: String, val detail: String, val path: String)
+
+    private val drives = listOf(
+        Drive("fs/c", "internal storage", "/sdcard/MREmu/fs/c"),
+        Drive("fs/d", "internal storage", "/sdcard/MREmu/fs/d"),
+        Drive("fs/e", "external storage", "/sdcard/MREmu/fs/e"),
+        Drive("fs/e/mre", "VXP apps", "/sdcard/MREmu/fs/e/mre")
+    )
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -225,7 +211,8 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
     ) {
         val sheetState = rememberModalBottomSheetState()
         var showSheet by remember { mutableStateOf(true) }
-        var page by remember { mutableStateOf(OptionsPage.Main) }
+        val stack = rememberPageBackStack(OptionsPage.Main)
+        val page = stack.current
 
         if (showSheet) {
             ModalBottomSheet(
@@ -243,21 +230,21 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
                     ) {
                         IconButton(
                             onClick = {
-                                if (page == OptionsPage.Folders) page = OptionsPage.Main
+                                if (stack.canGoBack) stack.pop()
                                 else { showSheet = false; onDismiss() }
                             },
                             modifier = Modifier.align(Alignment.CenterStart)
                         ) {
                             Icon(
-                                imageVector = if (page == OptionsPage.Folders)
+                                imageVector = if (stack.canGoBack)
                                     Icons.AutoMirrored.Filled.ArrowBack else Icons.Filled.Close,
-                                contentDescription = if (page == OptionsPage.Folders) "Back" else "Close",
+                                contentDescription = if (stack.canGoBack) "Back" else "Close",
                                 tint = Color(0xFFE6E1E5)
                             )
                         }
 
                         Text(
-                            text = if (page == OptionsPage.Main) "Options" else "Open fs folder",
+                            text = page.title,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE6E1E5),
@@ -268,15 +255,18 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
                     AnimatedContent(
                         targetState = page,
                         transitionSpec = {
-                            val goingForward = targetState == OptionsPage.Folders
+                            // Forward = deeper in the stack (slide in from the right),
+                            // otherwise we are going back (slide in from the left).
+                            // No fade: a pure horizontal slide with an animated height.
+                            val goingForward = targetState.ordinal > initialState.ordinal
                             val enter = if (goingForward)
-                                (slideInHorizontally { it / 3 } + fadeIn())
+                                slideInHorizontally(tween(300)) { it / 3 }
                             else
-                                (slideInHorizontally { -it / 3 } + fadeIn())
+                                slideInHorizontally(tween(300)) { -it / 3 }
                             val exit = if (goingForward)
-                                (slideOutHorizontally { -it / 3 } + fadeOut())
+                                slideOutHorizontally(tween(300)) { -it / 3 }
                             else
-                                (slideOutHorizontally { it / 3 } + fadeOut())
+                                slideOutHorizontally(tween(300)) { it / 3 }
                             (enter togetherWith exit).using(SizeTransform(clip = false))
                         },
                         label = "optionsPage"
@@ -284,21 +274,21 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
                         when (p) {
                             OptionsPage.Main -> {
                                 Column(Modifier.fillMaxWidth()) {
-                                    OptionRow(Icons.Filled.Refresh, "Hard Reset", null) {
-                                        showSheet = false; onHardReset()
+                                    OptionRow(Icons.Filled.Refresh, "Hard reset") {
+                                        stack.push(OptionsPage.HardReset)
                                     }
                                     OptionRow(
                                         Icons.Filled.FolderOpen,
-                                        "Open fs folder",
+                                        "Open FS folder...",
                                         Icons.AutoMirrored.Filled.KeyboardArrowRight
-                                    ) { page = OptionsPage.Folders }
-                                    OptionRow(Icons.Filled.DeleteSweep, "Clear user data", null) {
-                                        showSheet = false; onClearUserData()
+                                    ) { stack.push(OptionsPage.Folders) }
+                                    OptionRow(Icons.Filled.DeleteSweep, "Clear user data") {
+                                        stack.push(OptionsPage.ClearUserData)
                                     }
-                                    OptionRow(Icons.Filled.Info, "About", null) {
-                                        showSheet = false; onAbout()
+                                    OptionRow(Icons.Filled.Info, "About") {
+                                        stack.push(OptionsPage.About)
                                     }
-                                    OptionRow(Icons.Filled.PowerSettingsNew, "Quit", null, tint = Color(0xFFE98A8A)) {
+                                    OptionRow(Icons.Filled.PowerSettingsNew, "Quit", tint = Color(0xFFE98A8A)) {
                                         showSheet = false; onQuit()
                                     }
                                     Spacer(Modifier.height(16.dp))
@@ -307,18 +297,86 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
 
                             OptionsPage.Folders -> {
                                 Column(Modifier.fillMaxWidth()) {
-                                    OptionRow(Icons.Filled.SdStorage, "fs/c", Icons.AutoMirrored.Filled.KeyboardArrowRight) {
-                                        showSheet = false; onOpenFolder(File("/sdcard/MREmu/fs/c"))
+                                    drives.forEach { drive ->
+                                        OptionRow(
+                                            icon = if (drive.label.endsWith("mre"))
+                                                Icons.Filled.Folder else Icons.Filled.SdStorage,
+                                            label = drive.label,
+                                            detail = drive.detail,
+                                            trailing = Icons.AutoMirrored.Filled.KeyboardArrowRight
+                                        ) {
+                                            showSheet = false
+                                            onOpenFolder(File(drive.path))
+                                        }
                                     }
-                                    OptionRow(Icons.Filled.SdStorage, "fs/d", Icons.AutoMirrored.Filled.KeyboardArrowRight) {
-                                        showSheet = false; onOpenFolder(File("/sdcard/MREmu/fs/d"))
+                                    Spacer(Modifier.height(16.dp))
+                                }
+                            }
+
+                            OptionsPage.HardReset -> {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = stringResource(R.string.hard_reset_message),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFFC7C5D0),
+                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                                    )
+                                    var armed by remember { mutableStateOf(false) }
+                                    CheckRow("Reset the emulator now", armed) { armed = !armed }
+                                    Button(
+                                        onClick = { showSheet = false; onHardReset() },
+                                        enabled = armed,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(stringResource(R.string.hard_reset_confirm))
                                     }
-                                    OptionRow(Icons.Filled.SdStorage, "fs/e", Icons.AutoMirrored.Filled.KeyboardArrowRight) {
-                                        showSheet = false; onOpenFolder(File("/sdcard/MREmu/fs/e"))
+                                    Spacer(Modifier.height(16.dp))
+                                }
+                            }
+
+                            OptionsPage.ClearUserData -> {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = stringResource(R.string.clear_data_message),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFFC7C5D0),
+                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                                    )
+                                    var armed by remember { mutableStateOf(false) }
+                                    CheckRow("Erase everything on fs/c and fs/d", armed) { armed = !armed }
+                                    Button(
+                                        onClick = { showSheet = false; onClearUserData() },
+                                        enabled = armed,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(stringResource(R.string.clear_data_confirm))
                                     }
-                                    OptionRow(Icons.Filled.Folder, "fs/e/mre", Icons.AutoMirrored.Filled.KeyboardArrowRight) {
-                                        showSheet = false; onOpenFolder(File("/sdcard/MREmu/fs/e/mre"))
+                                    Spacer(Modifier.height(16.dp))
+                                }
+                            }
+
+                            OptionsPage.About -> {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = stringResource(R.string.about_message),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFFC7C5D0),
+                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                                    )
+                                    OptionRow(Icons.Filled.SdStorage, "VXP folder", detail = "/sdcard/MREmu/fs/e/mre") {
+                                        showSheet = false
+                                        onOpenFolder(File("/sdcard/MREmu/fs/e/mre"))
                                     }
+                                    OptionRow(
+                                        Icons.Filled.Info,
+                                        "Version",
+                                        detail = appVersion().ifEmpty { "-" },
+                                        onClick = {}
+                                    )
                                     Spacer(Modifier.height(16.dp))
                                 }
                             }
@@ -329,11 +387,13 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         }
     }
 
+    /** A label plus optional second line, with an optional leading and trailing icon. */
     @Composable
     private fun OptionRow(
         icon: androidx.compose.ui.graphics.vector.ImageVector,
         label: String,
-        trailing: androidx.compose.ui.graphics.vector.ImageVector?,
+        trailing: androidx.compose.ui.graphics.vector.ImageVector? = null,
+        detail: String? = null,
         tint: Color = Color(0xFFE6E1E5),
         onClick: () -> Unit
     ) {
@@ -355,12 +415,20 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
                     tint = tint,
                     modifier = Modifier.size(22.dp)
                 )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = tint,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = tint
+                    )
+                    if (detail != null) {
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF8E8E93)
+                        )
+                    }
+                }
                 if (trailing != null) {
                     Icon(
                         imageVector = trailing,
@@ -372,6 +440,34 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         }
     }
 
+    /**
+     * A destructive action armed by a todo-list checkbox: the row reads as a task to
+     * tick off, and the enabled state of the confirm button follows the tick.
+     */
+    @Composable
+    private fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCheckedChange(!checked) }
+                .padding(horizontal = 24.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Icon(
+                imageVector = if (checked) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
+                contentDescription = null,
+                tint = if (checked) Color(0xFF8AB4F8) else Color(0xFF8E8E93),
+                modifier = Modifier.size(22.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (checked) Color(0xFFE6E1E5) else Color(0xFFC7C5D0),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         savedStateRegistryController.performRestore(savedInstanceState)
         super.onCreate(savedInstanceState)
