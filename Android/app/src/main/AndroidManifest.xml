@@ -11,16 +11,13 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!--
-        Needed to hand folders to the system file manager. From Android 11 (API 30)
-        an app cannot see other packages unless it declares what it looks for, so
-        without this the OPEN_DOCUMENT_TREE intent resolves to nothing and
-        openFolder() reports "no app can open that folder".
+        No <queries> element on purpose. Package visibility filtering on Android 11+
+        applies to resolveActivity() / queryIntentActivities(), but not to startActivity(),
+        so declaring folder intents here would only be needed by a resolveActivity() guard
+        - and that guard is exactly what openFolder() avoids. Filtering resolveActivity()
+        makes it return null for file managers that startActivity() launches fine, which
+        would show a bogus "no app can open that folder" error.
     -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.OPEN_DOCUMENT_TREE" />
-        </intent>
-    </queries>
 
     <application
         android:allowBackup="false"

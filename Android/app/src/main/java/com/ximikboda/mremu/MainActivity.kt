@@ -36,22 +36,27 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
@@ -65,29 +70,81 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.io.File
 import java.io.FileOutputStream
+
+/** A single Roboto Flex instance with its variable axes pinned. */
+@OptIn(ExperimentalTextApi::class)
+private fun robotoFlex(weight: Int, opticalSize: Float) = Font(
+    resId = R.font.roboto_flex,
+    weight = FontWeight(weight),
+    variationSettings = FontVariation.Settings(
+        FontVariation.Setting("wght", weight.toFloat()),
+        // opsz tightens the counters for small text; the expressive screens read at
+        // roughly 16sp body and 22sp headers.
+        FontVariation.Setting("opsz", opticalSize),
+        FontVariation.Setting("wdth", 100f),  // default width, no horizontal stretch
+        FontVariation.Setting("GRAD", 0f)
+    )
+)
+
+/**
+ * Roboto Flex, used for the whole sheet. The axes are set per instance above, so the
+ * family resolves weights by itself and Material's own weights keep working.
+ */
+@OptIn(ExperimentalTextApi::class)
+private val RobotoFlexFamily = FontFamily(
+    robotoFlex(400, 16f),
+    robotoFlex(500, 16f),
+    robotoFlex(700, 20f)
+)
+
+/**
+ * Material's default styles retargeted at Roboto Flex. Only the slots the sheet actually
+ * uses are listed; anything else keeps the platform default.
+ */
+@OptIn(ExperimentalTextApi::class)
+private val AppTypography = Typography().run {
+    copy(
+        headlineSmall = headlineSmall.copy(fontFamily = RobotoFlexFamily),
+        bodyMedium = bodyMedium.copy(fontFamily = RobotoFlexFamily),
+        bodyLarge = bodyLarge.copy(fontFamily = RobotoFlexFamily),
+        bodySmall = bodySmall.copy(fontFamily = RobotoFlexFamily),
+        titleSmall = titleSmall.copy(fontFamily = RobotoFlexFamily),
+        labelLarge = labelLarge.copy(fontFamily = RobotoFlexFamily)
+    )
+}
 
 class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -101,7 +158,7 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         private const val TAG = "MREmu"
         private const val STORAGE_PERMISSION_CODE = 100
         private const val MANAGE_STORAGE_REQUEST_CODE = 101
-        private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage"
+        private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
 
         init {
             System.loadLibrary("MREmu")
@@ -131,7 +188,7 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
             setViewTreeViewModelStoreOwner(this@MainActivity)
             setViewTreeSavedStateRegistryOwner(this@MainActivity)
             setContent {
-                MaterialTheme {
+                MaterialTheme(typography = AppTypography) {
                     OptionsBottomSheet(
                         onHardReset = { dialog.dismiss(); performHardReset() },
                         onOpenFolder = { dir -> dialog.dismiss(); openFolder(dir) },
@@ -149,37 +206,74 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
     }
 
     /**
-     * Opens an emulator folder in the system file manager.
+     * Opens an emulator folder in a file manager.
      *
-     * The obvious intent for this, ACTION_VIEW with a resource/folder MIME type, is a
-     * bad fit: it is an implicit intent, so whichever third-party file manager the user
-     * happens to have installed wins it (Mixplorer on this device), and that app is
-     * free to ignore the document id and open its own root instead.
+     * ACTION_OPEN_DOCUMENT_TREE is the wrong tool here. It is the SAF *picker*: it opens
+     * a folder-selection UI that the user has to confirm with "USE THIS FOLDER" instead
+     * of simply landing on the path, and EXTRA_INITIAL_URI only asks DocumentsUI to
+     * pre-scroll there. That is a different job from "show me this folder".
      *
-     * ACTION_OPEN_DOCUMENT_TREE avoids both problems. File managers do not claim it -
-     * it is a DocumentsUI intent - so it reaches the system file manager regardless of
-     * what else is installed, and EXTRA_INITIAL_URI is the documented way to land on a
-     * specific folder. No setPackage() is used on purpose: the DocumentsUI package is
+     * ACTION_VIEW against a folder document URI is what actually navigates a file manager
+     * to a location. The URI is an ExternalStorageProvider document URI, whose ids are
+     * "<rootId>:<path with no leading slash>", e.g. /sdcard/MREmu/fs/c -> primary:MREmu/fs/c.
+     * Uri.fromFile() is not an option: it builds a file:// URI, which StrictMode blocks
+     * for outgoing intents since targetSdk 24, so it never reaches any app.
+     *
+     * Folder MIME types are not standardised, so openFolder() tries the one AOSP defines
+     * first and falls back to the legacy values to reach pre-SAF third-party managers.
+     *
+     * No setPackage() is used on purpose: the DocumentsUI package is
      * com.android.documentsui on AOSP but com.google.android.documentsui on Google
      * builds, and pinning either one throws on the other.
-     *
-     * Uri.fromFile() is not an option either: it builds a file:// URI, which StrictMode
-     * blocks for outgoing intents since targetSdk 24, so it never reaches any app. The
-     * folder is addressed through DocumentsContract instead, as "primary:" plus the path
-     * with the /sdcard prefix stripped, e.g. /sdcard/MREmu/fs/c -> primary:MREmu/fs/c.
-     * The tree form is used because DocumentsUI expects a tree URI when navigating to a
-     * directory.
      */
     private fun openFolder(dir: File) {
-        if (!dir.exists()) dir.mkdirs()
+        if (!dir.exists() && !dir.mkdirs()) {
+            Toast.makeText(this, getString(R.string.cannot_create_folder, dir.absolutePath), Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        val docId = "primary:" + dir.absolutePath.removePrefix("/sdcard/").trimStart('/')
-        val treeUri = DocumentsContract.buildTreeDocumentUri(EXTERNAL_STORAGE_AUTHORITY, docId)
+        // The drive paths are written as /sdcard/..., which is a symlink to
+        // /storage/emulated/0 on modern Android. File.absolutePath does not resolve it,
+        // so strip either spelling to get the path relative to the emulated root.
+        val relativePath = dir.absolutePath
+            .removePrefix(Environment.getExternalStorageDirectory().absolutePath)
+            .removePrefix("/sdcard")
+            .trim('/')
+        val docUri = DocumentsContract.buildDocumentUri(EXTERNAL_STORAGE_AUTHORITY, "primary:$relativePath")
 
+        // MIME_TYPE_DIR ("vnd.android.document/directory") is the only folder type the AOSP
+        // file manager claims, so it always has a handler on a stock device. "resource/folder"
+        // and "inode/directory" are undocumented legacy conventions; only Amaze, Material
+        // Files and AppManager answer to them, but they cost nothing to try after the first.
+        val mimeTypes = listOf(
+            DocumentsContract.Document.MIME_TYPE_DIR,
+            "resource/folder",
+            "inode/directory"
+        )
+
+        for (mime in mimeTypes) {
+            // No FLAG_GRANT_READ_URI_PERMISSION: ExternalStorageProvider is the system,
+            // not us, and we are handing out a URI we do not own.
+            val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(docUri, mime) }
+            try {
+                // Deliberately no resolveActivity() guard. Package visibility filtering on
+                // Android 11+ makes resolveActivity() return null for activities that
+                // startActivity() would launch fine, so trusting it shows a bogus
+                // "no app can open that folder" while a working file manager sits there.
+                // Catching the real ActivityNotFoundException cannot lie to the user.
+                startActivity(intent)
+                return
+            } catch (e: ActivityNotFoundException) {
+                Log.d(TAG, "No file manager handles folders as $mime")
+            }
+        }
+
+        // Nothing claimed the folder, so fall back to the SAF picker, pre-positioned.
+        // EXTRA_INITIAL_URI needs a root or *document* URI: DocumentsUI silently drops a
+        // tree URI and shows the last-used location instead.
         try {
             startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-                putExtra(DocumentsContract.EXTRA_INITIAL_URI, treeUri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, docUri)
             })
         } catch (e: Exception) {
             // Only reachable on a device with DocumentsUI removed or disabled.
@@ -188,10 +282,20 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         }
     }
 
+    /** Opens a web URL in the default browser, if any app can handle it. */
+    private fun openUrl(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: ActivityNotFoundException) {
+            // Reachable on a device with no browser at all.
+            Log.w(TAG, "No app can open $url", e)
+        }
+    }
+
     /** Confirmation now happens on the Hard reset sheet page, so this only runs the reset. */
     private fun performHardReset() {
         requestHardReset()
-        Toast.makeText(this, "Hard reset requested", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Reset emulator state requested", Toast.LENGTH_SHORT).show()
     }
 
     /** Confirmation now happens on the Clear user data sheet page, so this only clears. */
@@ -215,7 +319,7 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
 private enum class OptionsPage(val title: String) {
         Main("Options"),
         Folders("Open FS folder"),
-        HardReset("Hard reset"),
+        HardReset("Reset emulator state"),
         ClearUserData("Clear user data"),
         About("About")
     }
@@ -240,7 +344,10 @@ private enum class OptionsPage(val title: String) {
         onQuit: () -> Unit,
         onDismiss: () -> Unit
     ) {
-        val sheetState = rememberModalBottomSheetState()
+        // skipPartiallyExpanded so the sheet opens at Expanded, whose anchor is
+// max(0, screenHeight - contentHeight) -> the sheet is exactly as tall as its
+// content (capped at the screen), instead of the default half-screen peek.
+val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var showSheet by remember { mutableStateOf(true) }
         val stack = rememberPageBackStack(OptionsPage.Main)
         val page = stack.current
@@ -313,22 +420,37 @@ private enum class OptionsPage(val title: String) {
                         when (p) {
                             OptionsPage.Main -> {
                                 Column(Modifier.fillMaxWidth()) {
-                                    OptionRow(Icons.Filled.Refresh, "Hard reset") {
-                                        stack.push(OptionsPage.HardReset)
+                                    SegmentHeader(stringResource(R.string.section_emulator))
+                                    SegmentGroup {
+                                        OptionRow(Icons.Filled.Refresh, "Reset emulator state") {
+                                            stack.push(OptionsPage.HardReset)
+                                        }
+                                        OptionRow(Icons.Filled.DeleteSweep, "Clear user data", divider = false) {
+                                            stack.push(OptionsPage.ClearUserData)
+                                        }
                                     }
-                                    OptionRow(
-                                        Icons.Filled.FolderOpen,
-                                        "Open FS folder...",
-                                        Icons.AutoMirrored.Filled.KeyboardArrowRight
-                                    ) { stack.push(OptionsPage.Folders) }
-                                    OptionRow(Icons.Filled.DeleteSweep, "Clear user data") {
-                                        stack.push(OptionsPage.ClearUserData)
+                                    SegmentHeader(stringResource(R.string.section_files))
+                                    SegmentGroup {
+                                        OptionRow(
+                                            Icons.Filled.FolderOpen,
+                                            "Open FS folder...",
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            divider = false
+                                        ) { stack.push(OptionsPage.Folders) }
                                     }
-                                    OptionRow(Icons.Filled.Info, "About") {
-                                        stack.push(OptionsPage.About)
-                                    }
-                                    OptionRow(Icons.Filled.PowerSettingsNew, "Quit", tint = Color(0xFFE98A8A)) {
-                                        showSheet = false; onQuit()
+                                    SegmentHeader(stringResource(R.string.section_app))
+                                    SegmentGroup {
+                                        OptionRow(Icons.Filled.Info, "About") {
+                                            stack.push(OptionsPage.About)
+                                        }
+                                        OptionRow(
+                                            Icons.Filled.PowerSettingsNew,
+                                            "Quit",
+                                            tint = Color(0xFFE98A8A),
+                                            divider = false
+                                        ) {
+                                            showSheet = false; onQuit()
+                                        }
                                     }
                                     Spacer(Modifier.height(16.dp))
                                 }
@@ -338,16 +460,36 @@ private enum class OptionsPage(val title: String) {
                                 Column(Modifier.fillMaxWidth()) {
                                     // These rows leave the app rather than open another page,
                                     // so they get the external-link icon instead of a chevron.
-                                    drives.forEach { drive ->
-                                        OptionRow(
-                                            icon = if (drive.label.endsWith("mre"))
-                                                Icons.Filled.Folder else Icons.Filled.SdStorage,
-                                            label = drive.label,
-                                            detail = drive.detail,
-                                            trailing = Icons.AutoMirrored.Filled.OpenInNew
-                                        ) {
-                                            showSheet = false
-                                            onOpenFolder(File(drive.path))
+                                    val storage = drives.filterNot { it.label.endsWith("mre") }
+                                    val apps = drives.filter { it.label.endsWith("mre") }
+                                    SegmentHeader(stringResource(R.string.section_storage))
+                                    SegmentGroup {
+                                        storage.forEachIndexed { i, drive ->
+                                            OptionRow(
+                                                icon = Icons.Filled.SdStorage,
+                                                label = drive.label,
+                                                detail = drive.detail,
+                                                trailing = Icons.AutoMirrored.Filled.OpenInNew,
+                                                divider = i < storage.lastIndex
+                                            ) {
+                                                showSheet = false
+                                                onOpenFolder(File(drive.path))
+                                            }
+                                        }
+                                    }
+                                    SegmentHeader(stringResource(R.string.section_apps))
+                                    SegmentGroup {
+                                        apps.forEachIndexed { i, drive ->
+                                            OptionRow(
+                                                icon = Icons.Filled.Folder,
+                                                label = drive.label,
+                                                detail = drive.detail,
+                                                trailing = Icons.AutoMirrored.Filled.OpenInNew,
+                                                divider = i < apps.lastIndex
+                                            ) {
+                                                showSheet = false
+                                                onOpenFolder(File(drive.path))
+                                            }
                                         }
                                     }
                                     Spacer(Modifier.height(16.dp))
@@ -355,42 +497,53 @@ private enum class OptionsPage(val title: String) {
                             }
 
                             OptionsPage.HardReset -> {
+                                var remaining by remember { mutableStateOf(3) }
+                                LaunchedEffect(Unit) {
+                                    while (remaining > 0) {
+                                        delay(1000L)
+                                        remaining--
+                                    }
+                                }
                                 Column(Modifier.fillMaxWidth()) {
                                     Text(
                                         text = stringResource(R.string.hard_reset_message),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = Color(0xFFC7C5D0),
-                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                                     )
-                                    var armed by remember { mutableStateOf(false) }
-                                    CheckRow("Reset the emulator now", armed) { armed = !armed }
-                                    DestructiveButton(stringResource(R.string.hard_reset_confirm), armed) {
+                                    DestructiveButton("Reset", remaining) {
                                         showSheet = false
                                         onHardReset()
                                     }
-                                    Spacer(Modifier.height(16.dp))
+                                    Spacer(Modifier.height(24.dp))
                                 }
                             }
 
                             OptionsPage.ClearUserData -> {
+                                var remaining by remember { mutableStateOf(3) }
+                                LaunchedEffect(Unit) {
+                                    while (remaining > 0) {
+                                        delay(1000L)
+                                        remaining--
+                                    }
+                                }
                                 Column(Modifier.fillMaxWidth()) {
                                     Text(
                                         text = stringResource(R.string.clear_data_message),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = Color(0xFFC7C5D0),
-                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                                     )
-                                    var armed by remember { mutableStateOf(false) }
-                                    CheckRow("Erase everything on fs/c and fs/d", armed) { armed = !armed }
-                                    DestructiveButton(stringResource(R.string.clear_data_confirm), armed) {
+                                    DestructiveButton("Clear", remaining) {
                                         showSheet = false
                                         onClearUserData()
                                     }
-                                    Spacer(Modifier.height(16.dp))
+                                    Spacer(Modifier.height(24.dp))
                                 }
                             }
 
                             OptionsPage.About -> {
+                                val repoUrl = stringResource(R.string.about_repo_url)
                                 Column(Modifier.fillMaxWidth()) {
                                     Text(
                                         text = stringResource(R.string.about_message),
@@ -398,12 +551,25 @@ private enum class OptionsPage(val title: String) {
                                         color = Color(0xFFC7C5D0),
                                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                                     )
-                                    OptionRow(
-                                        Icons.Filled.Info,
-                                        "Version",
-                                        detail = appVersion().ifEmpty { "-" },
-                                        onClick = {}
-                                    )
+                                    // Opens a browser rather than another sheet page,
+                                    // so it gets the external-link icon like the folder rows.
+                                    SegmentGroup {
+                                        OptionRow(
+                                            icon = Icons.Filled.Code,
+                                            label = stringResource(R.string.about_repo),
+                                            detail = repoUrl,
+                                            trailing = Icons.AutoMirrored.Filled.OpenInNew
+                                        ) {
+                                            openUrl("https://$repoUrl")
+                                        }
+                                        OptionRow(
+                                            Icons.Filled.Info,
+                                            "Version",
+                                            detail = appVersion().ifEmpty { "-" },
+                                            divider = false,
+                                            onClick = {}
+                                        )
+                                    }
                                     Spacer(Modifier.height(16.dp))
                                 }
                             }
@@ -422,6 +588,7 @@ private enum class OptionsPage(val title: String) {
         trailing: androidx.compose.ui.graphics.vector.ImageVector? = null,
         detail: String? = null,
         tint: Color = Color(0xFFE6E1E5),
+        divider: Boolean = true,
         onClick: () -> Unit
     ) {
         Surface(
@@ -429,38 +596,48 @@ private enum class OptionsPage(val title: String) {
             modifier = Modifier.fillMaxWidth(),
             color = Color.Transparent
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(22.dp)
-                )
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = tint
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(22.dp)
                     )
-                    if (detail != null) {
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            text = detail,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF8E8E93)
+                            text = label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = tint
+                        )
+                        if (detail != null) {
+                            Text(
+                                text = detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF8E8E93)
+                            )
+                        }
+                    }
+                    if (trailing != null) {
+                        Icon(
+                            imageVector = trailing,
+                            contentDescription = null,
+                            tint = Color(0xFF8E8E93)
                         )
                     }
                 }
-                if (trailing != null) {
-                    Icon(
-                        imageVector = trailing,
-                        contentDescription = null,
-                        tint = Color(0xFF8E8E93)
+                // Drawn inside the row's own surface so the separator stays part of the
+                // touch target rather than becoming a gap between two targets.
+                if (divider) {
+                    HorizontalDivider(
+                        color = Color(0xFF34343A),
+                        modifier = Modifier.padding(start = 66.dp)
                     )
                 }
             }
@@ -468,17 +645,51 @@ private enum class OptionsPage(val title: String) {
     }
 
     /**
-     * Confirm button for a destructive action. Material's default disabled colours fade
-     * the button into the dark sheet, so the red is spelled out for both states: the
-     * button stays red and visible, only dimmed, and stays inert until the row's
-     * checkbox is ticked.
+     * Section label above a group of rows, matching the Material 3 Expressive pattern.
      */
     @Composable
-    private fun DestructiveButton(text: String, armed: Boolean, onClick: () -> Unit) {
+    private fun SegmentHeader(text: String) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            color = Color(0xFFC7C5D0),
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 8.dp)
+        )
+    }
+
+    /**
+     * A run of rows that touch each other inside one rounded card. Expressive draws the
+     * separator as a hairline inset to the text start rather than a full-bleed rule, so
+     * the group reads as a single object instead of a stack of separate list items.
+     */
+    @Composable
+    private fun SegmentGroup(
+        modifier: Modifier = Modifier,
+        content: @Composable ColumnScope.() -> Unit
+    ) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFF232327))
+                .border(1.dp, Color(0xFF34343A), RoundedCornerShape(24.dp))
+        ) {
+            content()
+        }
+    }
+
+    /**
+     * A destructive confirm button that, instead of needing a separate checkbox, arms
+     * itself with a 3..1 countdown on the first tap. During the countdown the label is
+     * replaced by just the number; the action fires when the countdown reaches zero.
+     */
+    @Composable
+    private fun DestructiveButton(label: String, remaining: Int, onConfirmed: () -> Unit) {
         val red = Color(0xFFC62828)
         Button(
-            onClick = onClick,
-            enabled = armed,
+            onClick = onConfirmed,
+            enabled = remaining == 0,
             colors = ButtonDefaults.buttonColors(
                 containerColor = red,
                 contentColor = Color.White,
@@ -487,40 +698,17 @@ private enum class OptionsPage(val title: String) {
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .height(72.dp)
+                .padding(horizontal = 32.dp, vertical = 16.dp)
         ) {
-            Text(text)
+            Text(
+                text = if (remaining > 0) "${remaining}s" else label,
+                style = MaterialTheme.typography.bodyLarge
+            )
         }
     }
 
-    /**
-     * A destructive action armed by a todo-list checkbox: the row reads as a task to
-     * tick off, and the enabled state of the confirm button follows the tick.
-     */
-    @Composable
-    private fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onCheckedChange(!checked) }
-                .padding(horizontal = 24.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Icon(
-                imageVector = if (checked) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
-                contentDescription = null,
-                tint = if (checked) Color(0xFF8AB4F8) else Color(0xFF8E8E93),
-                modifier = Modifier.size(22.dp)
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (checked) Color(0xFFE6E1E5) else Color(0xFFC7C5D0),
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         savedStateRegistryController.performRestore(savedInstanceState)
         super.onCreate(savedInstanceState)

@@ -5,10 +5,17 @@
 
     <string name="about_title">About MREmu</string>
     <string name="about_message">MREmu - MediaTek MRE / VRE emulator</string>
+    <string name="about_repo">Source repository</string>
+    <string name="about_repo_url">github.com/theonlyasdk/MREmu</string>
 
     <string name="open_fs_folder">Open fs folder</string>
+    <string name="section_emulator">Emulator</string>
+    <string name="section_files">Files</string>
+    <string name="section_app">App</string>
+    <string name="section_storage">Storage</string>
+    <string name="section_apps">Apps</string>
 
-    <string name="hard_reset_title">Hard Reset?</string>
+    <string name="hard_reset_title">Reset emulator state?</string>
     <string name="hard_reset_message">This stops the running app, clears its memory and restarts the emulator back to the launcher.</string>
     <string name="hard_reset_confirm">Reset</string>
 
@@ -17,6 +24,7 @@
     <string name="clear_data_confirm">Clear</string>
 
     <string name="no_app_to_open_folder">No app on this device can open that folder</string>
+    <string name="cannot_create_folder">Could not create %1$s</string>
 
     <string name="cancel">Cancel</string>
 </resources>
