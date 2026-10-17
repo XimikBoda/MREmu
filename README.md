@@ -10,10 +10,10 @@ For platform-specific dependencies and build instructions, see:
 - [Building on Windows](docs/build_instructions/windows.md)
 - [Building on Android](docs/build_instructions/android.md)
 
-## Headless operation
+## Running without a window
 
-The desktop build can run without a display, which is what makes it scriptable by an
-AI agent or usable over SSH/CI.
+Normally MREmu opens a window and you click on it. It can also run with nothing on screen,
+which is what makes it usable from a script, over SSH, in CI, or by an AI agent.
 
 ### `--inspect` — one-shot report
 
@@ -21,56 +21,93 @@ AI agent or usable over SSH/CI.
 MREmu.exe <app.vxp> --json report.json --steps 2000 --screen shot.png --inspect
 ```
 
-Loads the app, reports its parsed MRE tags, layout and entry point, optionally runs a
-bounded number of instructions, and optionally writes the emulated screen to a PNG.
+Loads the app, writes what it found (the MRE tags, the memory layout, the entry point) to
+a JSON file, optionally runs a set number of instructions, and optionally saves a picture
+of the screen. Then it exits. Useful for checking whether an app will even load.
 
-Note: cmdparser keys `get()` on the **short** name, and a bare boolean flag must be last
-or followed by another flag. So `--inspect` (not `--inspect=1`), and the positional VXP
-path must come before the flags.
+One quirk of the command-line parser: put the `.vxp` path first, and write `--inspect`
+on its own rather than `--inspect=1`.
 
-### `--mcp` — MCP server over stdio
+### `--mcp` — let an AI agent drive the emulator
 
 ```
 MREmu.exe <app.vxp> --mcp
 ```
 
-Speaks the Model Context Protocol over stdin/stdout, so an agent can launch the emulator
-as an MCP server and then observe and drive it. No window is opened, so it works on a
-machine with no display. To register it with an MCP client (OpenCode, Claude Code, etc.),
-point the server command at `MREmu.exe` with the arguments `["<app.vxp>", "--mcp"]`.
+Instead of opening a window, MREmu starts up, loads the app, and then waits for
+instructions over stdin/stdout in the Model Context Protocol format — the same format AI
+agents use for other tools. That means an agent can start the emulator and then ask it
+questions: *what is running, what are the CPU registers, what does the screen look like,
+what broke?*
 
-Tools exposed:
+Nothing is displayed, so it works on a headless machine, over SSH, or in CI.
 
-| Tool | What it does |
+#### Setting it up
+
+Point your agent at the executable and give it two arguments — the app to load, and
+`--mcp`. In OpenCode that is a few lines in `opencode.jsonc`:
+
+```jsonc
+"mremu": {
+  "type": "local",
+  "command": [
+    "C:\\path\\to\\MREmu.exe",
+    "C:\\path\\to\\Opera Mini 6.1.vxp",
+    "--mcp"
+  ],
+  "enabled": true
+}
+```
+
+The same works for Claude Code and other MCP clients. If you leave the app path out, the
+emulator starts empty and the agent can load apps itself.
+
+#### What the agent can do
+
+| Tool | In plain terms |
 | --- | --- |
-| `emu_status` | Running app, `run_state`, VM call count, stepped instructions, PC, screen size, last error, `faulted` |
-| `emu_list_apps` | Every loaded app with index, name and state |
-| `emu_load_vxp` | Load a VXP by absolute path |
-| `emu_close_app` | Close a loaded app by index |
-| `emu_regs` | All 16 registers plus CPSR and decoded flags |
-| `emu_set_reg` | Write one register by name (`r0`-`r12`, `sp`, `lr`, `pc`, `cpsr`) |
-| `emu_step` | Run at most N instructions, then yield |
-| `emu_pause` | Pause or resume |
-| `emu_screen` | The emulated screen as a PNG |
-| `emu_errors` | Errors recorded since the last clear |
-| `emu_trace_control` | Enable / disable / clear / query the VM API call tracer |
-| `emu_trace_dump` | Recorded VM API calls: name, PC, arguments, return value |
+| `emu_status` | "What am I running, is it healthy, where is it stuck?" |
+| `emu_list_apps` | "What apps are loaded?" |
+| `emu_load_vxp` | "Run this .vxp file." |
+| `emu_close_app` | "Shut that app down." |
+| `emu_regs` | "What are all the CPU registers right now?" |
+| `emu_set_reg` | "Put this value in that register." |
+| `emu_step` | "Run the app a bit and tell me what happened." |
+| `emu_pause` | "Hold still" / "carry on." |
+| `emu_screen` | "Show me what the phone screen looks like." |
+| `emu_errors` | "Did anything crash, and if so where?" |
+| `emu_trace_control` | "Start or stop recording every system call the app makes." |
+| `emu_trace_dump` | "Show me the calls you recorded." |
 
-Two things about the model worth knowing before driving it:
+The tracer is the interesting one. It records every call the app makes into the MRE
+system — `vm_create_timer`, `vm_get_sym_entry`, `vm_malloc` and so on — with the call's
+address, its arguments and what it returned. Turning it on before an app boots captures
+the app's entire startup sequence, which is exactly what you want when working out why an
+app will not start.
 
-- **The app is event-driven, not free-running.** It only executes inside a slice entered
-  by a timer callback or an incoming event, so it spends most of its time parked at its
-  idle handler. `emu_step` handles this by first making the app's pending timers due, and
-  reports `timers_made_due` so you can tell "stepped and there was nothing scheduled" from
-  "the step did not take effect". Once the app has spent its last timer, nothing can drive
-  it and a step's budget stays pending; inject input or reload the app.
-- **Instruction counts are not reported in total.** An unbounded slice runs to the app's
-  idle handler and its length is not knowable from outside, so only `stepped_instructions`
-  (instructions spent by bounded slices) is reported. `vm_calls` is the always-on activity
-  metric.
+#### Two things that surprise people
 
-`r9` is the MRE VM's DAT base pointer. Writing to it breaks the app's lazy `vm_*` symbol
-resolution permanently, so read the original value before writing and restore it after.
+**The app sits still most of the time, and that is normal.** These apps are event-driven.
+They only wake up when something happens to them: a timer expires, or input arrives.
+Between events they do nothing at all, so `emu_step` can report that it ran but nothing
+happened. That is not a bug. To check, look at `timers_made_due` in `emu_status`: `0`
+means the app had nothing scheduled, so there was genuinely nothing to run.
+
+One consequence is worth knowing: if an app uses up its last timer and then stops, nothing
+will ever wake it again, and it will sit there forever. Send it some input, or load it
+again.
+
+**There is no total instruction count.** Normal runs end when the app goes idle, and there
+is no way to know from outside how many instructions that took. So the agent reports
+`stepped_instructions`, which only counts instructions it asked to run in bounded chunks.
+For "is this app actually doing anything?", `vm_calls` is the number to watch — it counts
+every system call the app makes and is always accurate.
+
+#### One register to be careful with
+
+`r9` holds the MRE VM's pointer to its symbol table. Overwrite it and the app can no
+longer find any system functions, and it will not recover. Read the current value first
+and put it back afterwards.
 
 ## Known issues
 
