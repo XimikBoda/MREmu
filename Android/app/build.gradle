@@ -23,8 +23,12 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'),
+            // R8 + resource shrinking is the single biggest APK win here: the app ships
+            // material-icons-extended (thousands of vector classes) and only a handful are
+            // used, so without minification the dex balloons to ~40 MB uncompressed.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
                     'proguard-rules.pro'
             signingConfig signingConfigs.debug
         }
