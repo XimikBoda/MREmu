@@ -22,6 +22,14 @@ set(SOURCES
 						"DragAndDrop.cpp" "DragAndDrop.h"
 )
 
+# Headless agent control. Desktop only: on Android the options sheet already drives
+# the app and there is no stdio transport to serve.
+if (NOT ANDROID)
+	list(APPEND SOURCES
+					"McpServer.cpp" "McpServer.h"
+					"McpHost.cpp")
+endif()
+
 if (ANDROID)
 	add_library(MREmu SHARED ${SOURCES})
 else()

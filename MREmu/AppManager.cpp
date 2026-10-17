@@ -321,7 +321,13 @@ void AppManager::loop() {
 
 		std::unique_lock lock(events_mutex);
 		if(wait_time_ms > 0)
-			event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
+			event = events_cv.wait_for(lock, wait_time, [this] {
+				return !is_all_events_empty() || !running
+					|| wake_flag.load(std::memory_order_relaxed);
+			});
+
+		// Consumed: clear it before processing so the next sleep can block again.
+		wake_flag.store(false, std::memory_order_relaxed);
 
 		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
 		run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });

@@ -54,6 +54,10 @@ class AppManager {
 
 	std::mutex events_mutex;
 	std::condition_variable events_cv;
+	// Set by wake() before it notifies, cleared by the loop once it has woken. Part
+	// of the wait predicate so a wake cannot be lost in the window between the loop
+	// deciding to sleep and actually sleeping.
+	std::atomic<bool> wake_flag{false};
 
 	bool is_all_events_empty();
 
@@ -110,11 +114,33 @@ public:
 
 	void reset();
 
+	// Nudge the loop out of its wait so it re-checks timers and event queues now.
+	// Needed by external tooling: the loop sleeps until the nearest timer is due, so
+	// a timer made overdue from another thread would not be noticed until then.
+	// Safe to call without holding events_mutex.
+	void wake() {
+		wake_flag.store(true, std::memory_order_relaxed);
+		events_cv.notify_one();
+	}
+
 	static void add_sock_event(sock_event se);
 	static void add_dns_event(dns_event de);
 
 	App* get_active_app();
 	App* get_current_work_app_id();
+
+	// Read-only views for external tooling (the MCP host). Exposing accessors
+	// rather than the containers keeps the launch queue and the mutex-guarded
+	// active-app pointer encapsulated.
+	std::size_t app_count() const { return apps.size(); }
+	App* app_at(std::size_t index) const {
+		return index < apps.size() ? apps[index].get() : nullptr;
+	}
+	App* current_app() {
+		if (current_work_app_id < 0 || (std::size_t)current_work_app_id >= apps.size())
+			return nullptr;
+		return apps[current_work_app_id].get();
+	}
 };
 
 void add_input_event(uint32_t callback, int state, uint32_t text_emu_addr);

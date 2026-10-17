@@ -30,6 +30,19 @@
 #include "ArmApp.h"
 #include "DLLApp.h"
 
+#ifndef ANDROID
+#include "McpServer.h"
+namespace McpHost {
+	void setup(AppManager*, Keyboard*, Mcp::Control*, MREngine::Graphic*);
+	void bootstrap_launch(const std::string& path, bool local);
+	void pump(AppManager&);
+	void tick(bool running);
+	void shutdown();
+	bool quitting();
+	void note_error(const std::string&);
+}
+#endif
+
 AppManager* g_appManager = 0;
 
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c);
@@ -178,6 +191,13 @@ void trigger_hard_reset_with_error(const std::string& err_msg) {
 	show_error = true;
 	g_request_hard_reset = true;
 	Cpu::stop();
+}
+
+std::string take_error_message() {
+	std::lock_guard<std::mutex> lock(g_error_mutex);
+	std::string out = error_message;
+	error_message.clear();
+	return out;
 }
 
 #ifdef ANDROID
@@ -463,18 +483,13 @@ int main(int argc, char** argv) {
 		parser.set_optional<std::string>("j", "json", "", "Write the inspection report to this JSON file");
 		parser.set_optional<std::string>("s", "screen", "", "Write the emulated screen to this PNG file");
 		parser.set_optional<int>("n", "steps", 0, "With --inspect: execute at most N instructions (0 = do not execute)");
+		parser.set_optional<bool>("m", "mcp", false, "Headless MCP server over stdio: no window, agent-controllable");
 	}
 	parser.run_and_exit_if_error();
 	app_path = parser.get<std::string>("");
 	if (app_path.size() >= 2 && app_path.front() == '"' && app_path.back() == '"')
 		app_path = app_path.substr(1, app_path.size() - 2);
 	path_is_local = parser.get<bool>("l");
-
-	if (app_path.size())
-		spdlog::info("Vxp path from args: {} {}", app_path, path_is_local ? "(local path)" : "");
-
-	GDB::gdb_mode = parser.get<bool>("g");
-	GDB::gdb_port = parser.get<int>("p");
 
 	// cmdparser keys get() on the SHORT name (that is why the existing code uses
 	// "l" and "p" rather than the long names). Querying a long name misses the
@@ -483,6 +498,29 @@ int main(int argc, char** argv) {
 	std::string inspect_json = parser.get<std::string>("j");
 	std::string inspect_screen = parser.get<std::string>("s");
 	int inspect_steps = parser.get<int>("n");
+	bool mcp_mode = parser.get<bool>("m");
+
+#ifndef ANDROID
+	// Claim stdout for JSON-RPC before anything logs. This must precede every
+	// spdlog call, including the one below, because once spdlog's stdout sink is
+	// live on fd 1 any log line corrupts the protocol stream.
+	std::ostream* proto = nullptr;
+	if (mcp_mode) {
+		proto = Mcp::claim_stdout_for_protocol();
+		if (!proto) {
+			// Without this the protocol stream would be unusable: every log line
+			// would corrupt a reply, so fail loudly instead of silently.
+			spdlog::error("failed to reserve stdout for the MCP protocol stream");
+			return 2;
+		}
+	}
+#endif
+
+	if (app_path.size())
+		spdlog::info("Vxp path from args: {} {}", app_path, path_is_local ? "(local path)" : "");
+
+	GDB::gdb_mode = parser.get<bool>("g");
+	GDB::gdb_port = parser.get<int>("p");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
 #else
@@ -509,6 +547,11 @@ int main(int argc, char** argv) {
 	MREngine::Graphic graphic;
 	MREngine::NetworkManager nm;
 
+	// Declared before the platform split: the Android main loop uses them, and the
+	// headless modes below need them before the windowed code declares its own.
+	Keyboard keyboard;
+	Touch touch;
+
 #ifndef ANDROID
 	// Headless inspection runs before any window is created. SFML window creation
 	// is the part that needs a display, and --inspect has to work on a machine
@@ -516,6 +559,35 @@ int main(int argc, char** argv) {
 	if (inspect_mode) {
 		return run_inspection(graphic, app_path, path_is_local,
 			inspect_json, inspect_screen, inspect_steps);
+	}
+
+	// Headless MCP mode: no windows either. The emulator is pumped on a worker
+	// thread while this thread speaks MCP over stdio, so an agent can inspect and
+	// drive a running VXP on a machine with no display.
+	if (mcp_mode) {
+		static Mcp::Control ctl;
+		McpHost::setup(&appManager, &keyboard, &ctl, &graphic);
+		appManager.start();
+		// AppManager::loop drains the launch queue on its own thread, so queue the
+		// argv VXP after start() and it gets picked up like the GUI path does.
+		McpHost::bootstrap_launch(app_path, path_is_local);
+
+		std::atomic<bool> stop{false};
+		std::thread emu([&]() {
+			while (!stop.load() && !McpHost::quitting()) {
+				// Bounded slice per iteration: keeps the pump responsive to
+				// commands while still making forward progress with no window.
+				McpHost::pump(appManager);
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			}
+		});
+
+		int rc = Mcp::serve(std::cin, *proto, ctl);
+		McpHost::shutdown();
+		stop.store(true);
+		if (emu.joinable()) emu.join();
+		appManager.stop();
+		return rc;
 	}
 
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
@@ -560,9 +632,6 @@ int main(int argc, char** argv) {
 		GDB::cpu_state = GDB::Stop;
 
 	appManager.start();
-
-	Keyboard keyboard;
-	Touch touch;
 
 	if (app_path.size()) {
 		if (fs::exists(app_path) || path_is_local) {

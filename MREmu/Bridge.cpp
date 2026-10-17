@@ -16,6 +16,7 @@
 #include "Cpu.h"
 #include "GDB.h"
 #include "MREmu.h"
+#include <atomic>
 #include <string>
 #include <iostream>
 #include <thread>
@@ -1720,14 +1721,111 @@ namespace Bridge {
 		return ret;
 	}
 
+	// VM call tracing state. Guarded by trace_mutex because the tracer runs on the
+	// emulator thread while MCP tool calls read from another.
+	static std::mutex trace_mutex;
+	static std::vector<TraceCall> trace_calls;
+	static bool trace_on = false;
+	// Cap so an agent can trace a long session without unbounded growth. Each record
+	// is ~28 bytes, so this is ~14 MB.
+	static const size_t TRACE_MAX = 500000;
+	// Calls seen but NOT recorded because the cap was reached. Without this an agent
+	// would read a short trace and wrongly conclude the app made few calls.
+	static std::atomic<uint64_t> g_trace_dropped{0};
+
+	// Run control. Plain atomics so an MCP thread can set them while the
+	// AppManager thread is the only one touching Unicorn inside run_cpu.
+	static std::atomic<bool> g_paused{false};
+	static std::atomic<uint64_t> g_step_budget{0};
+	static std::atomic<uint64_t> g_bounded_insns{0};
+	static std::atomic<uint64_t> vm_calls{0};
+
+	void set_paused(bool on) {
+		g_paused.store(on, std::memory_order_relaxed);
+		// Drop any half-spent step budget when pausing: a step is a deliberate,
+		// bounded action and should not silently resume later.
+		if (on) g_step_budget.store(0, std::memory_order_relaxed);
+	}
+	bool paused() { return g_paused.load(std::memory_order_relaxed); }
+	void set_step_budget(uint64_t n) { g_step_budget.store(n, std::memory_order_relaxed); }
+	uint64_t step_budget() { return g_step_budget.load(std::memory_order_relaxed); }
+	uint64_t bounded_instructions() { return g_bounded_insns.load(std::memory_order_relaxed); }
+	uint64_t vm_call_count() { return vm_calls.load(std::memory_order_relaxed); }
+
+	void set_trace_enabled(bool on) {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		trace_on = on;
+	}
+
+	bool trace_enabled() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		return trace_on;
+	}
+
+	bool dispatch_ready() { return func_ptr != nullptr && idle_p != 0; }
+
+std::vector<TraceCall> trace_snapshot() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		return trace_calls;
+	}
+
+	std::vector<std::string> trace_api_names() {
+		std::vector<std::string> n;
+		n.reserve(func_map.size());
+		for (auto& f : func_map)
+			n.push_back(f.name);
+		return n;
+	}
+
+	void trace_clear() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		trace_calls.clear();
+		g_trace_dropped.store(0, std::memory_order_relaxed);
+	}
+
+	uint64_t trace_dropped() { return g_trace_dropped.load(std::memory_order_relaxed); }
+
+	size_t trace_count() {
+		std::lock_guard<std::mutex> lk(trace_mutex);
+		return trace_calls.size();
+	}
+
 	void bridge_hoock(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 		int ind = (address - ADDRESS_TO_EMU(func_ptr)) / 2;
 
-		if (ind > func_map.size())
+		if (ind > (int)func_map.size())
 			abort();
-		//if(ind) printf("--%s-- called -> ", func_map[ind].name.c_str());
+
+		// Always-on activity metric. This hook already runs for every VM call, so
+		// an atomic increment here is essentially free and gives tooling a signal
+		// that works even when the (much more expensive) tracer is off.
+		vm_calls.fetch_add(1, std::memory_order_relaxed);
+
+		bool want = false;
+		{
+			std::lock_guard<std::mutex> lk(trace_mutex);
+			want = trace_on;
+		}
+
+		TraceCall rec{};
+		if (want) {
+			rec.pc = read_reg(uc, UC_ARM_REG_PC);
+			rec.index = (uint32_t)ind;
+			rec.argc = 4;
+			for (int i = 0; i < 4; i++)
+				rec.args_in[i] = read_reg(uc, UC_ARM_REG_R0 + i);
+		}
+
 		func_map[ind].f(uc);
-		//if (ind) printf("%08x\n", read_arg(uc, 0));
+
+		if (want) {
+			rec.ret = read_reg(uc, UC_ARM_REG_R0);
+			std::lock_guard<std::mutex> lk(trace_mutex);
+			if (trace_calls.size() < TRACE_MAX)
+				trace_calls.push_back(rec);
+			else
+				g_trace_dropped.fetch_add(1, std::memory_order_relaxed);
+		}
 	}
 
 	void init() {
@@ -1801,19 +1899,56 @@ int run_cpu(uint32_t adr, int n, ...) {
 		write_reg(uc, UC_ARM_REG_CPSR, cpsr);
 
 		if (!GDB::gdb_mode) {
-			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, g_step_limit);
-			if (err) {
-				std::string reg_dump = Cpu::dumpREG(uc);
-				std::string app_name = Cpu::get_app_name();
-				std::string err_line = fmt::format("[{}] [error] uc_emu_start returned {} ({})\n",
-					app_name, (int)err, uc_strerror(err));
-				std::string full_err = err_line + reg_dump;
+			const uint64_t idle_until = (uint64_t)idle_p & ~1ULL;
+			// Instructions one run_cpu invocation may execute when a step budget is active.
+			//
+			// The budget is deliberately spread over successive VM callbacks rather
+			// than spent inside one: executing many thousands of instructions inside a
+			// single timer/event callback reliably faults this VXP with
+			// UC_ERR_FETCH_UNMAPPED or UC_ERR_WRITE_UNMAPPED at a garbage PC, whereas
+			// one chunk per callback runs indefinitely. See README known issues.
+			const uint64_t RUN_CHUNK = 4096;
 
-				spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
-				printf("%s\n", reg_dump.c_str());
+			// Budget 0 keeps the original behaviour exactly: one uncounted run until
+			// the app returns to its idle handler. A non-zero budget runs at most
+			// RUN_CHUNK instructions in this invocation and leaves the remainder for
+			// the app's next callback, so a step never runs deeply inside one call.
+			uint64_t budget = g_step_budget.load(std::memory_order_relaxed);
+			uint64_t count = 0;
 
-				trigger_hard_reset_with_error(full_err);
-				return 0;
+			if (g_paused.load(std::memory_order_relaxed) && !budget)
+				return read_reg(uc, UC_ARM_REG_R0); // paused with nothing to do
+
+			if (budget) {
+				// An MCP step: at most one chunk per invocation, remainder carried
+				// over to the app's next callback.
+				count = budget < RUN_CHUNK ? budget : RUN_CHUNK;
+				g_bounded_insns.fetch_add(count, std::memory_order_relaxed);
+				g_step_budget.store(budget > count ? budget - count : 0,
+					std::memory_order_relaxed);
+			}
+			else {
+				// --inspect sets a limit for one deliberate run of the app's entry
+				// point. There is no callback to spread it over, so spend it here in
+				// one go, exactly as before.
+				count = g_step_limit;
+			}
+
+			{
+				uc_err err = uc_emu_start(uc, adr, idle_until, 0, count);
+				if (err) {
+					std::string reg_dump = Cpu::dumpREG(uc);
+					std::string app_name = Cpu::get_app_name();
+					std::string err_line = fmt::format("[{}] [error] uc_emu_start returned {} ({})\n",
+						app_name, (int)err, uc_strerror(err));
+					std::string full_err = err_line + reg_dump;
+
+					spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
+					printf("%s\n", reg_dump.c_str());
+
+					trigger_hard_reset_with_error(full_err);
+					return 0;
+				}
 			}
 		}
 		else
