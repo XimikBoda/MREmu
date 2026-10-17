@@ -90,7 +90,9 @@ namespace NativeApps::Menu::AppSelector {
 	VMINT scroll_timer_id = 0;
 
 	struct vel_sample { int y; VMUINT t; };
-	constexpr int kVelSamples = 6;
+	// Sized so the ring can always span the whole kVelWindowMs even on a high rate
+	// touch panel: 24 samples covers 100ms at 240Hz, the fastest rate in practice.
+	constexpr int kVelSamples = 24;
 	vel_sample vel_samples[kVelSamples] = {};
 	int vel_count = 0;
 
@@ -134,17 +136,36 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	// Returns scroll velocity in px/s, or 0 when the finger paused before lifting.
+	//
+	// The window is measured in milliseconds rather than in samples. A fixed sample
+	// count spans a slice of the gesture that depends on the touch report rate - the
+	// old 6 sample ring covered ~50ms at 120Hz but ~200ms at 30Hz - so the same
+	// physical flick produced a different fling speed depending on the device.
+	// Walking back to the oldest sample still inside kVelWindowMs covers the same
+	// amount of time everywhere, which makes the estimate frame rate independent.
 	float vel_release() {
 		if (vel_count < 2) return 0.f;
 
 		const vel_sample& newest = vel_samples[0];
-		const vel_sample& oldest = vel_samples[vel_count - 1];
-		float dt = (float)(newest.t - oldest.t);
-		if (dt <= 0.f || dt > kVelWindowMs)
-			return 0.f;
+
+		// Samples are stored newest first, so walking back stops at the first one
+		// that has aged out of the window.
+		int oldest = 0;
+		for (int i = 1; i < vel_count; ++i) {
+			if (newest.t - vel_samples[i].t <= (VMUINT)kVelWindowMs)
+				oldest = i;
+			else
+				break;
+		}
+
+		const vel_sample& oldest_in_window = vel_samples[oldest];
+		float dt = (float)(newest.t - oldest_in_window.t);
+		// dt == 0 means every sample in range shares a timestamp, or the finger
+		// paused for longer than the window before lifting. Either way: no fling.
+		if (dt <= 0.f) return 0.f;
 
 		// Finger moving up (y decreasing) scrolls content down, hence the minus.
-		float v = -(float)(newest.y - oldest.y) / dt * 1000.f;
+		float v = -(float)(newest.y - oldest_in_window.y) / dt * 1000.f;
 		if (std::abs(v) < kFlingMinSpeed) return 0.f;
 		return std::max(-kMaxFlingSpeed, std::min(kMaxFlingSpeed, v));
 	}
@@ -169,6 +190,12 @@ namespace NativeApps::Menu::AppSelector {
 
 	// Brings the selected item fully into view with the smallest possible movement,
 	// clamped to the scrollable range.
+	//
+	// The item sits at b_h*m_i in the content, so its position has to be measured
+	// relative to the visible window, which currently starts at scroll_pos. Comparing
+	// the raw content offset against h only worked while scroll_pos was 0; once the
+	// list was scrolled, moving the selection near either edge no longer brought the
+	// row on screen.
 	void scroll_to_selection() {
 		float maxs = max_scroll_f();
 		if (maxs <= 0.f) {
@@ -176,7 +203,7 @@ namespace NativeApps::Menu::AppSelector {
 			return;
 		}
 
-		float item_top = (float)b_h * m_i;
+		float item_top = (float)b_h * m_i - (float)scroll_pos;
 		float item_bottom = item_top + (float)b_h;
 
 		float target;
@@ -193,6 +220,13 @@ namespace NativeApps::Menu::AppSelector {
 	// Critically damped spring back to the nearest in-bounds offset. No overshoot,
 	// matching iOS. Returns true only while it still has work to do, so an
 	// in-bounds position reports settled immediately and lets the fling own the tick.
+	//
+	// Integrated in closed form rather than stepped. Explicit integration (v += a*dt
+	// then x += v*dt) is only an approximation, and how far off it lands depends on
+	// how many times it runs, so the settle time changed with the frame rate. The
+	// analytic solution for critical damping, x'' = -2wx' - w^2 x, is
+	// x(t) = (C1 + C2 t) e^(-wt) with C1 = x0 and C2 = v0 + w x0, which gives the
+	// same trajectory for any dt and at any frame rate.
 	bool spring_step(float dt_ms) {
 		float maxs = max_scroll_f();
 
@@ -205,12 +239,18 @@ namespace NativeApps::Menu::AppSelector {
 		float target = scroll_raw < 0.f ? 0.f : maxs;
 
 		float dt = std::min(dt_ms, 100.f) / 1000.f; // 1/10s hitch guard
-		float x = scroll_raw - target;
-		float v = scroll_vel;
+		if (dt <= 0.f)
+			return true;
 
-		float a = -2.f * kSpringW * v - kSpringW * kSpringW * x;
-		v += a * dt;
-		x += v * dt;
+		const float w = kSpringW;
+		const float decay = std::exp(-w * dt);
+		const float x0 = scroll_raw - target;
+		const float v0 = scroll_vel;
+		const float c2 = v0 + w * x0;
+
+		// x'(t) = (C2 - w (C1 + C2 t)) e^(-wt), simplified with C1 = x0.
+		const float x = (x0 + c2 * dt) * decay;
+		const float v = (v0 - w * c2 * dt) * decay;
 
 		if (std::abs(x) < kStopPx && std::abs(v) < kStopVel) {
 			scroll_raw = target;
