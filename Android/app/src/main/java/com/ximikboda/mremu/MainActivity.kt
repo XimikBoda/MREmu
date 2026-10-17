@@ -29,6 +29,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -151,6 +152,12 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
     private val viewModelStoreImpl = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
 
+    /**
+     * The options sheet, held so that onDestroy can dismiss it and so a second
+     * Options tap cannot stack two sheets on the same activity.
+     */
+    private var optionsDialog: android.app.Dialog? = null
+
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val viewModelStore: ViewModelStore get() = viewModelStoreImpl
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
@@ -182,7 +189,19 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
     /** Builds and shows the Compose bottom sheet. Must run on the UI thread. */
     @OptIn(ExperimentalMaterial3Api::class)
     private fun presentOptionsDialog() {
+        // This block is posted from the native render thread, and the native side
+        // caches a single global ref to the activity that is never refreshed, so by
+        // the time it runs the activity may already be finishing. Dialog.show()
+        // against a dead window token throws BadTokenException on the main thread,
+        // which takes the whole process down.
+        if (isFinishing || isDestroyed) return
+        if (optionsDialog?.isShowing == true) return
+
         val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        optionsDialog = dialog
+        dialog.setOnDismissListener {
+            if (optionsDialog === dialog) optionsDialog = null
+        }
         val composeView = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@MainActivity)
             setViewTreeViewModelStoreOwner(this@MainActivity)
@@ -202,7 +221,12 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         }
         dialog.setContentView(composeView)
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-        dialog.show()
+        try {
+            dialog.show()
+        } catch (e: android.view.WindowManager.BadTokenException) {
+            Log.w(TAG, "Options dialog could not be shown", e)
+            if (optionsDialog === dialog) optionsDialog = null
+        }
     }
 
     /**
@@ -300,20 +324,55 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
 
     /** Confirmation now happens on the Clear user data sheet page, so this only clears. */
     private fun performClearUserData() {
-        var removed = 0
-        for (drive in arrayOf("c", "d")) {
-            val root = File("/sdcard/MREmu/fs/$drive")
-            root.walkBottomUp().forEach { entry ->
-                if (entry != root && entry.isFile && entry.delete()) removed++
+        // Walks and unlinks the whole guest fs/c and fs/d trees. On a device with a
+        // few thousand emulated files that is seconds of work, so it must not run on
+        // the main thread: it would ANR with no UI left on screen, because the sheet
+        // has already been dismissed by the time we get here.
+        Thread {
+            var removed = 0
+            var missing = false
+            var errored = false
+            for (drive in arrayOf("c", "d")) {
+                val root = File("/sdcard/MREmu/fs/$drive")
+                if (!root.exists()) {
+                    // Nothing to clear is not the same as cleared successfully, and
+                    // reporting it as success hides a denied MANAGE_EXTERNAL_STORAGE.
+                    missing = true
+                    continue
+                }
+                try {
+                    root.walkBottomUp().forEach { entry ->
+                        if (entry != root && entry.isFile && entry.delete()) removed++
+                    }
+                } catch (e: Exception) {
+                    errored = true
+                    Log.w(TAG, "Clearing drive $drive failed", e)
+                }
             }
-        }
-        Toast.makeText(this, "Cleared user data ($removed files)", Toast.LENGTH_SHORT).show()
+            val message = when {
+                (missing || errored) && removed == 0 -> "Nothing was cleared"
+                errored -> "Cleared user data ($removed files, some failed)"
+                missing -> "Cleared user data ($removed files)"
+                else -> "Cleared user data ($removed files)"
+            }
+            runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
+        }.start()
     }
 
-    private fun appVersion(): String = try {
-        packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
-    } catch (e: Exception) {
-        ""
+    private var cachedVersion: String? = null
+
+    /**
+     * Cached because it is a PackageManager binder round-trip and it is read from a
+     * composable body, so an unmemoised version repeated it on every recomposition.
+     */
+    private fun appVersion(): String {
+        cachedVersion?.let { return it }
+        return try {
+            packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+                .also { cachedVersion = it }
+        } catch (e: Exception) {
+            ""
+        }
     }
 
 private enum class OptionsPage(val title: String) {
@@ -351,6 +410,11 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var showSheet by remember { mutableStateOf(true) }
         val stack = rememberPageBackStack(OptionsPage.Main)
         val page = stack.current
+
+        // ModalBottomSheet dismisses on back press by default, so without this the
+        // platform Back gesture tears down the whole sheet instead of stepping one
+        // level up the page stack, making the sheet's paging unreachable by hand.
+        BackHandler(enabled = stack.canGoBack) { stack.pop() }
 
         if (showSheet) {
             ModalBottomSheet(
@@ -680,9 +744,12 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     }
 
     /**
-     * A destructive confirm button that, instead of needing a separate checkbox, arms
-     * itself with a 3..1 countdown on the first tap. During the countdown the label is
-     * replaced by just the number; the action fires when the countdown reaches zero.
+     * A destructive confirm button that, instead of needing a separate checkbox, runs a
+     * 3..1 countdown as soon as the page it sits on is opened. During the countdown the
+     * label is replaced by just the number; the action fires when the countdown reaches
+     * zero. (The countdown deliberately starts on navigation rather than on the first
+     * tap -- that is the intended design, and the earlier "on the first tap" wording in
+     * this comment was simply wrong about what the code does.)
      */
     @Composable
     private fun DestructiveButton(label: String, remaining: Int, onConfirmed: () -> Unit) {
@@ -721,6 +788,11 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         handleIntent(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+    }
+
     override fun onResume() {
         super.onResume()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
@@ -731,6 +803,24 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         super.onPause()
     }
 
+    override fun onStop() {
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        // This registry used to be left parked in STARTED forever: there was no
+        // onStart, no onStop and no onDestroy, so it never reached DESTROYED and
+        // the ViewModelStore was never cleared. Anything registering a lifecycle
+        // observer through this activity kept posting work after it was gone, and
+        // the options dialog leaked its window.
+        optionsDialog?.dismiss()
+        optionsDialog = null
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        viewModelStoreImpl.clear()
+        super.onDestroy()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         savedStateRegistryController.performSave(outState)
@@ -738,6 +828,8 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        // Without this, getIntent() keeps returning the original VIEW intent.
+        setIntent(intent)
         handleIntent(intent)
     }
 
@@ -831,35 +923,50 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_VIEW) {
-            val uri = intent.data
-            if (uri != null) {
-                Thread {
-                    try {
-                        val tempVxpFile = File(cacheDir, "opened_app.vxp")
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val uri = intent.data ?: return
 
-                        val inputStream = contentResolver.openInputStream(uri)
-                        val outputStream = FileOutputStream(tempVxpFile)
+        // Consume it. getIntent() keeps returning this VIEW intent after
+        // onNewIntent unless it is replaced, so every later recreation (dark mode,
+        // font scale, density, or process death) would re-copy and relaunch the
+        // originally-opened app.
+        intent.action = null
 
-                        inputStream?.use { input ->
-                            outputStream.use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-
-                        val realPosixPath = tempVxpFile.absolutePath
-                        Log.d("MREmu", "File copied to cache: $realPosixPath")
-
-                        runOnUiThread {
-                            nativeLoadVxpFile(realPosixPath)
-                        }
-
-                    } catch (e: Exception) {
-                        Log.e("MREmu", "Coping to cache error", e)
+        Thread {
+            try {
+                val input = contentResolver.openInputStream(uri)
+                if (input == null) {
+                    // Document providers return null for a deleted document or a
+                    // revoked grant. Handing the path to native anyway booted a
+                    // 0-byte image with no visible error.
+                    Log.w("MREmu", "Could not open $uri")
+                    runOnUiThread {
+                        Toast.makeText(this, "Could not open that file", Toast.LENGTH_SHORT).show()
                     }
-                }.start()
+                    return@Thread
+                }
+
+                // Unique per load: the fixed "opened_app.vxp" name meant two VIEW
+                // deliveries wrote the same file concurrently and interleaved into a
+                // corrupt image, because FileOutputStream truncates on open.
+                val tempVxpFile = File.createTempFile("opened_", ".vxp", cacheDir)
+
+                input.use { src ->
+                    FileOutputStream(tempVxpFile).use { src.copyTo(it) }
+                }
+
+                val realPosixPath = tempVxpFile.absolutePath
+                Log.d("MREmu", "File copied to cache: $realPosixPath")
+
+                // Deliberately NOT wrapped in runOnUiThread. nativeLoadVxpFile waits
+                // for g_appManager, which the render thread only publishes part way
+                // through start-up, so calling it on the UI thread blocked the main
+                // thread in a sleep loop for the whole of a cold start.
+                nativeLoadVxpFile(realPosixPath)
+            } catch (e: Exception) {
+                Log.e("MREmu", "Copy to cache error", e)
             }
-        }
+        }.start()
     }
 
     fun triggerVibration(durationMs: Long) {

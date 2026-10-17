@@ -220,6 +220,11 @@ static void request_options_dialog() {
 		jmethodID mid = env->GetMethodID(cls, "showOptionsDialogUi", "()V");
 		if (mid) {
 			env->CallVoidMethod(g_activity, mid);
+			// The call can itself throw (BadTokenException when the activity is
+			// finishing). Leaving that pending and then detaching the thread while
+			// it still owns the exception is undefined and aborts the process.
+			if (env->ExceptionCheck())
+				env->ExceptionClear();
 		}
 		else {
 			env->ExceptionClear();
@@ -239,12 +244,23 @@ Java_com_ximikboda_mremu_MainActivity_requestHardReset(JNIEnv *env, jobject thiz
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thiz, jstring j_path) {
+    if (!j_path)
+        return;
     const char *path_cstr = env->GetStringUTFChars(j_path, nullptr);
+    if (!path_cstr) {
+        // Raises OutOfMemoryError; the callee takes a const char* and would
+        // strlen() a null pointer.
+        env->ExceptionClear();
+        return;
+    }
 
-    while(!g_appManager)
-        sf::sleep(sf::seconds(0.2));
+    // g_appManager is published by the render thread during start-up. Bounded so a
+    // native start-up failure cannot block the calling thread forever.
+    for (int i = 0; i < 300 && !g_appManager; ++i)
+        sf::sleep(sf::milliseconds(100));
 
-    g_appManager->add_app_for_launch(path_cstr, false);
+    if (g_appManager)
+        g_appManager->add_app_for_launch(path_cstr, false);
 
     env->ReleaseStringUTFChars(j_path, path_cstr);
 }

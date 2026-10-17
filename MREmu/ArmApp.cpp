@@ -73,6 +73,12 @@ bool ArmApp::preparation()
 	mem_size = std::max<size_t>(4 * 1024 * 1024, mem_size);
 
 	mem_location = Memory::shared_malloc(mem_size, true, 0x100000);
+	// mem_size comes from get_ram(), a VXP-supplied tag, against a fixed shared
+	// pool. shared_malloc returns 0 when the request does not fit, and the memset
+	// below would then be memset(NULL, ...) -- a deterministic segfault on any app
+	// that asks for more RAM than the pool has.
+	if (!mem_location)
+		return false;
 	memset(mem_location, 0, mem_size);
 
 	offset_mem = ADDRESS_TO_EMU(mem_location);
