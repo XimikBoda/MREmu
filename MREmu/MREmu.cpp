@@ -13,9 +13,9 @@
 #include "Bridge.h"
 #include "App.h"
 #include "AppManager.h"
-#include "Keyboard.h"
-#include "Touch.h"
 #include "Log.h"
+
+#include "Device/Device.h"
 
 #include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
@@ -143,8 +143,7 @@ int main(int argc, char** argv) {
 
 	appManager.start();
 
-	Keyboard keyboard;
-	Touch touch;
+	Device device(win_device, graphic);
 
 	if (app_path.size()) {
 		if (fs::exists(app_path) || path_is_local) {
@@ -156,28 +155,6 @@ int main(int argc, char** argv) {
 	}
 	else
 		appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
-
-
-	int scale = 1;
-	sf::Sprite screen_sp(graphic.screen_tex);
-	touch.screen = &screen_sp;
-	keyboard.screen = &screen_sp;
-
-	auto update_screen_size = [&] {
-		int scale_x = win_device.getSize().x / graphic.width;
-		int scale_y = win_device.getSize().y / (graphic.height + graphic.height / 2);
-
-		scale = std::min(scale_x, scale_y);
-		if (scale < 1)
-			scale = 1;
-
-		screen_sp.setScale(scale, scale);
-		screen_sp.setPosition((win_device.getSize().x - graphic.width * scale) / 2, 0);
-
-		keyboard.update_resize(win_device.getSize().x, win_device.getSize().y);
-	};
-
-	update_screen_size();
 
 	sf::Clock fps;
 
@@ -203,23 +180,8 @@ int main(int argc, char** argv) {
 			}
 		}
 #endif
-
-		while (win_device.pollEvent(event)) {
-			keyboard.event(event);
-			touch.sf_event(event);
-			switch (event.type) {
-			case sf::Event::Closed:
-				win_device.close();
-#ifndef ANDROID
-				win_debug.close();
-#endif
-				break;
-            case sf::Event::Resized:
-                win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
-				update_screen_size();
-                break;
-			}
-		}
+		device.process_events();
+		
 #ifndef ANDROID
 		ImGui::SFML::Update(win_debug, deltaClock.restart());
 
@@ -238,12 +200,7 @@ int main(int argc, char** argv) {
 
 		graphic.update_screen();
 
-		{
-			screen_sp.setTexture(graphic.screen_tex, true);
-			win_device.draw(screen_sp);
-		}
-
-		keyboard.draw(&win_device);
+		device.draw();
 
 #ifndef ANDROID
 		if (ImGui::Begin("Fps")) {
@@ -253,7 +210,7 @@ int main(int argc, char** argv) {
 
 		Cpu::imgui_REG();
 
-		keyboard.imgui_keyboard();
+		device.imgui();
 		graphic.imgui_screen();
 
 		std::lock_guard lock(appManager.active_app_mutex);
