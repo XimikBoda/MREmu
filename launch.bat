@@ -346,7 +346,15 @@ set "ABIPARAM="
 if "%abichoice%"=="1" set "ABIPARAM=arm64-v8a"
 if "%abichoice%"=="2" set "ABIPARAM=armeabi-v7a"
 if "%abichoice%"=="3" set "ABIPARAM=x86_64"
-if not defined ABIPARAM goto android_abi_menu
+if not defined ABIPARAM (
+  rem Without this guard an out-of-range scripted argument re-entered this menu with
+  rem the same %~3 still set and spun forever, printing nothing.
+  if defined once (
+    echo Unknown ABI option "%abichoice%".
+    exit /b 1
+  )
+  goto android_abi_menu
+)
 call :android_build_abi %ABIPARAM%
 if defined once exit /b 0
 goto android_abi_menu
@@ -381,6 +389,10 @@ set "APK_VERSION=%APK_VERSION:"=%"
 set "APK_VERSION=%APK_VERSION:>=%"
 set "APK_OUT=%DL%\MREmu-%ABI%-%APK_VERSION%.apk"
 copy /y "%APK_SRC%" "%APK_OUT%" >nul
+if errorlevel 1 (
+  echo Copy to "%APK_OUT%" failed.
+  exit /b 1
+)
 echo.
 echo Saved: %APK_OUT%
 exit /b 0
