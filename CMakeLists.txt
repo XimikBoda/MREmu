@@ -33,6 +33,16 @@ endif()
 
 set(BUILD_SHARED_LIBS FALSE) 
 
+# Use ccache when available to speed up C++ rebuilds (Android + desktop).
+if(NOT MSVC)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
+    message(STATUS "ccache found: ${CCACHE_PROGRAM}")
+  endif()
+endif()
+
 include_directories("include")
 
 add_subdirectory (deps)

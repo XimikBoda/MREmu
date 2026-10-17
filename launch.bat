@@ -48,6 +48,8 @@ echo   [5] Clean
 echo   [6] Reconfigure + build Release
 echo   [7] Android build menu
 echo.
+echo   Press a listed key. Other keys beep and are ignored.
+echo.
 choice /c:01234567 /n
 if errorlevel 9 goto prompt_menu
 set "choice=%errorlevel%"
@@ -169,6 +171,8 @@ echo   [2] Build Release APK
 echo   [3] Install + Launch Debug APK
 echo   [4] Install + Launch Release APK
 echo   [5] Clean
+echo.
+echo   Press a listed key. Other keys beep and are ignored.
 echo.
 if not "%~2"=="" (
   set "achoice=%~2"
