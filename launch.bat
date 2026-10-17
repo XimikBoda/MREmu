@@ -1,7 +1,7 @@
 @echo off
 rem MREmu launcher: configure, build, run, and clean using the
 rem Visual Studio (Win32 / x86) CMake generator.
-rem   Usage: launch.bat [0-7] [android 0-5]   (no argument = interactive menu)
+rem   Usage: launch.bat [0-7] [android 0-6] [abi 0-3]   (no argument = interactive menu)
 rem     [0] -> exit
 rem     [1] -> build Release
 rem     [2] -> build Debug
@@ -13,6 +13,9 @@ rem     [7] -> Android build menu
 rem   Menu keys take effect immediately; no Enter key needed.
 rem   Pass a second argument to answer the Android menu non-interactively,
 rem   e.g. launch.bat 7 4 -> install + launch the Release APK.
+rem   Android option [6] opens the per-ABI build menu (0=back, 1=arm64-v8a,
+rem   2=armeabi-v7a, 3=x86_64), which also takes a third argument:
+rem   e.g. launch.bat 7 6 2 -> build a Release armeabi-v7a APK into Downloads.
 setlocal
 
 set "ANDROID_PACKAGE=com.ximikboda.mremu"
@@ -171,6 +174,7 @@ echo   [2] Build Release APK
 echo   [3] Install + Launch Debug APK
 echo   [4] Install + Launch Release APK
 echo   [5] Clean
+echo   [6] Build Release APK for a specific ABI -^> Downloads
 echo.
 echo   Press a listed key. Other keys beep and are ignored.
 echo.
@@ -178,8 +182,8 @@ if not "%~2"=="" (
   set "achoice=%~2"
   goto run_achoice
 )
-choice /c:012345 /n
-if errorlevel 7 goto prompt_android
+choice /c:0123456 /n
+if errorlevel 8 goto prompt_android
 set "achoice=%errorlevel%"
 set /a achoice-=1
 goto run_achoice
@@ -187,7 +191,7 @@ goto run_achoice
 rem Fallback if choice is unavailable.
 :prompt_android
 set "achoice="
-set /p "achoice=Choose 0-5: "
+set /p "achoice=Choose 0-6: "
 
 :run_achoice
 set "achoice=%achoice: =%"
@@ -200,6 +204,7 @@ if "%achoice%"=="2" goto android_release
 if "%achoice%"=="3" goto android_install
 if "%achoice%"=="4" goto android_install_release
 if "%achoice%"=="5" goto android_clean
+if "%achoice%"=="6" goto android_abi_menu
 if defined once (
   echo Unknown Android option "%achoice%".
   exit /b 1
@@ -304,6 +309,80 @@ if errorlevel 1 (
   exit /b 1
 )
 echo MREmu launched.
+exit /b 0
+
+:android_abi_menu
+echo.
+echo   Build a Release APK for which ABI?
+echo   [0] Back
+echo   [1] arm64-v8a
+echo   [2] armeabi-v7a
+echo   [3] x86_64
+echo.
+echo   Press a listed key. Other keys beep and are ignored.
+echo.
+if not "%~3"=="" (
+  set "abichoice=%~3"
+  goto run_abichoice
+)
+choice /c:0123 /n
+if errorlevel 5 goto prompt_abi
+set "abichoice=%errorlevel%"
+set /a abichoice-=1
+goto run_abichoice
+
+rem Fallback if choice is unavailable.
+:prompt_abi
+set "abichoice="
+set /p "abichoice=Choose 0-3: "
+
+:run_abichoice
+set "abichoice=%abichoice: =%"
+if "%abichoice%"=="0" (
+  if defined once exit /b 0
+  goto android_menu
+)
+set "ABIPARAM="
+if "%abichoice%"=="1" set "ABIPARAM=arm64-v8a"
+if "%abichoice%"=="2" set "ABIPARAM=armeabi-v7a"
+if "%abichoice%"=="3" set "ABIPARAM=x86_64"
+if not defined ABIPARAM goto android_abi_menu
+call :android_build_abi %ABIPARAM%
+if defined once exit /b 0
+goto android_abi_menu
+
+rem Builds a Release APK for one ABI and copies it to the user's Downloads as
+rem MREmu-<abi>-<version>.apk. Uses -PmremuAbis so the per-ABI native build is
+rem isolated from the default single-ABI dev build. Only exit /b here; a goto out
+rem of a called subroutine would break the caller's context.
+:android_build_abi
+set "ABI=%~1"
+echo.
+echo Building Release APK for %ABI%...
+cd /d "%ANDROID_DIR%"
+call gradlew.bat assembleRelease -PmremuAbis=%ABI%
+set "ANDROID_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%ANDROID_RC%"=="0" (
+  echo Release build for %ABI% failed.
+  exit /b %ANDROID_RC%
+)
+set "APK_SRC=%ANDROID_DIR%\app\build\outputs\apk\release\app-release.apk"
+if not exist "%APK_SRC%" (
+  echo APK not found: "%APK_SRC%".
+  exit /b 1
+)
+set "DL=%USERPROFILE%\Downloads"
+if not exist "%DL%" mkdir "%DL%"
+set "APK_VERSION=unknown"
+for /f "tokens=2 delims==" %%V in ('findstr /c:"android:versionName=" "%ANDROID_DIR%\app\src\main\AndroidManifest.xml"') do set "APK_VERSION=%%V"
+rem %%V is like "1.0"> ; drop the surrounding quote and the closing bracket.
+set "APK_VERSION=%APK_VERSION:"=%"
+set "APK_VERSION=%APK_VERSION:>=%"
+set "APK_OUT=%DL%\MREmu-%ABI%-%APK_VERSION%.apk"
+copy /y "%APK_SRC%" "%APK_OUT%" >nul
+echo.
+echo Saved: %APK_OUT%
 exit /b 0
 
 :android_debug
