@@ -37,6 +37,25 @@ Append `--offline` to any Gradle command:
 ./gradlew ... -q 2>&1 | tail -40
 ```
 
+## Desktop (non-Android) tooling
+
+The desktop target additionally builds `McpServer.cpp` and `McpHost.cpp`, which are
+excluded on Android. Desktop-only changes still need a desktop build to be verified:
+
+```
+cmake --build build --config Release      # from repo root -> bin\Release\MREmu.exe
+```
+
+Once built, the emulator can be driven without a display:
+
+- `MREmu.exe <vxp> --json out.json --steps 2000 --screen shot.png --inspect` — one-shot
+  report. Note `--steps` above ~5,000 crashes; see README known issues.
+- `MREmu.exe <vxp> --mcp` — MCP server over stdio (12 tools: status, registers,
+  pause/step/resume, screen, errors, VM API tracer). Registered in the user's OpenCode
+  config as the `mremu` MCP server.
+- `python C:\Users\User\Downloads\Opera Mini 6.1-analysis\test_mcp.py` — the stdio test
+  suite that exercises every tool end to end.
+
 ## Rules the agent must follow
 
 1. **NEVER run `clean` or `./gradlew --stop`.** Both throw away the warm Gradle daemon and caches, forcing a full rebuild.
