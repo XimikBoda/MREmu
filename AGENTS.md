@@ -46,7 +46,9 @@ excluded on Android. Desktop-only changes still need a desktop build to be verif
 cmake --build build --config Release      # from repo root -> bin\Release\MREmu.exe
 ```
 
-Once built, the emulator can be driven without a display:
+Once built, the emulator can be driven without a display. For the user-facing guide to the
+MCP server — client setup, every tool, and the behaviours that surprise people — see
+[docs/mcp.md](docs/mcp.md):
 
 - `MREmu.exe <vxp> --json out.json --steps 2000 --screen shot.png --inspect` — one-shot
   report. Note `--steps` above ~5,000 crashes; see README known issues.
@@ -95,6 +97,7 @@ Android/          Gradle Android project (settings.gradle, build.gradle, gradle.
 MREmu/            C++ emulator core (+ jni/ for Android JNI bridge)
 include/          Public headers (elfio, cmdparser, gif)
 deps/             Third-party CMake dependencies
+docs/             User documentation (build_instructions/, mcp.md)
 bin/              Build output root
 build/            Root build artifacts (gitignored)
 ```
