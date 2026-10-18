@@ -167,6 +167,52 @@ void master_blt(
 	}
 }
 
+// An app that renders its UI into a canvas it created itself has no path to the
+// display: only layers reach graphic->screen (see vm_graphic_flush_layer below),
+// and a canvas is not a layer. Opera Mini 6.1 does exactly this for its settings
+// list - it allocates a 240x320 canvas, draws every row label into it, and the
+// labels never appear because nothing composites that canvas.
+//
+// Composite display-sized canvases first so they act as the background, then let
+// the layer pass draw chrome over them.
+//
+// The exact size match is deliberate. An app also owns scratch canvases it never
+// intends to present (Opera Mini allocates a 320x4 rule and a 320x16 text row),
+// and presenting those would smear them across the screen. Only a canvas the same
+// size as the display is a plausible full-screen UI surface.
+static void composite_display_sized_canvases(MREngine::AppGraphic& gr) {
+	if (!graphic)
+		return;
+
+	std::lock_guard lock(gr.canvases_list_mutex);
+
+	for (const auto& entry : gr.canvases_list) {
+		MREngine::canvas_signature* cs = (MREngine::canvas_signature*)entry.first;
+		if (!cs || memcmp(cs->magic, CANVAS_MAGIC, 9))
+			continue;
+		if (cs->color_format != VM_GRAPHIC_COLOR_FORMAT_16)
+			continue;
+
+		MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
+		if (cfp->width != graphic->width || cfp->height != graphic->height)
+			continue;
+
+		uint16_t* src = (uint16_t*)(cfp + 1);
+		// Same transparency rule the layer pass uses: honour the canvas's own
+		// transparent colour, and treat "no transparency" as none.
+		const int trans = cfp->flag ? (int)cfp->trans_color : -1;
+
+		for (int sy = 0; sy < graphic->height; ++sy) {
+			for (int sx = 0; sx < graphic->width; ++sx) {
+				uint16_t color = src[sy * cfp->width + sx];
+				if ((int)color == trans)
+					continue;
+				graphic->screen[sy * graphic->width + sx] = color;
+			}
+		}
+	}
+}
+
 VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 	if (layer_handles == 0)
 		return -1;
@@ -184,6 +230,9 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 
 		sf::sleep(sf::microseconds(frame_delay - now));
 	}
+
+	// Background first, then the layer pass draws chrome over it.
+	composite_display_sized_canvases(gr);
 
 	for (int sy = 0; sy < graphic->height; ++sy)
 		for (int sx = 0; sx < graphic->width; ++sx)

@@ -63,6 +63,15 @@ Once built, the emulator can be driven without a display:
   swallowed as an *argument to the previous flag*. So `--mcp-window` must be declared as
   `"mcp-window"` (a `mcp_window` declaration makes `--mcp` fail with
   "The parameter m has invalid arguments"), and a bool flag must be the last token.
+- Canvas buffer convention: a **layer** hands out its pixel pointer (`base_buf1`), but
+  `vm_graphic_get_canvas_buffer` hands out the **canvas base**. `find_canvas_signature()`
+  accepts both; any draw routine that hand-rolls `buf - VM_CANVAS_DATA_OFFSET` will fail
+  the magic check and silently draw nothing for app-owned canvases. Use the helper.
+- Only `vm_graphic_flush_layer` writes `graphic->screen` from layers. App canvases are
+  otherwise never presented, so `vm_graphic_flush_layer` composites display-sized
+  (exactly 240x320) canvases underneath first. The exact size match is deliberate — apps
+  also own scratch canvases (Opera Mini allocates a 320x4 rule and a 320x16 text row) that
+  must not be presented.
 - `python C:\Users\User\Downloads\Opera Mini 6.1-analysis\test_mcp.py` — the stdio test
   suite that exercises every tool end to end.
 - `python C:\Users\User\Downloads\Opera Mini 6.1-analysis\test_mcp_window.py` — the same

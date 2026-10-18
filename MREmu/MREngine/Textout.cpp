@@ -148,8 +148,13 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	if (disp_buf == 0 || !s)
 		return;
 
-	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(disp_buf - VM_CANVAS_DATA_OFFSET);
-	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9))
+	// Accept both buffer conventions. A layer hands out its pixel pointer, but
+	// vm_graphic_get_canvas_buffer hands out the canvas base, and an app drawing
+	// into a canvas it created passes that base straight in. Assuming only the
+	// pixel form made every text draw into an app canvas fail the magic check and
+	// silently draw nothing.
+	MREngine::canvas_signature* cs_dst = find_canvas_signature(disp_buf);
+	if (!cs_dst)
 		return;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
