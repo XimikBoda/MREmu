@@ -60,9 +60,9 @@ bool ArmApp::preparation()
 	if (!tags.load(file_context))
 		return false;
 
-	app_name = (const char*)tags.get_app_name().c_str();
+	app_name = tags.get_app_name();
 	if (!app_name.size())
-		app_name = real_path.stem().string();
+		app_name = real_path.stem().u8string();
 
 	resources.file_context = &file_context;
 

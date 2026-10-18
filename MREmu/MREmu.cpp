@@ -59,6 +59,10 @@ int main(int argc, char** argv) {
     std::string app_path = "";
     bool path_is_local = false;
 
+#ifdef WIN32
+	SetConsoleOutputCP(CP_UTF8);
+#endif
+
 	Log::set_module("Main");
 	spdlog::set_level(spdlog::level::debug);
 

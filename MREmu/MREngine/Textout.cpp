@@ -12,6 +12,10 @@
 
 extern MREngine::Graphic* graphic;
 
+static bool is_skip_symbol(VMWCHAR c) {
+	return c < 0x20 || c == 0x7F;
+}
+
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 	sf::Image im;
 	int w = vm_graphic_get_string_width((VMWSTR)str.c_str());
@@ -24,6 +28,9 @@ sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 
 	int x_off = 0;
 	for (int i = 0; i < str.length(); ++i) {
+		if (is_skip_symbol(str[i]))
+			continue;
+
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)str[i]];
 
 		int ch_d = unifont_15_1_04_bin[data_offset];
@@ -33,7 +40,7 @@ sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 		if (x_off >= w)
 			break;
 
-		int st_x = 0;
+		int st_x = x_off;
 		int end_x = std::min<int>(w, x_off + ch_w + 1);
 
 		for (int sy = st_y; sy < end_y; ++sy) {
@@ -59,10 +66,6 @@ sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 	sf::Texture tex;
 	tex.loadFromImage(im);
 	return tex;
-}
-
-static bool is_skip_symbol(VMWCHAR c) {
-	return c < 0x20 || c == 0x7F;
 }
 
 VMINT vm_graphic_get_character_height(void) {
