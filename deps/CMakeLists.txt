@@ -1,5 +1,7 @@
 set(BUILD_SHARED_LIBS FALSE) 
 
+set(CMAKE_FOLDER "Deps")
+
 add_subdirectory(SFML)
 
 add_subdirectory(imgui)
@@ -20,3 +22,5 @@ set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures")
 add_subdirectory(unicorn) 
 
 add_subdirectory(asio.cmake) 
+
+unset(CMAKE_FOLDER)

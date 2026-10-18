@@ -1,5 +1,7 @@
 ﻿cmake_minimum_required (VERSION 3.8)
 
+set(CMAKE_FOLDER "MREmu")
+
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
 						"Memory.cpp" "Memory.h" 
@@ -57,3 +59,5 @@ endif()
 add_subdirectory (MREngine)
 add_subdirectory (NativeApps)
 add_subdirectory (Device)
+
+unset(CMAKE_FOLDER)
