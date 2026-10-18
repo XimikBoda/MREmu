@@ -435,6 +435,85 @@ namespace NativeApps::Menu::AppSelector {
 
 	void update_confirm_sheet(const vxp& app);
 
+	// Counts what a folder holds, so the details sheet can say something useful
+	// about it. Only .vxp files and subfolders are counted, matching what scan()
+	// would actually list, so the number matches what opening it shows.
+	struct dir_counts { int apps = 0; int folders = 0; };
+
+	dir_counts count_dir(const std::u16string& path) {
+		dir_counts c;
+		std::u16string pattern = path;
+		if (pattern.empty() || pattern.back() != u'\\')
+			pattern += u'\\';
+		pattern += u"*";
+
+		vm_fileinfo_ext e;
+		for (int h = vm_find_first_ext((VMWSTR)pattern.c_str(), &e);
+			h >= 0;
+			h = vm_find_next_ext(h, &e)) {
+			std::u16string name = (char16_t*)e.filefullname;
+			if (name == u"." || name == u"..")
+				continue;
+
+			if (e.attributes & VM_FS_ATTR_DIR) {
+				c.folders++;
+				continue;
+			}
+			if (name.size() < 4)
+				continue;
+			std::u16string ext = name.substr(name.size() - 4);
+			for (auto& ch : ext)
+				ch = (char16_t)std::tolower((char)ch);
+			if (ext == u".vxp")
+				c.apps++;
+		}
+		return c;
+	}
+
+	// Mirror of update_details_sheet for a folder. There is no Delete here on
+	// purpose - removing a folder is not something this does, and offering the
+	// button would imply it. Left opens the folder, right closes.
+	void update_dir_details_sheet(const vxp& dir) {
+		details_sheet.set_title(u"Folder Details");
+		details_sheet.clear_lines();
+		details_sheet.add_line(u"Folder: " + dir.name);
+
+		// Paths are long and the sheet is narrow, so let them scroll.
+		details_sheet.add_line(dir.path, 0xFFFF, true);
+
+		dir_counts c = count_dir(dir.path);
+		std::string s = "Contents: " + std::to_string(c.apps)
+			+ (c.apps == 1 ? " app, " : " apps, ")
+			+ std::to_string(c.folders)
+			+ (c.folders == 1 ? " folder" : " folders");
+		details_sheet.add_line(std::u16string(s.begin(), s.end()), 0xFFFF, false);
+
+		std::u16string open_path = dir.path;
+
+		details_sheet.set_left_action(u"Open", [open_path]() {
+			details_sheet.hide();
+			current_dir = open_path;
+			m_i = 0;
+			set_scroll_pos(0);
+			scan();
+			reset_marquee();
+			trigger_scrollbar();
+			draw();
+		}, VM_COLOR_888_TO_565(180, 180, 180), false);
+
+		details_sheet.set_right_action(u"Close", []() {
+			details_sheet.hide();
+			reset_marquee();
+			draw();
+		}, 0xFFFF, true);
+
+		details_sheet.set_on_dismiss([]() {
+			details_sheet.hide();
+			reset_marquee();
+			draw();
+		});
+	}
+
 	void update_details_sheet(const vxp& app) {
 		details_sheet.set_title(u"App Details");
 		details_sheet.clear_lines();
@@ -710,8 +789,12 @@ namespace NativeApps::Menu::AppSelector {
 					m_i = 0;
 				break;
 			case VM_KEY_LEFT_SOFTKEY:
-				if (!vxps.empty() && !vxps[m_i].is_dir) {
-					update_details_sheet(vxps[m_i]);
+				if (!vxps.empty()) {
+					// Folders get their own sheet; only apps have a Delete.
+					if (vxps[m_i].is_dir)
+						update_dir_details_sheet(vxps[m_i]);
+					else
+						update_details_sheet(vxps[m_i]);
 					details_sheet.show();
 					reset_marquee();
 					draw();
@@ -836,12 +919,17 @@ namespace NativeApps::Menu::AppSelector {
 				break;
 			case VM_PEN_EVENT_LONG_TAP: {
 				int item = (y + scroll_pos) / b_h;
-				if (item >= 0 && item < (int)vxps.size() && !vxps[item].is_dir) {
+				if (item >= 0 && item < (int)vxps.size()) {
 					m_i = item;
-					update_details_sheet(vxps[m_i]);
+					if (vxps[m_i].is_dir)
+						update_dir_details_sheet(vxps[m_i]);
+					else
+						update_details_sheet(vxps[m_i]);
 					details_sheet.show();
 					reset_marquee();
-					DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
+					// Only a real app is worth remembering as the last selection.
+					if (!vxps[m_i].is_dir)
+						DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
 					draw();
 				}
 				break;
