@@ -13,19 +13,22 @@
 VMWSTR ucs2_buf = 0;
 
 void MREngine::CharSet::init() {
-	ucs2_buf = (VMWSTR)Memory::shared_malloc(256);
+	ucs2_buf = (VMWSTR)Memory::shared_malloc(256 * 2);
+}
+
+static void do_iconv(iconv_t ch, char* in_buf, size_t in_size, char* out_buf, size_t out_size, size_t* written) {
+	char* in_ptr = in_buf;
+	char* out_ptr = out_buf;
+	iconv(ch, (const char**)&in_ptr, &in_size, &out_ptr, &out_size);
+	if (written) *written = out_ptr - out_buf;
 }
 
 VMINT vm_ucs2_to_gb2312(VMSTR dst, VMINT size, VMWSTR src) {
 	iconv_t ch = iconv_open("GB2312//TRANSLIT", "UCS-2LE");
-
-	const char* in_ptr = (char*)src;
-	char* out_ptr = dst;
+	if (ch == (iconv_t)-1) return VM_CHSET_CONVERT_ERR_PARAM;
 
 	size_t in_size = vm_wstrlen(src) * 2 + 2;
-	size_t out_size = size;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	do_iconv(ch, (char*)src, in_size, dst, size, NULL);
 
 	iconv_close(ch);
 	return VM_CHSET_CONVERT_SUCCESS;
@@ -33,14 +36,10 @@ VMINT vm_ucs2_to_gb2312(VMSTR dst, VMINT size, VMWSTR src) {
 
 VMINT vm_gb2312_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	iconv_t ch = iconv_open("UCS-2LE//TRANSLIT", "GB2312");
+	if (ch == (iconv_t)-1) return VM_CHSET_CONVERT_ERR_PARAM;
 
-	const char* in_ptr = src;
-	char* out_ptr = (char*)dst;
-
-	size_t in_size = strlen(in_ptr) + 1;
-	size_t out_size = size;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t in_size = strlen(src) + 1;
+	do_iconv(ch, src, in_size, (char*)dst, size, NULL);
 
 	iconv_close(ch);
 	return VM_CHSET_CONVERT_SUCCESS;
@@ -48,14 +47,10 @@ VMINT vm_gb2312_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 
 VMINT vm_ucs2_to_ascii(VMSTR dst, VMINT size, VMWSTR src) {
 	iconv_t ch = iconv_open("ASCII//TRANSLIT", "UCS-2LE");
-
-	const char* in_ptr = (char*)src;
-	char* out_ptr = dst;
+	if (ch == (iconv_t)-1) return VM_CHSET_CONVERT_ERR_PARAM;
 
 	size_t in_size = vm_wstrlen(src) * 2 + 2;
-	size_t out_size = size;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	do_iconv(ch, (char*)src, in_size, dst, size, NULL);
 
 	iconv_close(ch);
 	return VM_CHSET_CONVERT_SUCCESS;
@@ -63,14 +58,10 @@ VMINT vm_ucs2_to_ascii(VMSTR dst, VMINT size, VMWSTR src) {
 
 VMINT vm_ascii_to_ucs2(VMWSTR dst, VMINT size, VMSTR src) {
 	iconv_t ch = iconv_open("UCS-2LE//TRANSLIT", "ASCII");
+	if (ch == (iconv_t)-1) return VM_CHSET_CONVERT_ERR_PARAM;
 
-	const char* in_ptr = src;
-	char* out_ptr = (char*)dst;
-
-	size_t in_size = strlen(in_ptr) + 1;
-	size_t out_size = size;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t in_size = strlen(src) + 1;
+	do_iconv(ch, src, in_size, (char*)dst, size, NULL);
 
 	iconv_close(ch);
 	return VM_CHSET_CONVERT_SUCCESS;
@@ -128,17 +119,11 @@ VMINT vm_chset_convert(vm_chset_enum src_type, vm_chset_enum dest_type, VMCHAR* 
 		return VM_CHSET_CONVERT_ERR_PARAM;
 
 	iconv_t ch = iconv_open(iconv_names[dest_type], iconv_names[src_type]);
+	if (ch == (iconv_t)-1) return VM_CHSET_CONVERT_ERR_PARAM;
 
-	if (ch == (iconv_t)-1)
-		return VM_CHSET_CONVERT_ERR_PARAM;
+	size_t in_size = strlen(src) + 1;
 
-	const char* in_ptr = src;
-	char* out_ptr = dest;
-
-	size_t in_size = CONVERT_CHSET_MAX_LEN; // WARNING
-	size_t out_size = dest_size;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	do_iconv(ch, src, in_size, dest, dest_size, NULL);
 
 	iconv_close(ch);
 	return VM_CHSET_CONVERT_SUCCESS;
@@ -159,107 +144,89 @@ VMWSTR vm_ucs2_string(VMSTR s) {
 
 std::u8string ucs2_to_utf8(VMWSTR src) {
 	iconv_t ch = iconv_open("UTF-8//IGNORE", "UCS-2LE");
+	if (ch == (iconv_t)-1 || !src) return u8"";
 
-	const char* in_ptr = (char*)src;
 	size_t len = vm_wstrlen(src);
 	size_t in_size = len * 2;
-
 	size_t buf_size = len * 3;
 	std::vector<uint8_t> buf(buf_size, 0);
-	char* out_ptr = (char*)buf.data();
-	size_t out_size = buf_size;
 
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t written = 0;
+	do_iconv(ch, (char*)src, in_size, (char*)buf.data(), buf_size, &written);
 
 	iconv_close(ch);
-
-	return std::u8string((char8_t*)buf.data(), buf_size - out_size);
+	return std::u8string((char8_t*)buf.data(), written);
 }
 
 std::u8string ucs2_to_utf8(std::u16string src) {
 	iconv_t ch = iconv_open("UTF-8//IGNORE", "UCS-2LE");
+	if (ch == (iconv_t)-1 || src.empty()) return u8"";
 
-	const char* in_ptr = (char*)src.data();
-	size_t len = src.size();
-	size_t in_size = len * 2;
+	size_t in_size = src.size() * 2;
+	size_t buf_size = src.size() * 3;
+	std::vector<char8_t> buf(buf_size, 0);
 
-	size_t buf_size = len * 3;
-	std::vector<uint8_t> buf(buf_size, 0);
-	char* out_ptr = (char*)buf.data();
-	size_t out_size = buf_size;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t written = 0;
+	do_iconv(ch, (char*)src.data(), in_size, (char*)buf.data(), buf_size, &written);
 
 	iconv_close(ch);
-
-	return std::u8string((char8_t*)buf.data(), buf_size - out_size);
+	return std::u8string((char8_t*)buf.data(), written);
 }
 
 void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size) {
 	iconv_t ch = iconv_open("UCS-2LE//IGNORE", "UTF-8");
+	if (ch == (iconv_t)-1) return;
 
-	const char* in_ptr = (char*)src.c_str();
-	size_t in_size = src.size() + 1;
-
-	char* out_ptr = (char*)dest;
-	size_t out_size = size * 2;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t in_size = src.size() + 1; 
+	do_iconv(ch, (char*)src.data(), in_size, (char*)dest, size * 2, NULL);
 
 	iconv_close(ch);
 }
 
 std::u8string gb2312_to_utf8(std::string src) {
 	iconv_t ch = iconv_open("UTF-8//IGNORE", "GB2312");
+	if (!src.size() || ch == (iconv_t)-1) return u8"";
 
-	const char* in_ptr = (char*)src.data();
-	size_t len = src.size();
-	size_t in_size = len * 2;
+	size_t in_size = src.size();
+	size_t buf_size = in_size * 3;
+	std::vector<char8_t> buf(buf_size, 0);
 
-	size_t buf_size = len * 3;
-	std::vector<uint8_t> buf(buf_size, 0);
-	char* out_ptr = (char*)buf.data();
-	size_t out_size = buf_size;
-
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t written = 0;
+	do_iconv(ch, src.data(), in_size, (char*)buf.data(), buf_size, &written);
 
 	iconv_close(ch);
-
-	return std::u8string((char8_t*)buf.data(), buf_size - out_size);
+	return std::u8string(buf.data(), written);
 }
 
 std::u16string utf8_to_utf16(std::u8string src) {
 	iconv_t ch = iconv_open("UCS-2LE//IGNORE", "UTF-8");
+	if (ch == (iconv_t)-1 || src.empty()) return u"";
 
-	const char* in_ptr = (char*)src.c_str();
-	size_t len = src.size();
-	size_t in_size = len;
+	size_t in_size = src.size();
+	size_t chars_count = in_size;
 
-	size_t buf_size = len * 3;
-	std::vector<uint8_t> buf(buf_size, 0);
-	char* out_ptr = (char*)buf.data();
-	size_t out_size = buf_size;
+	std::vector<char16_t> buf(chars_count, 0);
+	size_t buf_size_bytes = chars_count * sizeof(char16_t);
 
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t written_bytes = 0;
+	do_iconv(ch, (char*)src.data(), in_size, (char*)buf.data(), buf_size_bytes, &written_bytes);
 
 	iconv_close(ch);
-
-	return std::u16string((char16_t*)buf.data(), (buf_size - out_size) / 2);
+	return std::u16string(buf.data(), written_bytes / sizeof(char16_t));
 }
 
 std::string utf8_to_ascii(std::u8string src) {
 	iconv_t ch = iconv_open("ASCII//TRANSLIT", "UTF-8");
+	if (ch == (iconv_t)-1 || src.empty()) return "";
 
-	const char* in_ptr = (char*)src.c_str();
-	size_t in_size = src.size() + 1;
+	size_t in_size = src.size();
+	size_t buf_size = in_size;
 
-	std::vector<uint8_t> buf(in_size * 2, 0);
-	char* out_ptr = (char*)buf.data();
-	size_t out_size = buf.size();
+	std::vector<char> buf(buf_size, 0);
 
-	size_t res = iconv(ch, &in_ptr, &in_size, &out_ptr, &out_size);
+	size_t written = 0;
+	do_iconv(ch, (char*)src.data(), in_size, buf.data(), buf_size, &written);
 
 	iconv_close(ch);
-
-	return std::string((char*)buf.data());
+	return std::string(buf.data(), written);
 }
