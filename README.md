@@ -40,7 +40,8 @@ agents use for other tools. That means an agent can start the emulator and then 
 questions: *what is running, what are the CPU registers, what does the screen look like,
 what broke?*
 
-Nothing is displayed, so it works on a headless machine, over SSH, or in CI.
+Nothing is displayed, so it works on a headless machine, over SSH, or in CI. If you want to
+watch it as well, add `--mcp-window` — see below.
 
 #### Setting it up
 
@@ -61,6 +62,26 @@ Point your agent at the executable and give it two arguments — the app to load
 
 The same works for Claude Code and other MCP clients. If you leave the app path out, the
 emulator starts empty and the agent can load apps itself.
+
+#### Watching what the agent is doing
+
+Because `--mcp` shows nothing, it can be hard to tell an agent's careful stepping apart
+from a hang. Add `--mcp-window` and you get the emulator window back:
+
+```
+MREmu.exe <app.vxp> --mcp --mcp-window
+```
+
+Nothing about the protocol changes — the agent still connects over stdin/stdout and uses
+exactly the same tools. You simply also get a window showing the emulated screen, with a
+line of text underneath it saying whether the app is running or paused, how many VM calls
+it has made, whether the call tracer is on, and whether anything faulted. The window title
+shows the same thing, so the state is readable even when the window is behind something
+else. Close the window and the whole thing shuts down.
+
+If you would rather not change the command line — an MCP client is usually configured once
+with a fixed list of arguments — set `MREMU_MCP_WINDOW=1` in the server's environment
+instead. It has the same effect.
 
 #### What the agent can do
 

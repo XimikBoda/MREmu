@@ -53,8 +53,21 @@ Once built, the emulator can be driven without a display:
 - `MREmu.exe <vxp> --mcp` — MCP server over stdio (12 tools: status, registers,
   pause/step/resume, screen, errors, VM API tracer). Registered in the user's OpenCode
   config as the `mremu` MCP server.
+- `MREmu.exe <vxp> --mcp --mcp-window` — same server, plus a real window showing the
+  emulated screen and a status line (run state, VM call count, trace, fault) so a human can
+  watch an agent work. The protocol thread moves to a worker because Win32 delivers window
+  messages to the creating thread; closing the window exits the process via `std::_Exit`
+  (the protocol thread is parked reading stdin, so running static destructors would race
+  it). `MREMU_MCP_WINDOW=1` in the environment does the same without a CLI flag.
+- `cmdparser` gotcha: long names are matched **exactly**, and an unrecognised `-`-token is
+  swallowed as an *argument to the previous flag*. So `--mcp-window` must be declared as
+  `"mcp-window"` (a `mcp_window` declaration makes `--mcp` fail with
+  "The parameter m has invalid arguments"), and a bool flag must be the last token.
 - `python C:\Users\User\Downloads\Opera Mini 6.1-analysis\test_mcp.py` — the stdio test
   suite that exercises every tool end to end.
+- `python C:\Users\User\Downloads\Opera Mini 6.1-analysis\test_mcp_window.py` — the same
+  tools through `--mcp --mcp-window`, plus an `EnumWindows` check that a real visible window
+  opened and that its title tracks the agent's run state. A window flashes on screen.
 
 ## Rules the agent must follow
 

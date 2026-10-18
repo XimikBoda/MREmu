@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <fstream>
+#include <cstdlib>
 
 #include "imgui.h"
 #include "imgui-SFML.h"
@@ -463,6 +464,94 @@ static int run_inspection(MREngine::Graphic& graphic,
 	}
 	return rc;
 }
+
+// ---------------------------------------------------------------------------
+// Watchable MCP mode
+// ---------------------------------------------------------------------------
+//   MREmu.exe <vxp> --mcp --mcp-window
+//
+// Plain --mcp is headless so it works on a machine with no display, but then a
+// human cannot see the emulator at all, which makes an agent's steps hard to
+// tell apart from a hang. This variant leaves the JSON-RPC server exactly as it
+// is and adds a window mirroring the emulated screen plus a status line saying
+// what the agent is doing (run state, VM call count, trace, fault).
+//
+// Threading: the window stays on this thread. Win32 delivers a window's messages
+// to the thread that created it, so polling events from the pump thread would
+// leave the window deaf to its own close button and to repaints. The protocol
+// moves to a worker thread instead and the render loop runs on the main one.
+static std::string mcp_status_line(const Mcp::Snapshot& s) {
+	std::string t = "mcp ";
+	t += s.run_state;
+	t += "  calls=" + std::to_string(s.vm_calls);
+	if (s.step_budget)
+		t += "  step=" + std::to_string(s.stepped_instructions);
+	if (s.trace_ready)
+		t += "  trace";
+	if (s.faulted)
+		t += "  FAULT";
+	// Unifont glyphs are 8-16px wide, so the window just clips a longer line.
+	if (t.size() > 56) t.resize(56);
+	return t;
+}
+
+static void run_mcp_window(MREngine::Graphic& graphic, Mcp::Control& ctl,
+	const std::atomic<bool>& client_gone)
+{
+	sf::RenderWindow win(sf::VideoMode(graphic.width, graphic.height + 208),
+		"MREmu (MCP)");
+	win.setVerticalSyncEnabled(true);
+
+	sf::Sprite sp(graphic.screen_tex);
+	sf::Texture status_tex;
+	std::string last_status, last_title;
+
+	while (win.isOpen() && !client_gone.load() && !McpHost::quitting()) {
+		sf::Event ev;
+		while (win.pollEvent(ev)) {
+			if (ev.type == sf::Event::Closed)
+				win.close();
+		}
+
+		const Mcp::Snapshot snap = ctl.snapshot();
+
+		// Same order as the GUI loop: refresh the texture from the framebuffer the
+		// app thread writes, then draw it.
+		graphic.update_screen();
+		sp.setTexture(graphic.screen_tex, true);
+
+		const std::string status = mcp_status_line(snap);
+		win.clear(sf::Color::Black);
+		win.draw(sp);
+
+		// Status line sits in the band under the screen, where the GUI shows the
+		// keyboard. Re-rasterise only when it changes: u16text_to_texture walks
+		// glyphs out of the embedded unifont on every call.
+		if (status != last_status) {
+			status_tex = u16text_to_texture(
+				std::u16string(status.begin(), status.end()),
+				snap.faulted ? sf::Color(255, 96, 96)
+					: (snap.run_state == "paused" ? sf::Color(255, 224, 96)
+						: sf::Color::White));
+			last_status = status;
+		}
+		if (status_tex.getSize().x) {
+			sf::Sprite status_sp(status_tex);
+			status_sp.setPosition(2.f, (float)graphic.height);
+			win.draw(status_sp);
+		}
+
+		// Title as well, so the state is legible even when the window is behind
+		// something else.
+		const std::string title = "MREmu (MCP) - " + status;
+		if (title != last_title) {
+			win.setTitle(title);
+			last_title = title;
+		}
+
+		win.display();
+	}
+}
 #endif
 
 int main(int argc, char** argv) {
@@ -483,7 +572,8 @@ int main(int argc, char** argv) {
 		parser.set_optional<std::string>("j", "json", "", "Write the inspection report to this JSON file");
 		parser.set_optional<std::string>("s", "screen", "", "Write the emulated screen to this PNG file");
 		parser.set_optional<int>("n", "steps", 0, "With --inspect: execute at most N instructions (0 = do not execute)");
-		parser.set_optional<bool>("m", "mcp", false, "Headless MCP server over stdio: no window, agent-controllable");
+		parser.set_optional<bool>("w", "mcp-window", false, "With --mcp: also open the emulator window so a human can watch");
+		parser.set_optional<bool>("m", "mcp", false, "MCP server over stdio: agent-controllable, headless unless --mcp-window");
 	}
 	parser.run_and_exit_if_error();
 	app_path = parser.get<std::string>("");
@@ -499,6 +589,13 @@ int main(int argc, char** argv) {
 	std::string inspect_screen = parser.get<std::string>("s");
 	int inspect_steps = parser.get<int>("n");
 	bool mcp_mode = parser.get<bool>("m");
+	bool mcp_window = parser.get<bool>("w");
+	// An MCP client is configured with a fixed argv, so MREMU_MCP_WINDOW is the
+	// escape hatch for "always show the window" that needs no command-line edit.
+	if (!mcp_window) {
+		const char* env = std::getenv("MREMU_MCP_WINDOW");
+		mcp_window = env && env[0] != 0 && env[0] != '0';
+	}
 
 #ifndef ANDROID
 	// Claim stdout for JSON-RPC before anything logs. This must precede every
@@ -561,9 +658,9 @@ int main(int argc, char** argv) {
 			inspect_json, inspect_screen, inspect_steps);
 	}
 
-	// Headless MCP mode: no windows either. The emulator is pumped on a worker
-	// thread while this thread speaks MCP over stdio, so an agent can inspect and
-	// drive a running VXP on a machine with no display.
+	// MCP mode: the emulator is pumped on a worker thread while this thread
+	// speaks MCP over stdio, so an agent can inspect and drive a running VXP on
+	// a machine with no display.
 	if (mcp_mode) {
 		static Mcp::Control ctl;
 		McpHost::setup(&appManager, &keyboard, &ctl, &graphic);
@@ -582,12 +679,55 @@ int main(int argc, char** argv) {
 			}
 		});
 
-		int rc = Mcp::serve(std::cin, *proto, ctl);
-		McpHost::shutdown();
+		if (!mcp_window) {
+			int rc = Mcp::serve(std::cin, *proto, ctl);
+			McpHost::shutdown();
+			stop.store(true);
+			if (emu.joinable()) emu.join();
+			appManager.stop();
+			return rc;
+		}
+
+		// Watchable: protocol on a worker, window here. Returns when the human
+		// closes the window or the client disconnects.
+		std::atomic<bool> client_gone{false};
+		std::atomic<int> serve_rc{0};
+		std::thread server([&]() {
+			serve_rc = Mcp::serve(std::cin, *proto, ctl);
+			McpHost::shutdown();
+			client_gone.store(true);
+		});
+
+		try {
+			run_mcp_window(graphic, ctl, client_gone);
+		}
+		catch (const std::exception& e) {
+			// No display, or the window could not be created. The agent still needs
+			// its server, so keep serving headless and say why on stderr (fd 1 is
+			// the protocol stream by now).
+			std::cerr << "[mcp] window unavailable, continuing headless: "
+				<< e.what() << std::endl;
+			while (!client_gone.load() && !McpHost::quitting())
+				std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		}
+
+		if (!client_gone.load()) {
+			// The human closed the window while the protocol thread is parked in a
+			// blocking read on stdin. Running static destructors would race that
+			// read against iostream teardown, so leave immediately: the client sees
+			// the pipe close and spawns a fresh server next time.
+			McpHost::shutdown();
+			std::_Exit(0);
+		}
+
 		stop.store(true);
+		// Reached only when the client disconnected, so serve() has already
+		// returned and this cannot block. It must be joined: a joinable std::thread
+		// reaching the end of main terminates the process with 0xC0000409.
+		if (server.joinable()) server.join();
 		if (emu.joinable()) emu.join();
 		appManager.stop();
-		return rc;
+		return serve_rc.load();
 	}
 
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
