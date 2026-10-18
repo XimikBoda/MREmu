@@ -27,7 +27,7 @@ Implemented in [`MREmu/NativeApps/Menu/AppSelector.cpp`](../MREmu/NativeApps/Men
 | |        Opera Software (342 KB)| |
 | +-------------------------------+ |
 | | [Icon] Bounce Tales           | |
-| |        Nokia / Rovio (410 KB) | |
+| |        Sumea Mobile (410 KB)  | |
 | +-------------------------------+ |
 | | [Icon] City Bloxx             | |
 | |        Digital Chocolate      | |
