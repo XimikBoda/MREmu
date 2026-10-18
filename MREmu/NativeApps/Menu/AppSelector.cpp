@@ -67,36 +67,25 @@ namespace NativeApps::Menu::AppSelector {
 	void pen_handler(VMINT event, VMINT x, VMINT y);
 	void timer_cb(VMINT tid);
 
-	// --- Scrolling with iOS-style overscroll ---------------------------
+	// --- Scrolling ----------------------------------------------------
 	//
 	// scroll_raw is the *unbounded* offset, so it can go negative (above the
 	// first item) or past the end (below the last item). scroll_pos is the
 	// value actually used for drawing/hit-testing; sync_scroll() derives it
 	// from scroll_raw by applying the rubber-band curve while out of bounds.
+	//
+	// The list follows the finger exactly and stops where the finger stops:
+	// no fling, no inertia, no settle animation. That is deliberate - the old
+	// fling ran on a 16ms timer that re-derived the offset and redrew, so it
+	// kept moving the list after the arrow keys had already moved the
+	// selection. Nothing here runs on a timer now, so keyboard scrolling is
+	// the only other thing that can move the view. Touch scrolling is
+	// unaffected: the pen handler still tracks the finger 1:1.
 	// -------------------------------------------------------------------------
 
 	constexpr float kRubberC = 0.55f;     // Apple WWDC18 rubberband constant
-	constexpr float kDecel = 0.998f;       // UIScrollView.DecelerationRateNormal (per ms)
-	constexpr float kSpringW = 12.0f;      // critically damped spring, ~0.38s settle
-	constexpr float kFlingMinSpeed = 60.f; // px/s below this we don't fling
-	constexpr float kMaxFlingSpeed = 8000.f;
-	constexpr float kVelWindowMs = 100;    // finger paused > this => no fling
-	constexpr float kStopPx = 0.5f;
-	constexpr float kStopVel = 5.f;
 
 	float scroll_raw = 0.f;
-	float scroll_vel = 0.f;   // px/s, positive = content scrolls down
-	bool scroll_anim = false; // fling or spring in progress
-	VMINT scroll_timer_id = 0;
-
-	struct vel_sample { int y; VMUINT t; };
-	// Sized so the ring can always span the whole kVelWindowMs even on a high rate
-	// touch panel: 24 samples covers 100ms at 240Hz, the fastest rate in practice.
-	constexpr int kVelSamples = 24;
-	vel_sample vel_samples[kVelSamples] = {};
-	int vel_count = 0;
-
-	VMUINT last_anim_tick = 0;
 
 	float max_scroll_f() {
 		return std::max(0.f, (float)vxps.size() * b_h - h);
@@ -121,69 +110,10 @@ namespace NativeApps::Menu::AppSelector {
 			scroll_pos = (int)scroll_raw;
 	}
 
-	void vel_reset(int y, VMUINT t) {
-		vel_samples[0] = { y, t };
-		vel_count = 1;
-	}
-
-	void vel_add(int y, VMUINT t) {
-		if (vel_count <= 0) { vel_reset(y, t); return; }
-		int n = vel_count < kVelSamples ? vel_count : kVelSamples;
-		for (int i = n - 1; i > 0; --i)
-			vel_samples[i] = vel_samples[i - 1];
-		vel_samples[0] = { y, t };
-		if (vel_count < kVelSamples) vel_count++;
-	}
-
-	// Returns scroll velocity in px/s, or 0 when the finger paused before lifting.
-	//
-	// The window is measured in milliseconds rather than in samples. A fixed sample
-	// count spans a slice of the gesture that depends on the touch report rate - the
-	// old 6 sample ring covered ~50ms at 120Hz but ~200ms at 30Hz - so the same
-	// physical flick produced a different fling speed depending on the device.
-	// Walking back to the oldest sample still inside kVelWindowMs covers the same
-	// amount of time everywhere, which makes the estimate frame rate independent.
-	float vel_release() {
-		if (vel_count < 2) return 0.f;
-
-		const vel_sample& newest = vel_samples[0];
-
-		// Samples are stored newest first, so walking back stops at the first one
-		// that has aged out of the window.
-		int oldest = 0;
-		for (int i = 1; i < vel_count; ++i) {
-			if (newest.t - vel_samples[i].t <= (VMUINT)kVelWindowMs)
-				oldest = i;
-			else
-				break;
-		}
-
-		const vel_sample& oldest_in_window = vel_samples[oldest];
-		float dt = (float)(newest.t - oldest_in_window.t);
-		// dt == 0 means every sample in range shares a timestamp, or the finger
-		// paused for longer than the window before lifting. Either way: no fling.
-		if (dt <= 0.f) return 0.f;
-
-		// Finger moving up (y decreasing) scrolls content down, hence the minus.
-		float v = -(float)(newest.y - oldest_in_window.y) / dt * 1000.f;
-		if (std::abs(v) < kFlingMinSpeed) return 0.f;
-		return std::max(-kMaxFlingSpeed, std::min(kMaxFlingSpeed, v));
-	}
-
-	void stop_scroll_anim() {
-		scroll_anim = false;
-		scroll_vel = 0.f;
-		if (scroll_timer_id) {
-			vm_delete_timer(scroll_timer_id);
-			scroll_timer_id = 0;
-		}
-	}
-
-	// Anything that moves scroll_pos directly must move scroll_raw with it. The
-	// animation timer derives scroll_pos from scroll_raw via sync_scroll(), so if
-	// only one of the two is set the next tick silently reverts the view.
+	// Anything that moves scroll_pos directly must move scroll_raw with it: an
+	// out-of-range scroll_raw is rubber-banded by sync_scroll() on the next drag,
+	// so leaving the two out of step would snap the view on the next touch.
 	void set_scroll_pos(int pos) {
-		stop_scroll_anim();
 		scroll_pos = pos;
 		scroll_raw = (float)scroll_pos;
 	}
@@ -217,78 +147,19 @@ namespace NativeApps::Menu::AppSelector {
 		set_scroll_pos((int)std::max(0.f, std::min(target, maxs)));
 	}
 
-	// Critically damped spring back to the nearest in-bounds offset. No overshoot,
-	// matching iOS. Returns true only while it still has work to do, so an
-	// in-bounds position reports settled immediately and lets the fling own the tick.
+	// Pulls an out-of-range offset back to the nearest bound, immediately.
 	//
-	// Integrated in closed form rather than stepped. Explicit integration (v += a*dt
-	// then x += v*dt) is only an approximation, and how far off it lands depends on
-	// how many times it runs, so the settle time changed with the frame rate. The
-	// analytic solution for critical damping, x'' = -2wx' - w^2 x, is
-	// x(t) = (C1 + C2 t) e^(-wt) with C1 = x0 and C2 = v0 + w x0, which gives the
-	// same trajectory for any dt and at any frame rate.
-	bool spring_step(float dt_ms) {
+	// This used to be a critically damped spring driven by the 16ms animation
+	// timer. Snapping is the whole of the bounds correction now: with no fling
+	// there is no velocity to carry into the settle, and an animated correction
+	// is exactly the thing that used to keep moving the list after the user had
+	// already released it or pressed an arrow key.
+	void snap_scroll_to_bounds() {
 		float maxs = max_scroll_f();
-
-		// Nothing to settle while in bounds. Returning early is what keeps the
-		// spring from dragging a perfectly valid offset back to the top; the
-		// spring is a bounds-correction, not the resting position.
 		if (scroll_raw >= 0.f && scroll_raw <= maxs)
-			return false;
-
-		float target = scroll_raw < 0.f ? 0.f : maxs;
-
-		float dt = std::min(dt_ms, 100.f) / 1000.f; // 1/10s hitch guard
-		if (dt <= 0.f)
-			return true;
-
-		const float w = kSpringW;
-		const float decay = std::exp(-w * dt);
-		const float x0 = scroll_raw - target;
-		const float v0 = scroll_vel;
-		const float c2 = v0 + w * x0;
-
-		// x'(t) = (C2 - w (C1 + C2 t)) e^(-wt), simplified with C1 = x0.
-		const float x = (x0 + c2 * dt) * decay;
-		const float v = (v0 - w * c2 * dt) * decay;
-
-		if (std::abs(x) < kStopPx && std::abs(v) < kStopVel) {
-			scroll_raw = target;
-			scroll_vel = 0.f;
-			return false; // settled
-		}
-
-		scroll_raw = target + x;
-		scroll_vel = v;
-		return true;
-	}
-
-	// Closed-form exponential decay, frame-rate independent.
-	void fling_step(float dt_ms) {
-		float maxs = max_scroll_f();
-		float dt = std::min(dt_ms, 100.f);
-
-		scroll_raw += scroll_vel * (1.f - std::pow(kDecel, dt)) / (-std::log(kDecel) * 1000.f);
-		scroll_vel *= std::pow(kDecel, dt);
-
-		// Hitting an edge mid-fling hands over to the spring.
-		if (scroll_raw < 0.f || scroll_raw > maxs) {
-			scroll_vel = 0.f;
 			return;
-		}
-		if (std::abs(scroll_vel) < 1.f) {
-			scroll_vel = 0.f;
-			scroll_anim = false;
-		}
-	}
-
-	void scroll_timer_cb(VMINT tid);
-
-	void start_scroll_anim() {
-		scroll_anim = true;
-		last_anim_tick = vm_get_tick_count();
-		if (!scroll_timer_id)
-			scroll_timer_id = vm_create_timer(16, scroll_timer_cb);
+		scroll_raw = std::max(0.f, std::min(scroll_raw, maxs));
+		sync_scroll();
 	}
 
 	static const char* get_t9_chars(int keycode) {
@@ -334,7 +205,7 @@ namespace NativeApps::Menu::AppSelector {
 		details_sheet.hide();
 		confirm_sheet.hide();
 		m_i = 0;
-		set_scroll_pos(0);   // also cancels any leftover fling and its timer
+		set_scroll_pos(0);
 		touched = false;
 		reset_marquee();
 		trigger_scrollbar();
@@ -762,37 +633,6 @@ namespace NativeApps::Menu::AppSelector {
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
 
-	void scroll_timer_cb(VMINT tid) {
-		// vm_create_timer timers repeat until deleted, so every exit path here must
-		// delete it. Zeroing scroll_timer_id without deleting leaks a live 16ms timer
-		// that keeps stepping the animation and calling sync_scroll() forever, which
-		// drags the view back to a stale scroll_raw long after the fling is over.
-		if (!scroll_anim || touched) {
-			// Either the finger grabbed the list, or it was already stopped.
-			scroll_anim = false;
-			scroll_vel = 0.f;
-			scroll_timer_id = 0;
-			vm_delete_timer(tid);
-			return;
-		}
-
-		VMUINT now = vm_get_tick_count();
-		float dt = (float)(now - last_anim_tick);
-		last_anim_tick = now;
-
-		bool settling = spring_step(dt);
-		if (!settling)
-			fling_step(dt);
-
-		sync_scroll();
-		draw();
-
-		if (!scroll_anim) {
-			scroll_timer_id = 0;
-			vm_delete_timer(tid);
-		}
-	}
-
 	void timer_cb(VMINT tid) {
 		if (!layer_buf || vxps.empty() || touched)
 			return;
@@ -969,8 +809,6 @@ namespace NativeApps::Menu::AppSelector {
 		trigger_scrollbar();
 		switch (event) {
 			case VM_PEN_EVENT_TAP:
-				// Grabbing a moving list stops it dead, like iOS.
-				stop_scroll_anim();
 				// Adopt the on-screen offset as the new raw one, but only when
 				// in bounds - copying a rubber-banded display offset back into
 				// scroll_raw would throw away the stretch the user is still holding.
@@ -980,7 +818,6 @@ namespace NativeApps::Menu::AppSelector {
 				touch_last_y = y;
 				touched = true;
 				touch_time = vm_get_tick_count();
-				vel_reset(y, vm_get_tick_count());
 				break;
 			case VM_PEN_EVENT_MOVE:
 			case VM_PEN_EVENT_REPEAT:
@@ -991,7 +828,6 @@ namespace NativeApps::Menu::AppSelector {
 					// Unbounded here on purpose - the rubber band is applied in
 					// sync_scroll() so the list resists instead of hard-stopping.
 					sync_scroll();
-					vel_add(y, vm_get_tick_count());
 				}
 				break;
 			case VM_PEN_EVENT_LONG_TAP: {
@@ -1008,8 +844,14 @@ namespace NativeApps::Menu::AppSelector {
 			}
 			case VM_PEN_EVENT_RELEASE:
 			case VM_PEN_EVENT_ABORT: {
-				float fling = vel_release();
 				touched = false;
+
+				// The list stops where the finger stopped. If that leaves it out of
+				// range, snap back now rather than on a timer, so an overscrolled
+				// list can never be left stranded. Done before the tap hit test so
+				// that a tap released past the edge still resolves against the
+				// corrected offset.
+				snap_scroll_to_bounds();
 
 				// A tap is a short, near-stationary press; anything else is a scroll.
 				if (std::abs(touch_start_y - y) < b_h / 2 && vm_get_tick_count() - touch_time < 250) {
@@ -1032,17 +874,6 @@ namespace NativeApps::Menu::AppSelector {
 						}
 					}
 					break;
-				}
-
-				// Out of bounds => spring back. In bounds with velocity => coast.
-				scroll_vel = fling;
-				float maxs = max_scroll_f();
-				if (scroll_raw < 0.f || scroll_raw > maxs) {
-					scroll_vel = 0.f; // spring back takes over
-					start_scroll_anim();
-				}
-				else if (fling != 0.f) {
-					start_scroll_anim();
 				}
 				break;
 			}
