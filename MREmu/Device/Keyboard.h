@@ -5,7 +5,7 @@
 #include <vmio.h>
 
 #ifdef ANDROID
-#include "jni/Vibration.h"
+#include "../jni/Vibration.h"
 #endif
 
 #define MREMU_KEY_SEND (VM_KEY_QWERTY_MENU + 1)
