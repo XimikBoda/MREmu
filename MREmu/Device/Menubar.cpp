@@ -1,11 +1,16 @@
 #include "Menubar.h"
 #include "../App.h"
 #include "../MREngine/CharSet.h"
+#include "../jni/ScreenCorner.h"
 #include <SFML/Graphics.hpp>
 
 App* get_active_app();
 
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c);
+
+Menubar::Menubar() {
+	screen_corner = ScreenCorner().getRadius();
+}
 
 int Menubar::getHeight() {
 	return base_size;
@@ -24,6 +29,7 @@ void Menubar::draw(sf::RenderTarget* rt) {
 
 		sf::Sprite sp(name_tex);
 		sp.setScale(font_scale, font_scale);
+		sp.setPosition(scale + screen_corner, scale);
 
 		rt->draw(sp);
 	}
@@ -41,12 +47,14 @@ static const char16_t* keys_marks[4] = {
 };
 
 void Menubar::update_resize(int win_w, int win_h) {
+	screen_corner = ScreenCorner().getRadius();
+
 	int screen_x = screen->getPosition().x;
 	int screen_y = screen->getPosition().y;
 	int screen_w = screen->getScale().x * screen->getTextureRect().width;
 	int screen_h = screen->getScale().y * screen->getTextureRect().height;
 
-	float scale = screen->getScale().x;
+	scale = screen->getScale().x;
 	float scaled_size = base_size * scale;
 
 	font_scale = std::max<int>(scaled_size / 16, 1);
@@ -58,7 +66,7 @@ void Menubar::update_resize(int win_w, int win_h) {
 		buttons_frontend_layer.clear(sf::Color::Transparent);
 
 		buttons_sp = sf::Sprite(buttons_frontend_layer.getTexture());
-		buttons_sp.setPosition(win_w - w, 0);
+		buttons_sp.setPosition(win_w - w - screen_corner, 0);
 
 		std::vector<sf::Vertex> lines;
 

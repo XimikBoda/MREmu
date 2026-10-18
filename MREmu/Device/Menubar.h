@@ -8,14 +8,18 @@ class Menubar {
 	std::u8string last_app_name;
 	int base_size = 20;
 
+	float scale = 1;
 	int font_scale = 1;
+	int screen_corner = 0;
 
 	sf::Texture name_tex;
 
 	sf::RenderTexture buttons_frontend_layer;
 	sf::Sprite buttons_sp;
 public:
-	sf::Sprite* screen;
+	sf::Sprite* screen = 0;
+
+	Menubar();
 
 	int getHeight();
 

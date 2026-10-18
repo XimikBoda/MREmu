@@ -17,6 +17,7 @@ import android.os.VibratorManager
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.view.RoundedCorner
 import java.io.File
 import java.io.FileOutputStream
 
@@ -192,5 +193,17 @@ class MainActivity : NativeActivity() {
         }
 
         return vibrator.hasVibrator()
+    }
+
+    fun getScreenCornerRadius(): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val insets = window.decorView.rootWindowInsets
+
+            if (insets != null) {
+                val corner = insets.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)
+                return corner?.radius ?: 0
+            }
+        }
+        return 0
     }
 }
