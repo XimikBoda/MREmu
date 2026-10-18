@@ -133,16 +133,20 @@ namespace NativeApps::Menu::AppSelector {
 			return;
 		}
 
-		float item_top = (float)b_h * m_i - (float)scroll_pos;
+		// item_top is an *absolute* content offset. The original code subtracted
+		// scroll_pos first, turning it into a viewport-relative delta, and then
+		// fed that delta to set_scroll_pos - so the view jumped to a position
+		// measured in screen pixels from wherever it happened to be, instead of
+		// lining the selected row up with an edge. That is what made arrow-key
+		// scrolling land on the wrong row (or off the end) on long lists.
+		float item_top = (float)b_h * m_i;
 		float item_bottom = item_top + (float)b_h;
 
-		float target;
-		if (item_bottom > (float)h)   // below the fold: line its bottom up with the edge
+		float target = scroll_raw;          // default: leave the view alone
+		if (item_bottom > scroll_raw + (float)h)   // below the fold
 			target = item_bottom - (float)h;
-		else if (item_top < 0.f)      // above the top: line its top up with the edge
+		else if (item_top < scroll_raw)             // above the top
 			target = item_top;
-		else                          // already fully visible, leave it alone
-			target = (float)scroll_pos;
 
 		set_scroll_pos((int)std::max(0.f, std::min(target, maxs)));
 	}
@@ -890,6 +894,11 @@ namespace NativeApps::Menu::AppSelector {
 			if (m_i >= 0 && m_i < (int)vxps.size())
 				DragAndDrop::set_last_selected_app(u16_to_u8(vxps[m_i].name));
 		}
+
+		// Keep the selected row on screen after a tap, the same way the keyboard
+		// path does. Without this a tap on a partially visible row left the
+		// view where it was and the highlight scrolled out of sight.
+		scroll_to_selection();
 
 		draw();
 	}
