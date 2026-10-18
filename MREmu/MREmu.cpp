@@ -495,22 +495,34 @@ static std::string mcp_status_line(const Mcp::Snapshot& s) {
 	return t;
 }
 
-static void run_mcp_window(MREngine::Graphic& graphic, Mcp::Control& ctl,
-	const std::atomic<bool>& client_gone)
+static void run_mcp_window(MREngine::Graphic& graphic, Keyboard& keyboard, Touch& touch,
+	Mcp::Control& ctl, const std::atomic<bool>& client_gone)
 {
 	sf::RenderWindow win(sf::VideoMode(graphic.width, graphic.height + 208),
 		"MREmu (MCP)");
 	win.setVerticalSyncEnabled(true);
 
+	// Touch and the keyboard widget both map window coordinates back onto the
+	// sprite, so they need the very sprite being drawn. Scale stays 1 here, which
+	// makes window coordinates equal emulated screen coordinates.
 	sf::Sprite sp(graphic.screen_tex);
+	touch.screen = &sp;
+	keyboard.screen = &sp;
+
 	sf::Texture status_tex;
 	std::string last_status, last_title;
 
 	while (win.isOpen() && !client_gone.load() && !McpHost::quitting()) {
 		sf::Event ev;
 		while (win.pollEvent(ev)) {
-			if (ev.type == sf::Event::Closed)
+			if (ev.type == sf::Event::Closed) {
 				win.close();
+				continue;
+			}
+			// Same input path the GUI uses, so a human can click and type in the
+			// window while the agent works, and the app sees one consistent stream.
+			keyboard.event(ev);
+			touch.sf_event(ev);
 		}
 
 		const Mcp::Snapshot snap = ctl.snapshot();
@@ -699,7 +711,7 @@ int main(int argc, char** argv) {
 		});
 
 		try {
-			run_mcp_window(graphic, ctl, client_gone);
+			run_mcp_window(graphic, keyboard, touch, ctl, client_gone);
 		}
 		catch (const std::exception& e) {
 			// No display, or the window could not be created. The agent still needs
