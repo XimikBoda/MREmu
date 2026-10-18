@@ -452,8 +452,15 @@ MreTags* get_tags_by_mem_adr(size_t offset_mem) {
 		return 0;
 
 	auto &apps = g_appManager->apps;
+	// Only apps that actually parsed a VXP tag table qualify. Native apps (the
+	// built-in menu) leave offset_mem at its default of 0, and the first VXP app
+	// loaded also gets emulated address 0 for its image, because that is where the
+	// shared memory pool starts. Without this guard a lookup for offset 0 returns
+	// the native app's empty table, so vm_get_vm_tag() answers NOT_FOUND for a tag
+	// the running app really does have. Test the tag table rather than is_native():
+	// DLLApp is a real VXP app but does not override is_native().
 	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->offset_mem == offset_mem)
+		if (!apps[i]->tags.raw_tags.empty() && apps[i]->offset_mem == offset_mem)
 			return &apps[i]->tags;
 
 	return 0;

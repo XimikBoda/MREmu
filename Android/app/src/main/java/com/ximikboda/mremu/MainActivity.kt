@@ -29,7 +29,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -44,12 +43,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -59,15 +62,21 @@ import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -83,6 +92,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -133,10 +143,11 @@ private val RobotoFlexFamily = FontFamily(
 
 /**
  * Material's default styles retargeted at Roboto Flex. Only the slots the sheet actually
- * uses are listed; anything else keeps the platform default.
+ * uses are listed; anything else keeps the platform default. Internal rather than private
+ * so other screens in this package can share the same type ramp.
  */
 @OptIn(ExperimentalTextApi::class)
-private val AppTypography = Typography().run {
+internal val AppTypography = Typography().run {
     copy(
         headlineSmall = headlineSmall.copy(fontFamily = RobotoFlexFamily),
         bodyMedium = bodyMedium.copy(fontFamily = RobotoFlexFamily),
@@ -157,6 +168,12 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
      * Options tap cannot stack two sheets on the same activity.
      */
     private var optionsDialog: android.app.Dialog? = null
+
+    /**
+     * The fatal-error dialog. Held separately from the options sheet so a second error
+     * cannot stack two dialogs, and dismissed in onDestroy with the rest of the windows.
+     */
+    private var errorDialog: android.app.Dialog? = null
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val viewModelStore: ViewModelStore get() = viewModelStoreImpl
@@ -197,7 +214,17 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         if (isFinishing || isDestroyed) return
         if (optionsDialog?.isShowing == true) return
 
-        val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        val stack = PageBackStack(listOf(OptionsPage.Main))
+        val dialog = object : android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar) {
+            @Deprecated("Deprecated in Java")
+            override fun onBackPressed() {
+                if (stack.canGoBack) {
+                    stack.pop()
+                } else {
+                    super.onBackPressed()
+                }
+            }
+        }
         optionsDialog = dialog
         dialog.setOnDismissListener {
             if (optionsDialog === dialog) optionsDialog = null
@@ -209,11 +236,15 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
             setContent {
                 MaterialTheme(typography = AppTypography) {
                     OptionsBottomSheet(
+                        stack = stack,
+                        onLaunchVxp = { file -> dialog.dismiss(); launchVxp(file) },
+                        onShareVxp = { file -> shareVxp(file) },
                         onHardReset = { dialog.dismiss(); performHardReset() },
                         onOpenFolder = { dir -> dialog.dismiss(); openFolder(dir) },
                         onClearUserData = { dialog.dismiss(); performClearUserData() },
                         onAbout = { dialog.dismiss() },
                         onQuit = { dialog.dismiss(); finish() },
+                        onOpenVxpBrowser = { dialog.dismiss(); openVxpBrowser() },
                         onDismiss = { dialog.dismiss() }
                     )
                 }
@@ -226,6 +257,74 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         } catch (e: android.view.WindowManager.BadTokenException) {
             Log.w(TAG, "Options dialog could not be shown", e)
             if (optionsDialog === dialog) optionsDialog = null
+        }
+    }
+
+    /**
+     * Called from the native render thread when the emulator raises a fatal error
+     * (unrecognised VXP, failed load, preparation fault). Marshals onto the UI thread
+     * and presents a dialog with the message and a copy button.
+     */
+    private fun showErrorDialogUi(message: String) {
+        runOnUiThread { presentErrorDialog(message) }
+    }
+
+    /** Builds and shows the Compose error dialog. Must run on the UI thread. */
+    private fun presentErrorDialog(message: String) {
+        // Posted from the native render thread against a cached global ref that is never
+        // refreshed, so the activity may already be gone by the time this runs.
+        if (isFinishing || isDestroyed) return
+        if (errorDialog?.isShowing == true) return
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        errorDialog = dialog
+        dialog.setOnDismissListener {
+            if (errorDialog === dialog) errorDialog = null
+        }
+
+        val composeView = ComposeView(this).apply {
+            setViewTreeLifecycleOwner(this@MainActivity)
+            setViewTreeViewModelStoreOwner(this@MainActivity)
+            setViewTreeSavedStateRegistryOwner(this@MainActivity)
+            setContent {
+                MaterialTheme(typography = AppTypography) {
+                    // The translucent platform Dialog above already provides the overlay
+                    // and window, so the card is laid out directly rather than wrapping
+                    // it in a Compose Dialog, which would open a second window.
+                    ErrorDialog(
+                        message = message,
+                        onCopy = { copyToClipboard(message) },
+                        onDismiss = { dialog.dismiss() }
+                    )
+                }
+            }
+        }
+        dialog.setContentView(composeView)
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        dialog.window?.setLayout(
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+            android.view.WindowManager.LayoutParams.WRAP_CONTENT
+        )
+        try {
+            dialog.show()
+        } catch (e: android.view.WindowManager.BadTokenException) {
+            Log.w(TAG, "Error dialog could not be shown", e)
+            if (errorDialog === dialog) errorDialog = null
+        }
+    }
+
+    /** Opens the placeholder VXP browser screen. */
+    private fun openVxpBrowser() {
+        startActivity(Intent(this, VxpBrowserActivity::class.java))
+    }
+
+    /** Copies [text] to the clipboard, confirming briefly. */
+    private fun copyToClipboard(text: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(TAG, text))
+        // Android 13+ shows its own copy confirmation, so only toast on older releases.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Toast.makeText(this, getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -316,6 +415,49 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         }
     }
 
+    /** Launches a VXP file directly via nativeLoadVxpFile on a background worker. */
+    private fun launchVxp(file: File) {
+        if (!file.exists()) {
+            Toast.makeText(this, "File does not exist: ${file.name}", Toast.LENGTH_SHORT).show()
+            return
+        }
+        VxpRepository(this).addRecentPath(file.absolutePath)
+        Thread {
+            try {
+                nativeLoadVxpFile(file.absolutePath)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load VXP file: ${file.absolutePath}", e)
+                runOnUiThread {
+                    Toast.makeText(this, "Failed to load VXP", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
+    }
+
+    /** Exports or shares a VXP file using Android's system share sheet via FileProvider. */
+    private fun shareVxp(file: File) {
+        if (!file.exists()) {
+            Toast.makeText(this, "File does not exist: ${file.name}", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "$packageName.fileprovider",
+                file
+            )
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share ${file.name}"))
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to share VXP file", e)
+            Toast.makeText(this, "Could not share file", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     /** Confirmation now happens on the Hard reset sheet page, so this only runs the reset. */
     private fun performHardReset() {
         requestHardReset()
@@ -377,6 +519,7 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
 
 private enum class OptionsPage(val title: String) {
         Main("Options"),
+        VxpLibrary("VXP Library"),
         Folders("Open FS folder"),
         HardReset("Reset emulator state"),
         ClearUserData("Clear user data"),
@@ -396,29 +539,45 @@ private enum class OptionsPage(val title: String) {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun OptionsBottomSheet(
+        stack: PageBackStack<OptionsPage>,
+        onLaunchVxp: (File) -> Unit,
+        onShareVxp: (File) -> Unit,
         onHardReset: () -> Unit,
         onOpenFolder: (File) -> Unit,
         onClearUserData: () -> Unit,
         onAbout: () -> Unit,
         onQuit: () -> Unit,
+        onOpenVxpBrowser: () -> Unit,
         onDismiss: () -> Unit
     ) {
-        // skipPartiallyExpanded so the sheet opens at Expanded, whose anchor is
-// max(0, screenHeight - contentHeight) -> the sheet is exactly as tall as its
-// content (capped at the screen), instead of the default half-screen peek.
-val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var showSheet by remember { mutableStateOf(true) }
-        val stack = rememberPageBackStack(OptionsPage.Main)
+        // Guards re-entry: several rows can reach dismissSheet, and hide() is a suspend
+        // call that would otherwise be launched twice for the same dismissal.
+        var dismissing by remember { mutableStateOf(false) }
+        var libraryMenuOpen by remember { mutableStateOf(false) }
         val page = stack.current
+        val sheetScope = rememberCoroutineScope()
 
-        // ModalBottomSheet dismisses on back press by default, so without this the
-        // platform Back gesture tears down the whole sheet instead of stepping one
-        // level up the page stack, making the sheet's paging unreachable by hand.
-        BackHandler(enabled = stack.canGoBack) { stack.pop() }
+        // Clearing showSheet drops ModalBottomSheet out of composition on the very next
+        // frame, so the sheet vanished with no exit animation at all. hide() has to run
+        // while the sheet is still composed: it plays the slide-down, and only once it
+        // has finished is it safe to remove it. The action the row was invoking runs
+        // last, so the UI settles before the app navigates away or the window goes.
+        fun dismissSheet(then: () -> Unit = {}) {
+            if (dismissing || !showSheet) return
+            dismissing = true
+            sheetScope.launch {
+                sheetState.hide()
+                showSheet = false
+                onDismiss()
+                then()
+            }
+        }
 
         if (showSheet) {
             ModalBottomSheet(
-                onDismissRequest = { showSheet = false; onDismiss() },
+                onDismissRequest = { dismissSheet() },
                 sheetState = sheetState,
                 containerColor = Color(0xFF1B1B1F),
                 contentColor = Color.White,
@@ -436,7 +595,7 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                         IconButton(
                             onClick = {
                                 if (stack.canGoBack) stack.pop()
-                                else { showSheet = false; onDismiss() }
+                                else dismissSheet()
                             },
                             modifier = Modifier.align(Alignment.CenterStart)
                         ) {
@@ -455,6 +614,53 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                             color = Color(0xFFE6E1E5),
                             modifier = Modifier.align(Alignment.Center)
                         )
+
+                        // Page-level actions on the right. Only the VXP library has one
+                        // for now; the other pages leave the slot empty rather than
+                        // reserving space for an icon that is not there.
+                        if (page == OptionsPage.VxpLibrary) {
+                            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                                IconButton(onClick = { libraryMenuOpen = true }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.MoreVert,
+                                        contentDescription = "VXP library options",
+                                        tint = Color(0xFFC7C5D0)
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = libraryMenuOpen,
+                                    onDismissRequest = { libraryMenuOpen = false },
+                                    containerColor = Color(0xFF2B2B30),
+                                    shape = RoundedCornerShape(16.dp),
+                                    shadowElevation = 12.dp,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = stringResource(R.string.vxp_browser),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = Color(0xFFE6E1E5)
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Filled.Language,
+                                                contentDescription = null,
+                                                tint = Color(0xFFE6E1E5),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            libraryMenuOpen = false
+                                            onOpenVxpBrowser()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     AnimatedContent(
@@ -496,6 +702,12 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                     SegmentHeader(stringResource(R.string.section_files))
                                     SegmentGroup {
                                         OptionRow(
+                                            Icons.Filled.SportsEsports,
+                                            stringResource(R.string.section_vxp_library),
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            divider = true
+                                        ) { stack.push(OptionsPage.VxpLibrary) }
+                                        OptionRow(
                                             Icons.Filled.FolderOpen,
                                             "Open FS folder...",
                                             Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -504,7 +716,11 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                     }
                                     SegmentHeader(stringResource(R.string.section_app))
                                     SegmentGroup {
-                                        OptionRow(Icons.Filled.Info, "About") {
+                                        OptionRow(
+                                            Icons.Filled.Info,
+                                            "About",
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight
+                                        ) {
                                             stack.push(OptionsPage.About)
                                         }
                                         OptionRow(
@@ -513,7 +729,7 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                             tint = Color(0xFFE98A8A),
                                             divider = false
                                         ) {
-                                            showSheet = false; onQuit()
+                                            dismissSheet(onQuit)
                                         }
                                     }
                                     Spacer(Modifier.height(16.dp))
@@ -536,8 +752,7 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                                 trailing = Icons.AutoMirrored.Filled.OpenInNew,
                                                 divider = i < storage.lastIndex
                                             ) {
-                                                showSheet = false
-                                                onOpenFolder(File(drive.path))
+                                                dismissSheet { onOpenFolder(File(drive.path)) }
                                             }
                                         }
                                     }
@@ -551,8 +766,7 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                                 trailing = Icons.AutoMirrored.Filled.OpenInNew,
                                                 divider = i < apps.lastIndex
                                             ) {
-                                                showSheet = false
-                                                onOpenFolder(File(drive.path))
+                                                dismissSheet { onOpenFolder(File(drive.path)) }
                                             }
                                         }
                                     }
@@ -576,8 +790,7 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                                     )
                                     DestructiveButton("Reset", remaining) {
-                                        showSheet = false
-                                        onHardReset()
+                                        dismissSheet(onHardReset)
                                     }
                                     Spacer(Modifier.height(24.dp))
                                 }
@@ -599,8 +812,7 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                                     )
                                     DestructiveButton("Clear", remaining) {
-                                        showSheet = false
-                                        onClearUserData()
+                                        dismissSheet(onClearUserData)
                                     }
                                     Spacer(Modifier.height(24.dp))
                                 }
@@ -636,6 +848,20 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                                     }
                                     Spacer(Modifier.height(16.dp))
                                 }
+                            }
+
+                            OptionsPage.VxpLibrary -> {
+                                VxpLibraryPage(
+                                    onLaunch = { item ->
+                                        dismissSheet { onLaunchVxp(item.file) }
+                                    },
+                                    onShare = { item ->
+                                        onShareVxp(item.file)
+                                    },
+                                    onRevealFolder = { folder ->
+                                        dismissSheet { onOpenFolder(folder) }
+                                    }
+                                )
                             }
                         }
                     }
@@ -775,6 +1001,118 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         }
     }
 
+    /**
+     * Fatal-error dialog raised by the emulator.
+     *
+     * This is the Android counterpart of the desktop ImGui "VXP Error" popup: the message
+     * is the same text, but it is laid out as a Compose dialog so it matches the rest of
+     * the app's UI instead of a native overlay. The body scrolls and wraps because the
+     * message carries a full path and can be far longer than one screen.
+     */
+    @Composable
+    private fun ErrorDialog(
+        message: String,
+        onCopy: () -> Unit,
+        onDismiss: () -> Unit
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onDismiss)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color(0xFF232327),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Taps inside the card must not dismiss; only the scrim behind it does.
+                    .clickable(enabled = false) {}
+            ) {
+                Column(Modifier.padding(24.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.ErrorOutline,
+                            contentDescription = null,
+                            tint = Color(0xFFE98A8A),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.size(12.dp))
+                        Text(
+                            text = stringResource(R.string.error_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Bounded so a long path scrolls inside the dialog instead of
+                    // pushing the buttons off screen.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF1B1B1F))
+                            .border(1.dp, Color(0xFF34343A), RoundedCornerShape(14.dp))
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFC7C5D0)
+                        )
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF2F2F36))
+                            .border(1.dp, Color(0xFF34343A), RoundedCornerShape(16.dp))
+                    ) {
+                        ErrorDialogAction(stringResource(R.string.copy)) { onCopy() }
+                        HorizontalDivider(color = Color(0xFF34343A))
+                        ErrorDialogAction(stringResource(R.string.ok), primary = true, onClick = onDismiss)
+                    }
+                }
+            }
+        }
+    }
+
+    /** One full-width row of [ErrorDialog]'s stacked actions. */
+    @Composable
+    private fun ErrorDialogAction(
+        label: String,
+        primary: Boolean = false,
+        onClick: () -> Unit
+    ) {
+        Surface(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.Transparent
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (primary) Color.White else Color(0xFFC7C5D0)
+                )
+            }
+        }
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         savedStateRegistryController.performRestore(savedInstanceState)
@@ -816,6 +1154,8 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         // the options dialog leaked its window.
         optionsDialog?.dismiss()
         optionsDialog = null
+        errorDialog?.dismiss()
+        errorDialog = null
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         viewModelStoreImpl.clear()
         super.onDestroy()
@@ -957,6 +1297,7 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
                 val realPosixPath = tempVxpFile.absolutePath
                 Log.d("MREmu", "File copied to cache: $realPosixPath")
+                VxpRepository(this).addRecentPath(realPosixPath)
 
                 // Deliberately NOT wrapped in runOnUiThread. nativeLoadVxpFile waits
                 // for g_appManager, which the render thread only publishes part way
@@ -967,6 +1308,27 @@ val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 Log.e("MREmu", "Copy to cache error", e)
             }
         }.start()
+    }
+
+    /**
+     * Plays a predefined haptic pattern for the Options button.
+     *
+     * Uses [View.performHapticFeedback] rather than the vibrator: the platform picks the
+     * right waveform for the attached input device, so it reads as a UI tick rather than
+     * the generic buzz [triggerVibration] produces for emulated key presses. Unknown
+     * constants are ignored, and a device with no haptics simply does nothing.
+     *
+     * Called from the native render thread, so it has to hop to the UI thread: haptic
+     * feedback is dispatched through the view's handler.
+     */
+    fun triggerHapticFeedback(feedbackConstant: Int) {
+        runOnUiThread {
+            try {
+                window.decorView.performHapticFeedback(feedbackConstant)
+            } catch (e: Exception) {
+                Log.w(TAG, "Haptic feedback unavailable", e)
+            }
+        }
     }
 
     fun triggerVibration(durationMs: Long) {

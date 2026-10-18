@@ -363,6 +363,7 @@ MigrationBackup/
 FodyWeavers.xsd
 
 .vscode
+.freebuff/
 build/
 .gradle/
 .cxx/

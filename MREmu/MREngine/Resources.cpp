@@ -175,7 +175,14 @@ VMUINT vm_get_resource_offset_from_file(VMWSTR filename, char* res_name) {
 }
 
 VMINT vm_get_res_header() {
-	return 8;
+	// Number of bytes of MRE bookkeeping an app has to skip at the start of a
+	// resource buffer. The engine hands resources out verbatim -
+	// vm_resource_get_data() copies the member to data[0] and vm_load_resource()
+	// returns the data pointer - so the offset is 0. Opera Mini 4.4 reads through
+	// `ptr + vm_get_res_header()`; answering 8 shifted every resource it loaded by
+	// 8 bytes, so its PNG signature check ran on the middle of the file, failed,
+	// and the app quit itself during startup.
+	return 0;
 }
 
 VMINT32 vm_res_init(void) {

@@ -5,7 +5,7 @@ MREmu can run with no window at all and talk to an AI agent over the
 other tools. The agent starts the emulator and then asks it questions: *what is running,
 what are the CPU registers, what does the screen look like, what broke?*
 
-```
+```bash
 MREmu.exe <app.vxp> --mcp
 ```
 
@@ -39,7 +39,7 @@ or by driving the selector's own UI.
 Because `--mcp` shows nothing, it can be hard to tell an agent's careful stepping apart
 from a hang. Add `--mcp-window` and you get the emulator window back:
 
-```
+```bash
 MREmu.exe <app.vxp> --mcp --mcp-window
 ```
 

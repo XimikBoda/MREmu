@@ -90,6 +90,7 @@ MCP server — client setup, every tool, and the behaviours that surprise people
 6. **Configuration cache is enabled** (`org.gradle.configuration-cache=true` in `Android/gradle.properties`). Avoid editing build scripts in ways that invalidate the configuration cache unnecessarily.
 7. **Generated directories are gitignored** and must not be committed: `build/`, `.gradle/`, `.cxx/`, `Android/app/build`, `Android/app/.cxx`, `Android/.gradle`.
 8. **Ask the user with the harness `question` tool, never as plain text.** Any time a decision is needed — scope, trade-offs, which of several options, anything that would otherwise be typed as "which do you prefer?" — call the `question` tool rather than embedding a question in the response. Each question must offer a concrete set of options and mark the recommended one first with `(Recommended)`, stating the reasoning, so the user can accept it in one keystroke or override it without having to type anything. Do not also restate the question in prose alongside the tool call. Reserve prose for reporting findings, not for requesting decisions.
+9. **Document fixed VXP cases.** When a VXP-app boot or behaviour issue is fixed, write a case study at `docs/fixed_cases/<vxp_name>.md` (lowercase, spaces to underscores) describing the symptom, root cause, how it was narrowed down, the fix (with the relevant code/diff), and verification (call counts, screens, tests). One file per affected VXP. Keep it so the next agent can reproduce and confirm the fix.
 
 ## Repository layout (top level)
 ```

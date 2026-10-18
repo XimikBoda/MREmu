@@ -1,6 +1,7 @@
 #include "AppSelector.h"
 #include "BottomSheet.h"
 #include "../../MREngine/Image.h"
+#include "../../MREngine/VxpIcon.h"
 #include "../../AppManager.h"
 #include "../../DragAndDrop.h"
 #include <vector>
@@ -317,16 +318,16 @@ namespace NativeApps::Menu::AppSelector {
 
 					vm_file_close(f);
 
-					std::string_view data_view(reinterpret_cast<const char*>(data.data()), data.size());
-					size_t pos = data_view.find("VREAPPLOGO09BVRE");
-
-					if (pos != std::string_view::npos) {
-						int img_size = *(int*)(data.data() + pos + 16 + 3);
-						VMUINT8* img_data = (data.data() + pos + 16 + 3 + 4);
-						if (data_view.substr(pos + 16, 3) == "PNG")
-							img_data += 8;
-
-						img = vm_graphic_load_image_resized_FIX(img_data, img_size, img_wh, img_wh);
+					// Icon discovery. The previous inline search trusted the VRE variant tag and
+					// its declared size, which only worked for packages whose payload happened
+					// to start with an image: the packages tagged JPG need an 8-byte skip that
+					// was keyed off the wrong tag, so they silently produced no icon.
+					// See MREngine::VxpIcon.
+					{
+						std::vector<uint8_t> icon = MREngine::extract_vxp_icon(data);
+						if (!icon.empty())
+							img = vm_graphic_load_image_resized_FIX(
+								icon.data(), (VMINT)icon.size(), img_wh, img_wh);
 					}
 
 					if (data.size() >= 12) {

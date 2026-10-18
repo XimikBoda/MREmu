@@ -135,7 +135,11 @@ static sf::FloatRect options_button_rect(int win_w, int win_h, int keyboard_bott
 	if (free_h < 24)
 		return sf::FloatRect();
 
-	int h = std::min(72, free_h - 12);
+	// 76 rather than 72: the taller target is easier to hit. The free-space budget is
+	// deliberately NOT reduced to match, because that budget decides how much room the
+	// emulated screen and on-screen keyboard get, and shrinking it costs a few pixels of
+	// keyboard height to buy four pixels on a button.
+	int h = std::min(76, free_h - 12);
 	if (h < 16)
 		h = free_h;
 	int w = h * 4;
@@ -161,7 +165,7 @@ static void draw_options_button(sf::RenderTarget& rt, const sf::FloatRect& r, bo
 	back.setOutlineThickness(1);
 	rt.draw(back);
 
-	// Three stacked dots, so the button reads as a menu without needing a font.
+	// Three dots in a row, so the button reads as a menu without needing a font.
 	const float cx = r.left + r.width / 2.f;
 	const float cy = r.top + r.height / 2.f;
 	const float d = r.height / 8.f;
@@ -169,7 +173,7 @@ static void draw_options_button(sf::RenderTarget& rt, const sf::FloatRect& r, bo
 	for (int i = -1; i <= 1; ++i) {
 		sf::CircleShape dot(d);
 		dot.setOrigin(d, d);
-		dot.setPosition(cx, cy + i * gap);
+		dot.setPosition(cx + i * gap, cy);
 		dot.setFillColor(sf::Color(235, 235, 240));
 		rt.draw(dot);
 	}
@@ -258,6 +262,89 @@ static void request_options_dialog() {
 		g_jvm->DetachCurrentThread();
 }
 
+// Called from the SFML render thread when the emulator raises a fatal error
+// (bad VXP, failed load, preparation fault). Hands the message to the activity,
+// which presents it as a Compose dialog with a copy button. The desktop build
+// shows the same text in the ImGui "VXP Error" popup instead.
+static void request_error_dialog(const std::string& message) {
+	if (!g_jvm || !g_activity)
+		return;
+
+	JNIEnv* env = nullptr;
+	bool attached = false;
+	if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK) {
+		if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK)
+			return;
+		attached = true;
+	}
+
+	jclass cls = env->GetObjectClass(g_activity);
+	if (cls) {
+		jmethodID mid = env->GetMethodID(cls, "showErrorDialogUi", "(Ljava/lang/String;)V");
+		if (mid) {
+			jstring j_msg = env->NewStringUTF(message.c_str());
+			if (j_msg) {
+				env->CallVoidMethod(g_activity, mid, j_msg);
+				env->DeleteLocalRef(j_msg);
+			}
+			else {
+				// NewStringUTF raises OutOfMemoryError; leaving it pending and then
+				// detaching the thread while it still owns the exception is undefined
+				// and aborts the process.
+				env->ExceptionClear();
+			}
+			// The call can itself throw (BadTokenException when the activity is
+			// finishing). Same reasoning as above.
+			if (env->ExceptionCheck())
+				env->ExceptionClear();
+		}
+		else {
+			env->ExceptionClear();
+		}
+		env->DeleteLocalRef(cls);
+	}
+
+	if (attached)
+		g_jvm->DetachCurrentThread();
+}
+
+// Called from the SFML render thread when the Options button is tapped. Uses
+// performHapticFeedback() rather than the vibrator so the platform picks a
+// predefined pattern for the current input device, which reads as a deliberate
+// "this opened something" tick instead of the generic buzz used for key presses.
+static void trigger_options_haptic() {
+	if (!g_jvm || !g_activity)
+		return;
+
+	JNIEnv* env = nullptr;
+	bool attached = false;
+	if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK) {
+		if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK)
+			return;
+		attached = true;
+	}
+
+	jclass cls = env->GetObjectClass(g_activity);
+	if (cls) {
+		jmethodID mid = env->GetMethodID(cls, "triggerHapticFeedback", "(I)V");
+		if (mid) {
+			// 2 == View.HAPTIC_TICK, added in API 21, so it is valid on every
+			// supported release. HAPTIC_CLOCK_TICK would read better but is API 27
+			// and would be a silent no-op below that.
+			env->CallVoidMethod(g_activity, mid, (jint)2);
+			if (env->ExceptionCheck())
+				env->ExceptionClear();
+		}
+		else {
+			env->ExceptionClear();
+		}
+		env->DeleteLocalRef(cls);
+	}
+
+	if (attached)
+		g_jvm->DetachCurrentThread();
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_ximikboda_mremu_MainActivity_requestHardReset(JNIEnv *env, jobject thiz) {
     // The main loop picks this up and performs the reset on the render thread.
@@ -289,6 +376,12 @@ Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thi
 #else
 // The options dialog is Android-only; desktop builds simply have no button.
 static void request_options_dialog() {}
+
+// Desktop raises errors through the ImGui popup in the main loop instead.
+static void request_error_dialog(const std::string&) {}
+
+// No on-screen Options button outside Android.
+static void trigger_options_haptic() {}
 #endif
 
 #ifndef ANDROID
@@ -937,6 +1030,19 @@ int main(int argc, char** argv) {
 		options_btn = options_button_rect(
 			win_device.getSize().x, win_device.getSize().y, keyboard.bottom());
 #endif
+#ifdef ANDROID
+		// Surface a pending fatal error to the Compose dialog. Android-only: the desktop
+		// build renders the same message in an ImGui popup further down this loop, which
+		// reads error_message directly. Draining it here would hand that popup an empty
+		// string, so the take_error_message() call must stay on this side of the split.
+		if (show_error) {
+			show_error = false;
+			std::string err = take_error_message();
+			if (!err.empty())
+				request_error_dialog(err);
+		}
+#endif
+
 		if (g_request_hard_reset) {
 			g_request_hard_reset = false;
 
@@ -1015,6 +1121,7 @@ int main(int argc, char** argv) {
 				event.mouseButton.button == sf::Mouse::Button::Left) {
 				if (options_btn_pressed &&
 					options_btn.contains((float)event.mouseButton.x, (float)event.mouseButton.y)) {
+					trigger_options_haptic();
 					request_options_dialog();
 				}
 				options_btn_pressed = false;
@@ -1026,6 +1133,7 @@ int main(int argc, char** argv) {
 			else if (event.type == sf::Event::TouchEnded) {
 				if (options_btn_pressed &&
 					options_btn.contains((float)event.touch.x, (float)event.touch.y)) {
+					trigger_options_haptic();
 					request_options_dialog();
 				}
 				options_btn_pressed = false;

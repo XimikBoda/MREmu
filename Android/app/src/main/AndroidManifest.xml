@@ -52,6 +52,26 @@
                 <data android:pathPattern=".*\\.vxp" />
             </intent-filter>
         </activity>
+        <!--
+            Placeholder destination for the VXP Browser entry in the library's header
+            menu. Not exported and not launchable from the launcher; it exists so the
+            menu opens a real screen rather than a no-op.
+        -->
+        <activity
+            android:name=".VxpBrowserActivity"
+            android:exported="false"
+            android:label="@string/vxp_browser"
+            android:theme="@style/Theme.Android" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

@@ -772,7 +772,9 @@ VMINT vm_is_support_pen_touch(void) {
 VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
 	if (filename[0] == '@') {
 		fs::path vpath = UCS2_to_path((VMWSTR)filename);
-		uint32_t adr;
+		// Initialise before sscanf: on a malformed "@:\<name>.rom" the parse fails
+		// and an uninitialised adr would be turned into a wild host pointer.
+		uint32_t adr = 0;
 		sscanf(vpath.stem().string().c_str(), "%d", &adr);
 		return vm_get_vm_tag_from_rom((VMUINT8*)ADDRESS_FROM_EMU(adr), tag_num, buf, buf_size);
 	}
