@@ -345,7 +345,7 @@ const char16_t* keys_marks_right[3][3] = {
 	{u"\u232B", u"\u2B07", u"\u21A9"},
 };
 
-void Keyboard::update_resize(int win_w, int win_h) {
+void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 	int screen_x = screen->getPosition().x;
 	int screen_y = screen->getPosition().y;
 	int screen_w = screen->getScale().x * screen->getTextureRect().width;
@@ -359,7 +359,7 @@ void Keyboard::update_resize(int win_w, int win_h) {
 		right = { x + size.x / 2, y, size.x / 2, size.y };
 	}
 	else {
-		auto size = size_by_aspect_ratio((win_w - screen_w) / 2, win_h, 3.f / 4.f);
+		auto size = size_by_aspect_ratio((win_w - screen_w) / 2, win_h - menu_h, 3.f / 4.f);
 		int y = win_h - size.y;
 		left = { (screen_x - size.x) / 2, y, size.x, size.y };
 		right = { screen_x + screen_w, y, size.x, size.y };

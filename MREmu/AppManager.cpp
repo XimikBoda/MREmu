@@ -350,6 +350,12 @@ App* AppManager::get_current_work_app_id()
 		return &*apps[current_work_app_id];
 }
 
+App* get_active_app() {
+	if (g_appManager)
+		return g_appManager->get_active_app();
+	return 0;
+}
+
 App* get_cur_app() {
 	App* curr_app = 0;
 	if (g_appManager && (curr_app = g_appManager->get_current_work_app_id()))

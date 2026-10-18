@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.8)
 add_library (Device 
 						"Device.cpp" "Device.h"
 						"Keyboard.cpp" "Keyboard.h"
+						"Menubar.cpp" "Menubar.h"
 						"Touch.cpp" "Touch.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)

@@ -89,5 +89,5 @@ public:
 
 	int find_key_by_pos(int px, int py);
 
-	void update_resize(int w, int h);
+	void update_resize(int w, int h, int menu_h);
 };

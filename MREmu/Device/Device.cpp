@@ -28,22 +28,34 @@ void Device::update_size() {
 
 	touch.screen = &screen_sp;
 	keyboard.screen = &screen_sp;
+	menubar.screen = &screen_sp;
 
-	int scale_x = win.getSize().x / graphic.width;
-	int scale_y = win.getSize().y / (graphic.height + graphic.height / 2);
+	int menubar_height = menubar.getHeight();
 
-	scale = std::min(scale_x, scale_y);
-	if (scale < 1)
-		scale = 1;
+	float scale_x = win.getSize().x / (float)graphic.width;
+	float scale_y = win.getSize().y / (float)(graphic.height + menubar_height);
+
+	float scale = scale_x;
+
+	if (scale_y < scale_x) {
+		if(win.getSize().x > graphic.width * scale_y * 2)
+			scale_y = win.getSize().y / (float)graphic.height, menubar_height = 0;
+		scale = scale_y;
+	}
+
+	if (scale < 0)
+		scale = 0;
 
 	screen_sp.setScale(scale, scale);
-	screen_sp.setPosition((win.getSize().x - graphic.width * scale) / 2, 0);
+	screen_sp.setPosition((win.getSize().x - graphic.width * scale) / 2, menubar_height * scale);
 
-	keyboard.update_resize(win.getSize().x, win.getSize().y);
+	keyboard.update_resize(win.getSize().x, win.getSize().y, menubar.getHeight() * scale);
+	menubar.update_resize(win.getSize().x, win.getSize().y);
 }
 
 void Device::draw() {
 	keyboard.draw(&win);
+	menubar.draw(&win);
 
 	screen_sp.setTexture(graphic.screen_tex, true);
 	win.draw(screen_sp);
