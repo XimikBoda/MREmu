@@ -69,6 +69,16 @@ idle handler indefinitely. `emu_step` reports this honestly (`timers_made_due: 0
 non-zero `step_budget`) rather than appearing to work. To drive the app again, inject
 input or reload the VXP.
 
+### A second concurrent directory enumeration stops after one entry
+
+`vm_find_next_ext` (`MREmu/MREngine/IO.cpp`) walks a `find_el` snapshot. A second
+enumeration opened while another find handle is still active (the old `AppSelector::scan()`
+leaked its handle, and VXP apps can legitimately keep one open) stops after the first
+entry. The app selector's old folder-details count had this and was removed rather than
+shipped wrong; `scan()` itself now closes its handle, so back-to-back enumerations through
+the selector work. Whether an app's own second concurrent enumeration is affected is
+unverified.
+
 ### VXP offsets are not bounds-checked
 
 `MREmu/ArmApp.cpp` and `MREmu/MreTags.cpp` use offsets and sizes read straight out of

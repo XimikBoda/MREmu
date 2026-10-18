@@ -30,7 +30,9 @@ Point your agent at the executable and give it two arguments — the app to load
 ```
 
 The same works for Claude Code and other MCP clients. If you leave the app path out, the
-emulator starts empty and the agent can load apps itself.
+emulator boots the app selector instead — exactly what the graphical emulator does — so
+the agent starts with the app list visible and can launch a VXP from it with `emu_load_vxp`
+or by driving the selector's own UI.
 
 ## Watching what the agent is doing
 

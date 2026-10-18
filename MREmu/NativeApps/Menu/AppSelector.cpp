@@ -268,14 +268,13 @@ namespace NativeApps::Menu::AppSelector {
 			pattern += u'\\';
 		pattern += u"*";
 
-		for (int ret = 0, find_h = vm_find_first_ext((VMWSTR)pattern.c_str(), &direntry);
-			find_h >= 0 && !ret;
+		int find_h = vm_find_first_ext((VMWSTR)pattern.c_str(), &direntry);
+		for (int ret = 0; find_h >= 0 && !ret;
 			ret = vm_find_next_ext(find_h, &direntry))
 		{
 			std::u16string name = (char16_t*)direntry.filefullname;
 			if (name == u"." || name == u"..")
 				continue;
-
 			std::u16string item_path = current_dir;
 			if (item_path.empty() || item_path.back() != u'\\')
 				item_path += u'\\';
@@ -401,6 +400,13 @@ namespace NativeApps::Menu::AppSelector {
 			}
 		}
 
+		// Close the enumeration. It used to be left open, which leaked a handle per
+		// scan() and - worse - left a live iterator behind: a second enumeration
+		// started while this one was still open would stop after the first entry,
+		// which is what made the folder details count wrong.
+		if (find_h >= 0)
+			vm_find_close_ext(find_h);
+
 		auto sort_entries = [](std::vector<vxp>& list, size_t start_idx) {
 			std::sort(list.begin() + start_idx, list.end(), [](const vxp& a, const vxp& b) {
 				std::u16string na = a.name;
@@ -435,41 +441,10 @@ namespace NativeApps::Menu::AppSelector {
 
 	void update_confirm_sheet(const vxp& app);
 
-	// Counts what a folder holds, so the details sheet can say something useful
-	// about it. Only .vxp files and subfolders are counted, matching what scan()
-	// would actually list, so the number matches what opening it shows.
-	struct dir_counts { int apps = 0; int folders = 0; };
-
-	dir_counts count_dir(const std::u16string& path) {
-		dir_counts c;
-		std::u16string pattern = path;
-		if (pattern.empty() || pattern.back() != u'\\')
-			pattern += u'\\';
-		pattern += u"*";
-
-		vm_fileinfo_ext e;
-		for (int h = vm_find_first_ext((VMWSTR)pattern.c_str(), &e);
-			h >= 0;
-			h = vm_find_next_ext(h, &e)) {
-			std::u16string name = (char16_t*)e.filefullname;
-			if (name == u"." || name == u"..")
-				continue;
-
-			if (e.attributes & VM_FS_ATTR_DIR) {
-				c.folders++;
-				continue;
-			}
-			if (name.size() < 4)
-				continue;
-			std::u16string ext = name.substr(name.size() - 4);
-			for (auto& ch : ext)
-				ch = (char16_t)std::tolower((char)ch);
-			if (ext == u".vxp")
-				c.apps++;
-		}
-		return c;
-	}
-
+	// NOTE: no contents count here on purpose. It was tried (a second
+	// vm_find_first_ext/enumeration while the app lists its own dir) and it
+	// silently stops after the first entry - see the known-issues note in
+	// README.md. A wrong number is worse than no number.
 	// Mirror of update_details_sheet for a folder. There is no Delete here on
 	// purpose - removing a folder is not something this does, and offering the
 	// button would imply it. Left opens the folder, right closes.
@@ -480,13 +455,6 @@ namespace NativeApps::Menu::AppSelector {
 
 		// Paths are long and the sheet is narrow, so let them scroll.
 		details_sheet.add_line(dir.path, 0xFFFF, true);
-
-		dir_counts c = count_dir(dir.path);
-		std::string s = "Contents: " + std::to_string(c.apps)
-			+ (c.apps == 1 ? " app, " : " apps, ")
-			+ std::to_string(c.folders)
-			+ (c.folders == 1 ? " folder" : " folders");
-		details_sheet.add_line(std::u16string(s.begin(), s.end()), 0xFFFF, false);
 
 		std::u16string open_path = dir.path;
 

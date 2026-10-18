@@ -679,7 +679,14 @@ int main(int argc, char** argv) {
 		appManager.start();
 		// AppManager::loop drains the launch queue on its own thread, so queue the
 		// argv VXP after start() and it gets picked up like the GUI path does.
-		McpHost::bootstrap_launch(app_path, path_is_local);
+		// With no path, fall back to the app selector exactly as the GUI does.
+		// bootstrap_launch() returns on an empty path, so without this --mcp
+		// started the emulator with nothing running at all: a black screen and an
+		// empty emu_list_apps, with nothing to say a native app was expected.
+		if (!app_path.empty())
+			McpHost::bootstrap_launch(app_path, path_is_local);
+		else
+			appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
 
 		std::atomic<bool> stop{false};
 		std::thread emu([&]() {
