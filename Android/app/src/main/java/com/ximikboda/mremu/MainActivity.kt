@@ -189,6 +189,18 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
         private const val PICK_VXP_REQUEST_CODE = 102
 
+        // Vibration shaping, in milliseconds. See triggerVibration for why the same
+        // duration needs different treatment depending on the device's motor.
+        // TICK_MAX_MS and PREDEFINED_MAX_MS split the OEM-tuned effect band: at or below
+        // TICK_MAX_MS the pulse is a discrete tick (what the app selector fires per
+        // selection change), above it and up to PREDEFINED_MAX_MS it is a firmer click,
+        // and above that it is a sustained buzz that no predefined effect models.
+        private const val TICK_MAX_MS = 100L
+        private const val PREDEFINED_MAX_MS = 250L
+        // Shortest pulse an eccentric rotating mass motor will actually produce, used
+        // only on API < 29 where there are no predefined effects to defer to the OEM.
+        private const val ROTATING_MASS_FLOOR_MS = 60L
+
         init {
             System.loadLibrary("MREmu")
         }
@@ -1447,6 +1459,29 @@ private enum class OptionsPage(val title: String) {
         }
     }
 
+    /**
+     * Plays [durationMs] of vibration, shaped for the actuator this handset actually has.
+     *
+     * Phones ship two very different motors, and a duration that suits one is wrong for the
+     * other. A linear resonant actuator is crisp and resolves a 10-20 ms tick perfectly. An
+     * eccentric rotating mass motor - the coin motor still fitted to a lot of budget Android
+     * phones - needs roughly 15-30 ms just to spin the mass past the perceptible threshold,
+     * so a 40 ms one-shot arrives barely started and reads as almost nothing. Retriggered
+     * faster than that, which is exactly what the app selector's key auto-repeat does once it
+     * accelerates to 50 ms, the mass is cancelled mid spin-up over and over and the result
+     * is a stutter rather than a buzz.
+     *
+     * No public API reports motor type. The predefined effects are the way out of that:
+     * each OEM tunes them against the hardware in the handset, so asking for EFFECT_TICK
+     * lands a waveform that suits whichever motor is fitted. API 29 and up use them for
+     * short pulses. A long pulse is a sustained buzz rather than a tick and no predefined
+     * effect covers that, so it stays a one-shot of the requested length - a sustained buzz
+     * is motor-agnostic anyway. Below API 29 there are no predefined effects at all, so the
+     * duration is lifted to the rotating-mass floor instead: that makes the tick a little
+     * long on a linear actuator, but it is the only way it is felt on the cheap motor.
+     *
+     * Called from the native render thread.
+     */
     fun triggerVibration(durationMs: Long) {
         try {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1462,11 +1497,24 @@ private enum class OptionsPage(val title: String) {
                 return
             }
 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && durationMs <= PREDEFINED_MAX_MS) {
+                // EFFECT_TICK / EFFECT_CLICK are effect ids, not VibrationEffect
+                // objects; createPredefined() is what turns one into a waveform.
+                val effectId = if (durationMs <= TICK_MAX_MS) VibrationEffect.EFFECT_TICK
+                else VibrationEffect.EFFECT_CLICK
+                vibrator.vibrate(VibrationEffect.createPredefined(effectId))
+                return
+            }
+
+            val effectiveMs =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) durationMs
+                else maxOf(durationMs, ROTATING_MASS_FLOOR_MS)
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                vibrator.vibrate(VibrationEffect.createOneShot(effectiveMs, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(durationMs)
+                vibrator.vibrate(effectiveMs)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Vibration failed", e)
