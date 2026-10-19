@@ -110,6 +110,7 @@ The ones worth reaching for:
 | `kFocusRimPx` | 2 | Thickness of the outline around the selected tile |
 | `kFocusAlpha` | 235 | How solid that outline is |
 | `kAccentR/G/B` | 126, 178, 242 | The outline's colour, shared with the title text |
+| `kIconOverdrawNum/Den` | 11, 10 | Icon scale before the clip — trims the frames packages bake in |
 | `kMaxCellPx` | 64 | Ceiling on the cell pitch, so tiles stay tile-sized |
 | `kGridDim`, `kListDim` | 64, 70 | How far each layout pushes the wallpaper back |
 | `kPressR/G/B` | 232, 236, 243 | The block behind a held softkey |
@@ -121,6 +122,23 @@ the tile is sized from the **larger** of the two gaps and the smaller is
 absorbed by the centring. They are separate constants because row and column
 spacing are separate design decisions, but giving them different values has no
 effect until the cell pitch itself is made rectangular.
+
+### Icon overdraw
+
+Package artwork is drawn at `kIconOverdrawNum/Den` of the tile (110%) and
+centred, so the squircle clip throws away its outermost band.
+
+This is not for looks. A VXP icon is its **own** rounded-square artwork, and many
+of them have a pale frame drawn around the outside — Gameloft Live's is a 45×45
+GIF with a light border a couple of pixels in. Drawn edge to edge, that frame
+showed on all four sides and every tile looked outlined in grey, while the clip
+only cut it at the corners where the two shapes happened to overlap. Scaling past
+the clip puts the frame outside the tile, and the tile's edge becomes purely the
+squircle.
+
+The icon is also decoded at the overdraw size rather than at `grid_icon`, so the
+source is resampled once at the resolution it is actually drawn at instead of
+being stretched after decoding.
 
 ### No drop shadow
 

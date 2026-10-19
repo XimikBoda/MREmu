@@ -141,6 +141,11 @@ namespace NativeApps::Menu::AppSelector {
 
 	// --- Tile chrome --------------------------------------------------------
 
+	// Package artwork is drawn [num]/[den] of the tile and centred, so the clip
+	// throws away its outermost band. See the overdraw comment in draw_tile().
+	static constexpr int kIconOverdrawNum = 11;
+	static constexpr int kIconOverdrawDen = 10;
+
 	// There is deliberately no drop shadow under the tiles. A dark squircle
 	// offset down and right reads as a rim rather than as depth at this size:
 	// the tile's own antialiased edge blends against whatever is underneath it,
@@ -574,8 +579,13 @@ namespace NativeApps::Menu::AppSelector {
 	void ensure_big_icon(vxp& v) {
 		if (v.img_big || v.icon_data.empty() || grid_icon < 1)
 			return;
+
+		// Decoded at the overdraw size, not at grid_icon, so the loader resamples
+		// the source once at the resolution it is actually drawn at. Decoding at
+		// grid_icon and stretching afterwards would resample the stretched result.
+		int px = grid_icon * kIconOverdrawNum / kIconOverdrawDen;
 		v.img_big = vm_graphic_load_image_resized_FIX(
-			v.icon_data.data(), (VMINT)v.icon_data.size(), grid_icon, grid_icon);
+			v.icon_data.data(), (VMINT)v.icon_data.size(), px, px);
 	}
 
 	void entry() {
@@ -1455,12 +1465,38 @@ namespace NativeApps::Menu::AppSelector {
 				const uint16_t* src = (const uint16_t*)(cfp + 1);
 				int sw = cfp->width, sh = cfp->height;
 
-				for (int py = 0; py < size; ++py) {
-					const uint16_t* srow = src + (size_t)(py * sh / size) * sw;
-					for (int px = 0; px < size; ++px) {
-						int cov = tile_coverage(px, py, size, radius);
+				// Overdraw: the icon is drawn larger than the tile and centred, so
+				// the clip throws away its outermost band.
+				//
+				// This is for the frames the packages bake in. A VXP icon is its
+				// own rounded-square artwork with a pale border drawn around it -
+				// Gameloft Live's is a 45x45 GIF with a light frame a couple of
+				// pixels in. Drawing it edge to edge showed that frame on all four
+				// sides, so every tile looked outlined in grey no matter what the
+				// squircle did, and our clip only cut the corners where the frame
+				// and the clip happened to overlap.
+				//
+				// Scaling past the clip is what removes it: the frame ends up
+				// outside the tile, and the artwork fills the shape the grid is
+				// actually drawing. Nothing else is drawn on top, so the tile's
+				// edge is purely the clip.
+				const int draw_size = size * kIconOverdrawNum / kIconOverdrawDen;
+				const int o = (size - draw_size) / 2;
+
+				for (int py = 0; py < draw_size; ++py) {
+					int ly = o + py;
+					if (ly < 0 || ly >= size)
+						continue;
+
+					const uint16_t* srow = src + (size_t)(py * sh / draw_size) * sw;
+					for (int px = 0; px < draw_size; ++px) {
+						int lx = o + px;
+						if (lx < 0 || lx >= size)
+							continue;
+
+						int cov = tile_coverage(lx, ly, size, radius);
 						if (cov)
-							blend_at(x + px, y + py, srow[px * sw / size], cov);
+							blend_at(x + lx, y + ly, srow[px * sw / draw_size], cov);
 					}
 				}
 			}
