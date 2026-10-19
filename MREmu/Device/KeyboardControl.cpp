@@ -38,6 +38,13 @@ void KeyboardControl::press_key(int key_code, key_source source) {
 			vibration.vibrate(sf::milliseconds(50));
 		}
 #endif
+		if (key_code == MREMU_KEY_PRINTSCREEN){ //TODO
+			auto app = get_active_app();
+			if (app) {
+				graphic->screenshot(app->app_name);
+			}
+
+		}
 
 		pkey.push_back(pkey_t(key_code, source));
 		if(key_code <= VM_KEY_QWERTY_MENU)

@@ -6,6 +6,7 @@
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 #include <vmpromng.h>
+#include <format>
 
 MREngine::Graphic* graphic = 0; // Do I really need this?
 
@@ -175,6 +176,21 @@ void MREngine::Graphic::imgui_screen() {
 			vm_graphic_flush_screen();
 	}
 	ImGui::End();
+}
+
+std::string get_screenshots_path();
+
+void MREngine::Graphic::screenshot(std::u8string name) {
+	vm_time_t time;
+	vm_get_time(&time);
+
+	int ms = vm_get_tick_count();
+
+	std::string file_name = std::format("{:04}_{:02}_{:02}_{:02}_{:02}_{:02}_{:03}_{}.png",
+		time.year, time.mon, time.day, time.hour, time.min, time.sec, ms % 1000, (char*)name.c_str());
+
+	auto im = screen_tex.copyToImage();
+	im.saveToFile(get_screenshots_path() + file_name);
 }
 
 MREngine::Graphic::~Graphic()
