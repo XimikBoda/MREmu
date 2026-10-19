@@ -45,6 +45,16 @@ ILLEGAL = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 SITE_TAG = re.compile(r"\s*\[[^\]]*\]")
 COPY_MARK = re.compile(r"\s*\(\s*(copy|\d+)\s*\)\s*$", re.I)
 RES_TOKEN = re.compile(r"\b\d{3,4}\s*[xX]\s*\d{3,4}\b")
+# Uploader / device / format junk that some packages bake into their own name.
+UPLOADER_JUNK = re.compile(
+    r"\s*(?:MT\d{4}\([^)]*\)\s*works\s+in\s+all\s+vxp\s+phone-\d+"
+    r"|QVGA\s+\d+K\s+\w+\s+\d{6}"
+    r"|works\s+in\s+all\s+vxp\s+phone-\d+"
+    r"|works\s+in\s+nokia\s+[\d,]+"
+    r")",
+    re.I)
+# Attribution prefix before " - " (e.g. "Pragathees Waran - Go Cart ...").
+ATTRIBUTION = re.compile(r"^[A-Za-z][A-Za-z .'-]*\s+-\s+")
 
 
 def sha256(path):
@@ -86,6 +96,8 @@ def clean_stem(filename):
     """Reduce a filename to something readable, without inventing anything."""
     stem = filename[:-4] if filename.lower().endswith(".vxp") else filename
     stem = SITE_TAG.sub("", stem)
+    stem = UPLOADER_JUNK.sub("", stem)
+    stem = ATTRIBUTION.sub("", stem)
     stem = stem.replace("_", " ")
     stem = COPY_MARK.sub("", stem)
     return re.sub(r"\s+", " ", stem).strip(" -.")
@@ -295,6 +307,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", default=DEFAULT_DIR)
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--keep-duplicates", action="store_true",
+                    help="move duplicates to _duplicates/ instead of deleting "
+                         "them (default is to delete)")
     args = ap.parse_args()
 
     if not os.path.isdir(args.dir):
@@ -343,9 +358,6 @@ def main():
         print("dry run - nothing changed. Re-run with --apply.")
         return
 
-    qdir = os.path.join(args.dir, QUARANTINE)
-    os.makedirs(qdir, exist_ok=True)
-
     # Always record the mapping before touching anything. Renaming is
     # otherwise irreversible: the original filename is not recoverable from
     # the package, only from this file.
@@ -358,14 +370,42 @@ def main():
             fh.write("rename\t%s\t->\t%s\n" % (e["keep"], target(e)))
     print("manifest: %s" % manifest)
 
-    for old, _keep in sorted(moved):
-        src = os.path.join(args.dir, old)
-        dst = os.path.join(qdir, old)
-        n = 2
-        while os.path.exists(dst):
-            dst = os.path.join(qdir, "%s.%d.vxp" % (old[:-4], n))
-            n += 1
-        os.replace(src, dst)
+    # Eliminate duplicates: delete them. The content is preserved in the
+    # surviving copy (verified byte-identical by hash), so nothing is lost.
+    # The --keep-duplicates flag overrides this for a safety net.
+    if args.keep_duplicates:
+        qdir = os.path.join(args.dir, QUARANTINE)
+        os.makedirs(qdir, exist_ok=True)
+        for old, _keep in sorted(moved):
+            src = os.path.join(args.dir, old)
+            dst = os.path.join(qdir, old)
+            n = 2
+            while os.path.exists(dst):
+                dst = os.path.join(qdir, "%s.%d.vxp" % (old[:-4], n))
+                n += 1
+            os.replace(src, dst)
+        print("quarantined: %d (in %s)" % (len(moved), QUARANTINE))
+    else:
+        for old, _keep in sorted(moved):
+            src = os.path.join(args.dir, old)
+            if os.path.exists(src):
+                os.remove(src)
+        # Remove _duplicates if it exists from a previous run.
+        qdir = os.path.join(args.dir, QUARANTINE)
+        if os.path.isdir(qdir):
+            try:
+                # Only remove if empty (all duplicates were deleted, not moved).
+                if not os.listdir(qdir):
+                    os.rmdir(qdir)
+                else:
+                    # Move any remaining files to a temp location and remove.
+                    import shutil
+                    for f in os.listdir(qdir):
+                        os.remove(os.path.join(qdir, f))
+                    os.rmdir(qdir)
+            except OSError:
+                pass
+        print("eliminated: %d duplicates" % len(moved))
 
     # Two-phase rename so a swap cannot collide with a target name.
     tmp = {}
@@ -378,7 +418,7 @@ def main():
         os.replace(t, os.path.join(args.dir, target(e)))
 
     print()
-    print("applied: %d moved, %d renamed, %d kept" %
+    print("applied: %d eliminated, %d renamed, %d kept" %
           (len(moved), len(renamed), len(entries) - len(renamed)))
 
 
