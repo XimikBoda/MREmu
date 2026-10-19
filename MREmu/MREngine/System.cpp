@@ -204,7 +204,14 @@ VMUINT vm_get_mre_version(void) {
 
 void vm_vibrator_once(void) {
 	spdlog::debug("vm_vibrator_once called");
-	mremu_vibrate(sf::milliseconds(1000));
+	// A one-shot tick, not an alert. The API takes no duration argument, so this
+	// value is entirely the emulator's choice, and 1000ms was wrong for the way
+	// guests actually use it: the app selector fires one of these per selection
+	// change, and with auto-repeat accelerating to 50ms a 1s buzz would run
+	// continuously while scrolling and keep going long after release. 40ms reads
+	// as a discrete tick instead, and still leaves vm_vibrator_on/off to carry the
+	// sustained case.
+	mremu_vibrate(sf::milliseconds(40));
 }
 
 void vm_vibrator_on(void) {

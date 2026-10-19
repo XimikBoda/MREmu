@@ -15,6 +15,7 @@
 #include <vmio.h>
 #include <vmpromng.h>
 #include <vmstdlib.h>
+#include <vmsys.h>
 #include <vmtimer.h>
 #include <algorithm>
 #include <cmath>
@@ -1992,6 +1993,13 @@ namespace NativeApps::Menu::AppSelector {
 		}
 
 		if (m_i != old_m_i) {
+			// One tick per item change, through the VM vibration API so it is the
+			// same feedback regardless of whether the key came from the on-screen
+			// keypad, a physical keyboard, or the MCP host. With auto-repeat this
+			// doubles as scroll feedback, which is why vm_vibrator_once has to be a
+			// short tick rather than a second-long buzz.
+			vm_vibrator_once();
+
 			reset_marquee();
 			// The switch item is not an app, so there is nothing to remember
 			// about it as the last selection.
