@@ -971,6 +971,37 @@ namespace NativeApps::Menu::AppSelector {
 		reset_marquee();
 	}
 
+	// Flips between the two layouts and persists the choice. Shared by the
+	// trailing switch item and by the grid's Back softkey, which also lands here
+	// once there is no parent folder left to go up to.
+	void toggle_view() {
+		view = view == View::List ? View::Grid : View::List;
+		// The two layouts have different pitches and different viewport
+		// heights, so the old offset means nothing in the new one.
+		set_scroll_pos(0);
+		save_view_pref();
+		reset_marquee();
+		trigger_scrollbar();
+		// The switch item is the last one in either layout, so without this
+		// it lands off the bottom of the grid and the switch appears to have
+		// lost the selection.
+		scroll_to_selection();
+	}
+
+	// The "Back" softkey, shared by the key handler and the pen so the two
+	// cannot drift apart.
+	//
+	// Up a folder is what this has always meant, and in the list it stays exactly
+	// that. In the grid it also has to be a way *out*: reaching list view
+	// otherwise meant scrolling to the very last item on the very last page and
+	// choosing it, and at the root there was no Back at all - open_parent_dir()
+	// just returned false, so the key did nothing at all. With no parent left,
+	// fall back to the layout switch instead.
+	void do_back() {
+		if (!open_parent_dir() && view == View::Grid)
+			toggle_view();
+	}
+
 	// Enter a folder, launch an app, or flip the layout. One place, because
 	// OK, a tap and the grid's Choose label all mean the same thing.
 	void activate(int i) {
@@ -978,17 +1009,7 @@ namespace NativeApps::Menu::AppSelector {
 			return;
 
 		if (is_switch_item(i)) {
-			view = view == View::List ? View::Grid : View::List;
-			// The two layouts have different pitches and different viewport
-			// heights, so the old offset means nothing in the new one.
-			set_scroll_pos(0);
-			save_view_pref();
-			reset_marquee();
-			trigger_scrollbar();
-			// The switch item is the last one in either layout, so without this
-			// it lands off the bottom of the grid and the switch appears to have
-			// lost the selection.
-			scroll_to_selection();
+			toggle_view();
 			return;
 		}
 
@@ -1047,9 +1068,9 @@ namespace NativeApps::Menu::AppSelector {
 		return (i >= 0 && i < count()) ? i : -1;
 	}
 
-	// Grid navigation. Left and right walk along the row and wrap into
-	// the neighbouring one; up and down move a whole row, and because the grid
-	// pages, crossing a page boundary takes the page with it.
+	// Grid navigation. Left and right walk the whole item list and wrap at both
+	// ends, so they cross row boundaries; up and down move a whole row, and
+	// because the grid pages, crossing a page boundary takes the page with it.
 	void move_selection_grid(VMINT keycode) {
 		int n = count();
 		if (n <= 1)
@@ -1929,7 +1950,7 @@ namespace NativeApps::Menu::AppSelector {
 				return;
 			case VM_KEY_RIGHT_SOFTKEY:
 				// Reads as "Back" on the grid's softkey bar.
-				open_parent_dir();
+				do_back();
 				draw();
 				return;
 			case VM_KEY_OK:
@@ -2003,7 +2024,7 @@ namespace NativeApps::Menu::AppSelector {
 				else if (fired == 2)
 					activate(m_i);
 				else if (fired == 3)
-					open_parent_dir();
+					do_back();
 			}
 			break;
 		}

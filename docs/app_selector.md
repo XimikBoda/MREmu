@@ -273,9 +273,18 @@ press and tap. Every caller draws exactly once.
 | | List | Grid |
 | --- | --- | --- |
 | Left softkey / *Options* | app or folder details | same |
-| Right softkey / *Back* | parent folder | same |
+| Right softkey / *Back* | parent folder | parent folder, else **list view** |
 | OK / *Choose* | open folder, launch, switch layout | same |
 | Long tap | details sheet | same |
+
+In the grid, *Back* is also the way **out**. Reaching list view otherwise meant
+scrolling to the very last item on the very last page and choosing it, and at
+the MRE root there was no *Back* at all — `open_parent_dir()` just returned
+false. So it falls back to the layout switch when there is no parent left.
+
+`do_back()` holds that rule for both the key handler and the pen, so the two
+cannot drift apart, and `toggle_view()` holds the layout flip shared by it and
+the trailing switch item.
 
 Tapping the grid's softkey bar runs the same three actions, with the pressed label
 inverted over a block sized to the text.
