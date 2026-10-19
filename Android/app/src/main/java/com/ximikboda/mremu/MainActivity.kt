@@ -826,13 +826,6 @@ private enum class OptionsPage(val title: String) {
                             }
 
                             OptionsPage.HardReset -> {
-                                var remaining by remember { mutableStateOf(3) }
-                                LaunchedEffect(Unit) {
-                                    while (remaining > 0) {
-                                        delay(1000L)
-                                        remaining--
-                                    }
-                                }
                                 Column(Modifier.fillMaxWidth()) {
                                     Text(
                                         text = stringResource(R.string.hard_reset_message),
@@ -840,7 +833,12 @@ private enum class OptionsPage(val title: String) {
                                         color = Color(0xFFC7C5D0),
                                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                                     )
-                                    DestructiveButton("Reset", remaining) {
+                                    // No countdown here. Emulator state is disposable and
+                                    // rebuilt immediately, so a three second lockout was
+                                    // pure friction in front of an action that costs
+                                    // nothing. Clear user data keeps its countdown, since
+                                    // that one permanently deletes files the guest wrote.
+                                    DestructiveButton("Reset", null) {
                                         dismissSheet(onHardReset)
                                     }
                                     Spacer(Modifier.height(24.dp))
@@ -1021,19 +1019,24 @@ private enum class OptionsPage(val title: String) {
     }
 
     /**
-     * A destructive confirm button that, instead of needing a separate checkbox, runs a
-     * 3..1 countdown as soon as the page it sits on is opened. During the countdown the
-     * label is replaced by just the number; the action fires when the countdown reaches
-     * zero. (The countdown deliberately starts on navigation rather than on the first
-     * tap -- that is the intended design, and the earlier "on the first tap" wording in
-     * this comment was simply wrong about what the code does.)
+     * A destructive confirm button.
+     *
+     * When [remaining] is non-null the button counts down from 3..1 as soon as the page it
+     * sits on is opened, showing just the number until it reaches zero, and stays disabled
+     * until then. That replaces a separate confirmation checkbox. Passing null skips the
+     * countdown entirely and the button is live immediately.
+     *
+     * The countdown deliberately starts on navigation rather than on the first tap -- that
+     * is the intended design, and the earlier "on the first tap" wording in this comment was
+     * simply wrong about what the code does.
      */
     @Composable
-    private fun DestructiveButton(label: String, remaining: Int, onConfirmed: () -> Unit) {
+    private fun DestructiveButton(label: String, remaining: Int?, onConfirmed: () -> Unit) {
         val red = Color(0xFFC62828)
+        val counting = remaining != null && remaining > 0
         Button(
             onClick = onConfirmed,
-            enabled = remaining == 0,
+            enabled = !counting,
             colors = ButtonDefaults.buttonColors(
                 containerColor = red,
                 contentColor = Color.White,
@@ -1046,7 +1049,7 @@ private enum class OptionsPage(val title: String) {
                 .padding(horizontal = 32.dp, vertical = 16.dp)
         ) {
             Text(
-                text = if (remaining > 0) "${remaining}s" else label,
+                text = if (counting) "${remaining}s" else label,
                 style = MaterialTheme.typography.bodyLarge
             )
         }
