@@ -19,7 +19,7 @@ static bool is_skip_symbol(VMWCHAR c) {
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 	sf::Image im;
 	int w = vm_graphic_get_string_width((VMWSTR)str.c_str());
-	im.create(w, 16, sf::Color::Transparent);
+	im.resize(sf::Vector2u(w, 16), sf::Color::Transparent);
 
 	sf::Color* buf32_dst = (sf::Color*)im.getPixelsPtr();
 

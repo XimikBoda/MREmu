@@ -6,6 +6,8 @@
 #include <vmmm.h>
 #include <vm4res.h>
 
+static const std::vector<sf::SoundChannel> def_channelMap = { sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight };
+
 Midi::Midi(const char* file) {
 	std::lock_guard lock(access_mutex);
 	midi_player = adl_init(44100);
@@ -17,7 +19,7 @@ Midi::Midi(const char* file) {
 		spdlog::error("Couldn't open music file: {}", adl_errorInfo(midi_player));
 		error = true;
 	}
-	initialize(2, 44100);
+	initialize(2, 44100, def_channelMap);
 }
 
 Midi::Midi(void* buf, size_t len) {
@@ -31,7 +33,7 @@ Midi::Midi(void* buf, size_t len) {
 		spdlog::error("Couldn't open buffer: {}", adl_errorInfo(midi_player));
 		error = true;
 	}
-	initialize(2, 44100);
+	initialize(2, 44100, def_channelMap);
 }
 
 bool Midi::onGetData(Chunk& data) {
@@ -42,10 +44,10 @@ bool Midi::onGetData(Chunk& data) {
 	if (samples_count == 0) {
 		if (repeat) {
 			repeat--;
-			setLoop(true);
+			setLooping(true);
 		}
 		else {
-			setLoop(false);
+			setLooping(false);
 			done = true;
 		}
 		return false;

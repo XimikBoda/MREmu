@@ -20,7 +20,7 @@ sf::Vector2i Touch::to_screen_coords(sf::Vector2i d_pos) {
 }
 
 bool Touch::is_on_screen(sf::Vector2i pos) {
-	auto size = screen->getTexture()->getSize();
+	auto size = screen->getTexture().getSize();
 	return 0 <= pos.x && pos.x < size.x &&
 		0 <= pos.y && pos.y < size.y;
 }
@@ -60,29 +60,23 @@ bool Touch::d_event(d_event_e ev, touch_source s, sf::Vector2i d_pos) {
 	return false;
 }
 
-bool Touch::sf_event(sf::Event& event) {
-	switch (event.type) {
-	case sf::Event::MouseButtonPressed:
-		if (event.mouseButton.button == sf::Mouse::Button::Left)
-			return d_event(Began, Mouse, { event.mouseButton.x, event.mouseButton.y });
-		break;
-	case sf::Event::MouseMoved:
-		return d_event(Moved, Mouse, { event.mouseMove.x, event.mouseMove.y });
-		break;
-	case sf::Event::MouseButtonReleased:
-		if (event.mouseButton.button == sf::Mouse::Button::Left)
-			return d_event(End, Mouse, { event.mouseButton.x, event.mouseButton.y });
-		break;
-
-	case sf::Event::TouchBegan:
-		return d_event(Began, (touch_source)(Touch0 + event.touch.finger), { event.touch.x, event.touch.y });
-		break;
-	case sf::Event::TouchMoved:
-		return d_event(Moved, (touch_source)(Touch0 + event.touch.finger), { event.touch.x, event.touch.y });
-		break;
-	case sf::Event::TouchEnded:
-		return d_event(End, (touch_source)(Touch0 + event.touch.finger), { event.touch.x, event.touch.y });
-		break;
+bool Touch::sf_event(const sf::Event& event) {
+	if (const auto* mouseButton = event.getIf<sf::Event::MouseButtonPressed>()) {
+		if (mouseButton->button == sf::Mouse::Button::Left)
+			return d_event(Began, Mouse, mouseButton->position);
 	}
+	else if (const auto* mouseMove = event.getIf<sf::Event::MouseMoved>())
+		return d_event(Moved, Mouse, mouseMove->position);
+	else if (const auto* mouseButton = event.getIf<sf::Event::MouseButtonReleased>()) {
+		if (mouseButton->button == sf::Mouse::Button::Left)
+			return d_event(End, Mouse, mouseButton->position);
+	}
+	else if (const auto* touch = event.getIf<sf::Event::TouchBegan>())
+		return d_event(Began, (touch_source)(Touch0 + touch->finger), touch->position);
+	else if (const auto* touch = event.getIf<sf::Event::TouchMoved>())
+		return d_event(Moved, (touch_source)(Touch0 + touch->finger), touch->position);
+	else if (const auto* touch = event.getIf<sf::Event::TouchEnded>())
+		return d_event(End, (touch_source)(Touch0 + touch->finger), touch->position);
+	
 	return false;
 }

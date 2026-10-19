@@ -1,25 +1,22 @@
 #include "Device.h"
 
 Device::Device(sf::RenderWindow& win_device, MREngine::Graphic& graphic_) 
-	: win(win_device), graphic(graphic_), keyboard(keyboardControl), menubar(keyboardControl)
+	: win(win_device), graphic(graphic_), keyboard(keyboardControl), menubar(keyboardControl), screen_sp(graphic.screen_tex)
 {
 	update_size();
 }
 
 void Device::process_events() {
-	sf::Event event;
-	while (win.pollEvent(event)) {
-		keyboard.event(event);
-		menubar.event(event);
-		touch.sf_event(event);
-		switch (event.type) {
-		case sf::Event::Closed:
+	while (const std::optional event = win.pollEvent()) {
+		keyboard.event(*event);
+		menubar.event(*event);
+		touch.sf_event(*event);
+
+		if (event->is<sf::Event::Closed>())
 			win.close();
-			break;
-		case sf::Event::Resized:
-			win.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
+		else if (const auto* resied = event->getIf<sf::Event::Resized>()) {
+			win.setView(sf::View(sf::FloatRect({ 0.f, 0.f }, { (float)resied->size.x, (float)resied->size.y })));
 			update_size();
-			break;
 		}
 	}
 }
@@ -47,8 +44,8 @@ void Device::update_size() {
 	if (scale < 0)
 		scale = 0;
 
-	screen_sp.setScale(scale, scale);
-	screen_sp.setPosition((win.getSize().x - graphic.width * scale) / 2, menubar_height * scale);
+	screen_sp.setScale({ scale, scale });
+	screen_sp.setPosition({ (win.getSize().x - graphic.width * scale) / 2, menubar_height * scale });
 
 	keyboard.update_resize(win.getSize().x, win.getSize().y, menubar.getHeight() * scale);
 	menubar.update_resize(win.getSize().x, win.getSize().y);

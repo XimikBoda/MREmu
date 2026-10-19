@@ -36,13 +36,20 @@ public:
 	}
 };
 
+static const std::vector<sf::SoundChannel> stereo_map = { sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight };
+static const std::vector<sf::SoundChannel> mono_map = { sf::SoundChannel::Mono };
+
 Bitstream::Bitstream(bool stereo, int sample_rate, vm_bitstream_audio_result_callback callback) {
 	std::lock_guard lock(access_mutex);
 	this->stereo = stereo;
 	this->sample_rate = sample_rate;
 	this->callback = callback;
 
-	initialize(stereo ? 2 : 1, sample_rate);
+	if (stereo)
+		initialize(2, sample_rate, stereo_map);
+	else
+		initialize(2, sample_rate, mono_map);
+
 }
 
 bool Bitstream::onGetData(Chunk& data) {

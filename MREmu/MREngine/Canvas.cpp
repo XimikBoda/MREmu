@@ -73,7 +73,7 @@ void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
 	}
 
 	sf::Image im;
-	im.create(w, h, pix_data.data());
+	im.resize(sf::Vector2u(w, h), pix_data.data());
 
 	p.second.loadFromImage(im);
 }

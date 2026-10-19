@@ -17,16 +17,16 @@ class Keyboard {
 
 	sf::RenderTexture frontend_layer_left; // numpad
 	sf::RenderTexture frontend_layer_right; // dpad
-public:
 
 	sf::Sprite sp_left;
 	sf::Sprite sp_right;
+public:
 
 	sf::Sprite *screen;
 
 	Keyboard(KeyboardControl& kc);
 
-	bool event(sf::Event& event);
+	bool event(const sf::Event& event);
 
 	void update();
 
@@ -36,7 +36,7 @@ public:
 
 	void draw_press_key(sf::RenderTarget* rt, int key);
 
-	int find_key_by_pos(int px, int py);
+	int find_key_by_pos(sf::Vector2i p);
 
 	void update_resize(int w, int h, int menu_h);
 };

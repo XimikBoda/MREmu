@@ -7,7 +7,10 @@
 #include "imgui.h"
 #include "imgui-SFML.h"
 
-Keyboard::Keyboard(KeyboardControl& keyboardControl) : kc(keyboardControl) {}
+static sf::Texture null_tx;
+
+Keyboard::Keyboard(KeyboardControl& keyboardControl) 
+	: kc(keyboardControl), sp_left(null_tx), sp_right(null_tx){}
 
 struct Keys {
 	char name[20] = "";
@@ -40,64 +43,59 @@ const Keys keys_imgui[3 * 7] =
 
 const std::map<sf::Keyboard::Key, int> key_to_key =
 {
-	{sf::Keyboard::Up,			VM_KEY_UP},
-	{sf::Keyboard::Down,		VM_KEY_DOWN},
-	{sf::Keyboard::Left,		VM_KEY_LEFT},
-	{sf::Keyboard::Right,		VM_KEY_RIGHT},
-	{sf::Keyboard::Slash,		VM_KEY_LEFT_SOFTKEY},
-	{sf::Keyboard::RShift,		VM_KEY_RIGHT_SOFTKEY},
-	{sf::Keyboard::Enter,		VM_KEY_OK},
-	{sf::Keyboard::BackSpace,	VM_KEY_CLEAR},
-	{sf::Keyboard::Escape,		VM_KEY_BACK},
-	{sf::Keyboard::Numpad7,		VM_KEY_NUM1},
-	{sf::Keyboard::Numpad8,		VM_KEY_NUM2},
-	{sf::Keyboard::Numpad9,		VM_KEY_NUM3},
-	{sf::Keyboard::Numpad4,		VM_KEY_NUM4},
-	{sf::Keyboard::Numpad5,		VM_KEY_NUM5},
-	{sf::Keyboard::Numpad6,		VM_KEY_NUM6},
-	{sf::Keyboard::Numpad1,		VM_KEY_NUM7},
-	{sf::Keyboard::Numpad2,		VM_KEY_NUM8},
-	{sf::Keyboard::Numpad3,		VM_KEY_NUM9},
-	{sf::Keyboard::Divide,		VM_KEY_STAR},
-	{sf::Keyboard::Numpad0,		VM_KEY_NUM0},
-	{sf::Keyboard::Multiply,	VM_KEY_POUND},
-	{sf::Keyboard::Add,			VM_KEY_VOL_UP},
-	{sf::Keyboard::Subtract,	VM_KEY_VOL_DOWN},
+	{sf::Keyboard::Key::Up,			VM_KEY_UP},
+	{sf::Keyboard::Key::Down,		VM_KEY_DOWN},
+	{sf::Keyboard::Key::Left,		VM_KEY_LEFT},
+	{sf::Keyboard::Key::Right,		VM_KEY_RIGHT},
+	{sf::Keyboard::Key::Slash,		VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::Key::RShift,		VM_KEY_RIGHT_SOFTKEY},
+	{sf::Keyboard::Key::Enter,		VM_KEY_OK},
+	{sf::Keyboard::Key::Backspace,	VM_KEY_CLEAR},
+	{sf::Keyboard::Key::Escape,		VM_KEY_BACK},
+	{sf::Keyboard::Key::Numpad7,	VM_KEY_NUM1},
+	{sf::Keyboard::Key::Numpad8,	VM_KEY_NUM2},
+	{sf::Keyboard::Key::Numpad9,	VM_KEY_NUM3},
+	{sf::Keyboard::Key::Numpad4,	VM_KEY_NUM4},
+	{sf::Keyboard::Key::Numpad5,	VM_KEY_NUM5},
+	{sf::Keyboard::Key::Numpad6,	VM_KEY_NUM6},
+	{sf::Keyboard::Key::Numpad1,	VM_KEY_NUM7},
+	{sf::Keyboard::Key::Numpad2,	VM_KEY_NUM8},
+	{sf::Keyboard::Key::Numpad3,	VM_KEY_NUM9},
+	{sf::Keyboard::Key::Divide,		VM_KEY_STAR},
+	{sf::Keyboard::Key::Numpad0,	VM_KEY_NUM0},
+	{sf::Keyboard::Key::Multiply,	VM_KEY_POUND},
+	{sf::Keyboard::Key::Add,		VM_KEY_VOL_UP},
+	{sf::Keyboard::Key::Subtract,	VM_KEY_VOL_DOWN},
 
-	{sf::Keyboard::F2,			MREMU_KEY_PRINTSCREEN},
+	{sf::Keyboard::Key::F2,			MREMU_KEY_PRINTSCREEN},
 };
 
-bool Keyboard::event(sf::Event& event) {
-	switch (event.type) {
-	case sf::Event::KeyPressed:
-	case sf::Event::KeyReleased: {
-		const auto& el = key_to_key.find(event.key.code);
-
-		if (el != key_to_key.end()) {
-			if (event.type == sf::Event::KeyPressed)
-				kc.press_key(el->second, KeyboardControl::Keyboard);
-			else
-				kc.unpress_key(el->second);
-		}
-		return true;
+bool Keyboard::event(const sf::Event& event) {
+	if (const auto* key = event.getIf<sf::Event::KeyPressed>()) {
+		const auto& el = key_to_key.find(key->code);
+		if (el != key_to_key.end())
+			kc.press_key(el->second, KeyboardControl::Keyboard);
 	}
-	case sf::Event::MouseButtonPressed:
-		if (event.mouseButton.button == sf::Mouse::Button::Left)
-			kc.press_key(find_key_by_pos(event.mouseButton.x, event.mouseButton.y), kc.Mouse);
-		return true;
-	case sf::Event::MouseButtonReleased:
-		if (event.mouseButton.button == sf::Mouse::Button::Left)
+	else if (const auto* key = event.getIf<sf::Event::KeyReleased>()) {
+		const auto& el = key_to_key.find(key->code);
+		if (el != key_to_key.end()) 
+			kc.unpress_key(el->second);
+	}
+	else if (const auto* mouseButton = event.getIf<sf::Event::MouseButtonPressed>()) {
+		if (mouseButton->button == sf::Mouse::Button::Left)
+			kc.press_key(find_key_by_pos(mouseButton->position), kc.Mouse);
+	}
+	else if (const auto* mouseButton = event.getIf<sf::Event::MouseButtonReleased>()) {
+		if (mouseButton->button == sf::Mouse::Button::Left)
 			kc.unpress_by_source(kc.Mouse);
-		return true;
-	case sf::Event::TouchBegan:
-		kc.press_key(find_key_by_pos(event.touch.x, event.touch.y),
-			(KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
-		return true;
-	case sf::Event::TouchEnded:
-		kc.unpress_by_source((KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
-		return true;
 	}
-	return false;
+	else if (const auto* touch = event.getIf<sf::Event::TouchBegan>())
+		kc.press_key(find_key_by_pos(touch->position),
+			(KeyboardControl::key_source)(kc.Touch0 + touch->finger));
+	else if (const auto* touch = event.getIf<sf::Event::TouchEnded>())
+		kc.unpress_by_source((KeyboardControl::key_source)(kc.Touch0 + touch->finger));
+
+	return false; //TODO
 }
 
 void Keyboard::imgui_keyboard() {
@@ -177,13 +175,13 @@ void Keyboard::draw_press_key(sf::RenderTarget* rt, int key) {
 
 	if (x != -1) {
 		offset_vec = sp_left.getPosition();
-		kw = (float)sp_left.getTextureRect().width / 3.f;
-		kh = (float)sp_left.getTextureRect().height / 4.f;
+		kw = (float)sp_left.getTextureRect().size.x / 3.f;
+		kh = (float)sp_left.getTextureRect().size.y / 4.f;
 	}
 	else {
 		offset_vec = sp_right.getPosition();
-		kw = (float)sp_right.getTextureRect().width / 3.f;
-		kh = (float)sp_right.getTextureRect().height / 4.f;
+		kw = (float)sp_right.getTextureRect().size.x / 3.f;
+		kh = (float)sp_right.getTextureRect().size.y / 4.f;
 
 		for (int i = 0; i < 3; ++i)
 			for (int j = 0; j < 3; ++j)
@@ -211,7 +209,7 @@ void Keyboard::draw_press_key(sf::RenderTarget* rt, int key) {
 			v[j].position += offset_vec;
 			v[j].color = c;
 		}
-		rt->draw(v, 4, sf::TriangleFan);
+		rt->draw(v, 4, sf::PrimitiveType::TriangleFan);
 	}
 }
 
@@ -220,15 +218,16 @@ static bool in_box(int x, int y, int bx, int by, int bw, int bh) {
 }
 
 static bool in_box(int x, int y, sf::Sprite sp) {
-	return in_box(x, y, sp.getPosition().x, sp.getPosition().y, sp.getTextureRect().width, sp.getTextureRect().height);
+	return in_box(x, y, sp.getPosition().x, sp.getPosition().y, sp.getTextureRect().size.x, sp.getTextureRect().size.y);
 }
 
-int Keyboard::find_key_by_pos(int px, int py) {
+int Keyboard::find_key_by_pos(sf::Vector2i p) {
+	int px = p.x, py = p.y;
 	if (in_box(px, py, sp_left)) {
 		int x = sp_left.getPosition().x;
 		int y = sp_left.getPosition().y;
-		int w = sp_left.getTextureRect().width;
-		int h = sp_left.getTextureRect().height;
+		int w = sp_left.getTextureRect().size.x;
+		int h = sp_left.getTextureRect().size.y;
 
 		float kw = (float)w / 3;
 		float kh = (float)h / 4;
@@ -240,8 +239,8 @@ int Keyboard::find_key_by_pos(int px, int py) {
 	if (in_box(px, py, sp_right)) {
 		int x = sp_right.getPosition().x;
 		int y = sp_right.getPosition().y;
-		int w = sp_right.getTextureRect().width;
-		int h = sp_right.getTextureRect().height;
+		int w = sp_right.getTextureRect().size.x;
+		int h = sp_right.getTextureRect().size.y;
 
 		float kw = (float)w / 3;
 		float kh = (float)h / 4;
@@ -293,31 +292,31 @@ const char16_t* keys_marks_right[3][3] = {
 void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 	int screen_x = screen->getPosition().x;
 	int screen_y = screen->getPosition().y;
-	int screen_w = screen->getScale().x * screen->getTextureRect().width;
-	int screen_h = screen->getScale().y * screen->getTextureRect().height;
+	int screen_w = screen->getScale().x * screen->getTextureRect().size.x;
+	int screen_h = screen->getScale().y * screen->getTextureRect().size.y;
 
 	sf::IntRect left, right;
 	if (win_h - screen_h > win_w - screen_w) { //bottom
 		auto size = size_by_aspect_ratio(win_w, win_h - screen_h, 6.f / 4.f);
 		int x = (win_w - size.x) / 2, y = screen_y + screen_h;
-		left = { x, y, size.x / 2 + 1, size.y };
-		right = { x + size.x / 2, y, size.x / 2, size.y };
+		left = { {x, y}, {size.x / 2 + 1, size.y} };
+		right = { {x + size.x / 2, y}, {size.x / 2, size.y} };
 	}
 	else {
 		auto size = size_by_aspect_ratio((win_w - screen_w) / 2, win_h - menu_h, 3.f / 4.f);
 		int y = win_h - size.y;
-		left = { (screen_x - size.x) / 2, y, size.x, size.y };
-		right = { screen_x + screen_w, y, size.x, size.y };
+		left = { {screen_x - size.x, y}, {size.x, size.y} };
+		right = { {screen_x + screen_w, y}, {size.x, size.y} };
 	}
 
 	{
-		int w = left.width, h = left.height;
+		int w = left.size.x, h = left.size.y;
 
-		frontend_layer_left.create(w, h);
+		frontend_layer_left.resize(sf::Vector2u(w, h));
 		frontend_layer_left.clear(sf::Color::Transparent);
 
 		sp_left = sf::Sprite(frontend_layer_left.getTexture());
-		sp_left.setPosition(left.left, left.top);
+		sp_left.setPosition(sf::Vector2f(left.position.x, left.position.y));
 
 		float kw = (float)(w - 1) / 3.f;
 		float kh = (float)(h - 1) / 4.f;
@@ -342,27 +341,27 @@ void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 			for (int ix = 0; ix < 3; ++ix) {
 				auto tex = u16text_to_texture(keys_marks_left[iy][ix], sf::Color::White);
 				sf::Sprite sp(tex);
-				sp.setOrigin(sp.getTextureRect().width / 2, sp.getTextureRect().height / 2);
-				sp.setPosition(ix * kw + kw / 2.f, iy * kh + kh / 2.f);
-				sp.setScale(font_scale, font_scale);
+				sp.setOrigin({ sp.getTextureRect().size.x / 2.f, sp.getTextureRect().size.y / 2.f });
+				sp.setPosition({ ix * kw + kw / 2.f, iy * kh + kh / 2.f });
+				sp.setScale(sf::Vector2f(font_scale, font_scale));
 				frontend_layer_left.draw(sp);
 			}
 
 		for (int i = 0; i < lines.size(); ++i)
 			lines[i].color = sf::Color::White;
 
-		frontend_layer_left.draw(lines.data(), lines.size(), sf::Lines);
+		frontend_layer_left.draw(lines.data(), lines.size(), sf::PrimitiveType::Lines);
 		frontend_layer_left.display();
 	}
 
 	{
-		int w = right.width, h = right.height;
+		int w = right.size.x, h = right.size.y;
 
-		frontend_layer_right.create(w, h);
+		frontend_layer_right.resize(sf::Vector2u(w, h));
 		frontend_layer_right.clear(sf::Color::Transparent);
 
 		sp_right = sf::Sprite(frontend_layer_right.getTexture());
-		sp_right.setPosition(right.left, right.top);
+		sp_right.setPosition(sf::Vector2f(right.position.x, right.position.y));
 
 		float kw = (float)(w - 1) / 3.f;
 		float kh = (float)(h - 1) / 4.f;
@@ -394,16 +393,16 @@ void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 
 				auto tex = u16text_to_texture(keys_marks_right[iy][ix], sf::Color::White);
 				sf::Sprite sp(tex);
-				sp.setOrigin(sp.getTextureRect().width / 2, sp.getTextureRect().height / 2);
-				sp.setPosition(x + kw / 2.f, y + kh / 2.f);
-				sp.setScale(font_scale, font_scale);
+				sp.setOrigin({ sp.getTextureRect().size.x / 2.f, sp.getTextureRect().size.y / 2.f });
+				sp.setPosition({ x + kw / 2.f, y + kh / 2.f });
+				sp.setScale(sf::Vector2f(font_scale, font_scale));
 				frontend_layer_right.draw(sp);
 			}
 
 		for (int i = 0; i < lines.size(); ++i)
 			lines[i].color = sf::Color::White;
 
-		frontend_layer_right.draw(lines.data(), lines.size(), sf::Lines);
+		frontend_layer_right.draw(lines.data(), lines.size(), sf::PrimitiveType::Lines);
 		frontend_layer_right.display();
 	}
 }

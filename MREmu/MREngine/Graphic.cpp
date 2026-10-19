@@ -108,7 +108,7 @@ void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 		pix_data[i * 4 + 3] = 0xFF;
 	}
 	sf::Image im;
-	im.create(w, h, &pix_data[0]);
+	im.resize(sf::Vector2u(w, h), &pix_data[0]);
 
 	tex.loadFromImage(im);
 }
@@ -116,7 +116,7 @@ void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 MREngine::Graphic::Graphic()
 {
 	activate();
-	screen_tex.create(width, height);
+	screen_tex.resize(sf::Vector2u(width, height));
 	screen.resize(width * height);
 	{
 		int image_size = width * height * 2;

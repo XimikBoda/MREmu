@@ -109,8 +109,8 @@ int main(int argc, char** argv) {
 	MREngine::NetworkManager nm;
 
 #ifndef ANDROID
-	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
-	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
+	sf::RenderWindow win_debug(sf::VideoMode(sf::Vector2u(1000, 600)), "MREmu Debug");
+	sf::RenderWindow win_device(sf::VideoMode(sf::Vector2u(graphic.width, graphic.height + 208)), "MREmu Device");
 	ImGui::SFML::Init(win_debug);
 	win_debug.setFramerateLimit(60);
 	win_device.setFramerateLimit(60);
@@ -163,7 +163,6 @@ int main(int argc, char** argv) {
 	sf::Clock fps;
 
 	sf::Clock deltaClock;
-	sf::Event event;
 
 	while (win_device.isOpen()
 #ifndef ANDROID
@@ -171,17 +170,12 @@ int main(int argc, char** argv) {
 #endif
     ) {
 #ifndef ANDROID
-		while (win_debug.pollEvent(event)) {
-			ImGui::SFML::ProcessEvent(event);
-			switch (event.type) {
-			case sf::Event::Closed:
+		while (const std::optional event = win_debug.pollEvent()) {
+			ImGui::SFML::ProcessEvent(win_debug, *event);
+			if (event->is<sf::Event::Closed>())
 				win_debug.close();
-				win_device.close();
-				break;
-			case sf::Event::Resized:
-				win_debug.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
-				break;
-			}
+			else if (const auto* resied = event->getIf<sf::Event::Resized>())
+				win_debug.setView(sf::View(sf::FloatRect({ 0.f, 0.f }, { (float)resied->size.x, (float)resied->size.y })));
 		}
 #endif
 		device.process_events();

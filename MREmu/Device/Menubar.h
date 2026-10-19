@@ -22,7 +22,7 @@ class Menubar {
 
 	KeyboardControl& kc;
 
-	int find_key_by_pos(int px, int py);
+	int find_key_by_pos(sf::Vector2i p);
 	void draw_press_key(sf::RenderTarget* rt, int key);
 public:
 	sf::Sprite* screen = 0;
@@ -33,7 +33,7 @@ public:
 
 	void draw(sf::RenderTarget* rt);
 
-	bool event(sf::Event& event);
+	bool event(const sf::Event& event);
 
 	void update_resize(int win_w, int win_h);
 };

@@ -37,5 +37,5 @@ public:
 
 	void update();
 	bool d_event(d_event_e ev, touch_source s, sf::Vector2i d_pos);
-	bool sf_event(sf::Event& event);
+	bool sf_event(const sf::Event& event);
 };
