@@ -70,18 +70,22 @@ screen. The emulated display is a fixed 240×320 that the app can read back.
 | `emu_close_app` | "Shut that app down." |
 | `emu_regs` | "What are all the CPU registers right now?" |
 | `emu_set_reg` | "Put this value in that register." |
+| `emu_read_mem` | "Read raw memory bytes and hex dump from an emulated address." |
 | `emu_step` | "Run the app a bit and tell me what happened." |
 | `emu_pause` | "Hold still" / "carry on." |
 | `emu_screen` | "Show me what the phone screen looks like." |
 | `emu_errors` | "Did anything crash, and if so where?" |
 | `emu_trace_control` | "Start or stop recording every system call the app makes." |
-| `emu_trace_dump` | "Show me the calls you recorded." |
+| `emu_trace_dump` | "Show me the calls you recorded (supports filtering and tailing)." |
+| `emu_key` | "Inject a keypad event (press, release, click) by VM keycode." |
+| `emu_touch` | "Inject a touchscreen event (click, tap, release, move) at (x, y)." |
 
 The tracer is the interesting one. It records every call the app makes into the MRE
 system — `vm_create_timer`, `vm_get_sym_entry`, `vm_malloc` and so on — with the call's
 address, its arguments and what it returned. Turning it on before an app boots captures
 the app's entire startup sequence, which is exactly what you want when working out why an
-app will not start.
+app will not start. You can pass `filter` to find specific APIs (e.g. `filter="vm_graphic"`),
+and `tail=true` with a `limit` to inspect the most recent calls right before a fault.
 
 ## Two things that surprise people
 

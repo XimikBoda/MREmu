@@ -100,16 +100,17 @@ struct HostApi {
 	bool (*close_app)(int index);
 	bool (*write_reg)(const std::string& name, unsigned value);
 	bool (*inject_key)(int key, bool down);
-	bool (*inject_touch)(int x, int y, bool down);
+	bool (*inject_touch)(int x, int y, int event);
 	std::string (*screen_png_base64)(int max_side);
 	std::vector<std::string> (*list_apps)(void);
 	bool (*set_trace)(bool on);
-	std::string (*trace_dump)(size_t offset, size_t limit);
+	std::string (*trace_dump)(size_t offset, size_t limit, const std::string& filter, bool tail);
 	std::size_t (*trace_count)(void);
 	void (*trace_clear)(void);
 	std::vector<std::string> (*trace_api_names)(void);
 	bool (*step)(uint64_t instructions);
 	void (*set_pause)(bool on);
+	std::string (*read_mem)(uint32_t addr, size_t size);
 };
 
 // Reserve the real stdout for the JSON-RPC stream and point fd 1 at stderr, so

@@ -205,16 +205,59 @@ static bool inject_key(int key, bool down) {
 	return true;
 }
 
-static bool inject_touch(int x, int y, bool down) {
+static bool inject_touch(int x, int y, int event) {
 	// Touch injection is handled on the emulator thread; the command is queued.
 	Mcp::Command c;
 	c.kind = "touch";
-	c.n = down ? 1 : 0;
+	c.n = event;
 	char buf[32];
 	snprintf(buf, sizeof(buf), "%d,%d", x, y);
 	c.a = buf;
 	g_ctl->push(c);
 	return true;
+}
+
+static std::string read_mem(uint32_t addr, size_t size) {
+	if (!uc) return "error: cpu not initialized";
+	if (size == 0) return "error: size must be greater than 0";
+	if (size > 4096) size = 4096;
+
+	std::vector<uint8_t> buf(size);
+	uc_err err = uc_mem_read(uc, addr, buf.data(), size);
+	if (err != UC_ERR_OK) {
+		char err_msg[96];
+		snprintf(err_msg, sizeof(err_msg), "error: uc_mem_read failed (code %d: %s) at 0x%08X",
+			(int)err, uc_strerror(err), addr);
+		return err_msg;
+	}
+
+	std::ostringstream o;
+	char header[64];
+	snprintf(header, sizeof(header), "0x%08X (%zu bytes):\n", addr, size);
+	o << header;
+
+	for (size_t i = 0; i < size; i += 16) {
+		char hex_part[64] = "";
+		char ascii_part[17] = "";
+		size_t chunk = std::min<size_t>(16, size - i);
+		for (size_t j = 0; j < 16; j++) {
+			if (j < chunk) {
+				char b[4];
+				snprintf(b, sizeof(b), "%02X ", buf[i + j]);
+				strcat(hex_part, b);
+				uint8_t c = buf[i + j];
+				ascii_part[j] = (c >= 32 && c <= 126) ? (char)c : '.';
+			} else {
+				strcat(hex_part, "   ");
+			}
+		}
+		ascii_part[chunk] = '\0';
+		char line[128];
+		snprintf(line, sizeof(line), "  %08X:  %-48s |%s|\n",
+			addr + (uint32_t)i, hex_part, ascii_part);
+		o << line;
+	}
+	return o.str();
 }
 
 static bool set_trace(bool on) {
@@ -230,30 +273,58 @@ static std::vector<std::string> trace_api_names() { return Bridge::trace_api_nam
 // The dispatch table is built by init(), and trace_api_names() reads func_map. The
 // table only becomes useful once an app is actually loaded, because that is when
 // ArmApp::start() resolves symbols and the app begins jumping through it.
-static std::string trace_dump(size_t offset, size_t limit) {
+static std::string trace_dump(size_t offset, size_t limit, const std::string& filter, bool tail) {
 	auto calls = Bridge::trace_snapshot();
 	auto names = Bridge::trace_api_names();
 
+	std::vector<size_t> matched;
+	matched.reserve(calls.size());
+	for (size_t i = 0; i < calls.size(); i++) {
+		const auto& c = calls[i];
+		std::string nm = (c.index < names.size()) ? names[c.index] : ("idx" + std::to_string(c.index));
+		if (!filter.empty() && nm.find(filter) == std::string::npos)
+			continue;
+		matched.push_back(i);
+	}
+
 	std::ostringstream o;
 	o << "total=" << calls.size()
+	  << " matched=" << matched.size()
 	  << " dropped=" << Bridge::trace_dropped()
 	  << " offset=" << offset << " limit=" << limit
 	  << " dispatch_ready=" << (Bridge::dispatch_ready() ? "true" : "false")
 	  << " trace_enabled=" << (Bridge::trace_enabled() ? "true" : "false")
-	  << " apps=" << (g_app_manager ? g_app_manager->app_count() : 0)
-	  << "\n";
+	  << " apps=" << (g_app_manager ? g_app_manager->app_count() : 0);
+	if (!filter.empty()) o << " filter=" << filter;
+	if (tail) o << " tail=true";
+	o << "\n";
 
 	uint64_t dropped = Bridge::trace_dropped();
 	if (dropped)
 		o << "WARNING: " << dropped << " later calls were NOT recorded: the trace "
 		  << "buffer is full. This trace is incomplete; narrow the window or read "
 		  << "it in segments.\n";
-	if (offset >= calls.size()) {
+
+	if (matched.empty()) {
+		o << "(no recorded calls match query)\n";
+		return o.str();
+	}
+
+	size_t start = offset;
+	size_t count = limit;
+	if (tail) {
+		if (count > matched.size()) count = matched.size();
+		start = matched.size() - count;
+	}
+
+	if (start >= matched.size()) {
 		o << "(no further recorded calls; offset is past the end)\n";
 		return o.str();
 	}
-	size_t end = std::min(calls.size(), offset + limit);
-	for (size_t i = offset; i < end; i++) {
+
+	size_t end = std::min(matched.size(), start + count);
+	for (size_t k = start; k < end; k++) {
+		size_t i = matched[k];
 		const auto& c = calls[i];
 		std::string nm = (c.index < names.size()) ? names[c.index] : ("idx" + std::to_string(c.index));
 		char line[320];
@@ -262,7 +333,7 @@ static std::string trace_dump(size_t offset, size_t limit) {
 			i, nm.c_str(), c.pc, c.args_in[0], c.args_in[1], c.args_in[2], c.args_in[3], c.ret);
 		o << line;
 	}
-	if (end < calls.size()) o << "... " << (calls.size() - end) << " more\n";
+	if (end < matched.size()) o << "... " << (matched.size() - end) << " more\n";
 	return o.str();
 }
 
@@ -386,10 +457,13 @@ static void handle_command(const Mcp::Command& c) {
 		inject_key(c.n, !c.b.empty() ? c.b != "up" : true);
 		return;
 	}
-	// "touch" is drained on the emulator thread; Touch needs a live window so a
-	// headless run records it as unsupported rather than pretending it worked.
 	if (c.kind == "touch") {
-		note_error("touch injection needs a window; headless runs cannot deliver it");
+		int x = 0, y = 0;
+		if (sscanf(c.a.c_str(), "%d,%d", &x, &y) == 2) {
+			void add_pen_event(int event, int x, int y);
+			add_pen_event(c.n, x, y);
+		}
+		return;
 	}
 }
 
@@ -444,6 +518,7 @@ void setup(AppManager* am, Keyboard* kb, Mcp::Control* ctl, MREngine::Graphic* g
 	g_ctl = ctl;
 	g_graphic = g;
 	Mcp::set_host(&api());
+	publish_snapshot(true);
 }
 
 // In headless mode the pump thread starts before AppManager::start(), so the
@@ -490,7 +565,7 @@ static const Mcp::HostApi& api() {
 		load_vxp, close_app, reg_write,
 		inject_key, inject_touch, screen_png_base64, list_apps,
 		set_trace, trace_dump, trace_count, trace_clear, trace_api_names,
-		step, do_pause
+		step, do_pause, read_mem
 	};
 	return a;
 }
