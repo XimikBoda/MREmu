@@ -1922,7 +1922,17 @@ namespace NativeApps::Menu::AppSelector {
 		}
 
 		int old_m_i = m_i;
-		if (event == VM_KEY_EVENT_UP) {
+
+		// Directional keys must act on auto-repeat as well as on release, or
+		// holding a D-pad key moves the selection exactly once and the repeat
+		// events the frontend now sends are thrown away.
+		//
+		// Everything else stays on release only. A held OK would otherwise
+		// launch an app over and over as the repeat accelerates, and the
+		// softkeys and the T9 number row are one-shot actions whose "pressed"
+		// highlight is drawn from the release handler anyway.
+		const bool release = (event == VM_KEY_EVENT_UP);
+		if (release || event == VM_KEY_EVENT_REPEAT) {
 			trigger_scrollbar();
 			switch (keycode) {
 			case VM_KEY_UP:
@@ -1944,16 +1954,22 @@ namespace NativeApps::Menu::AppSelector {
 				// this menu always had.
 				break;
 			case VM_KEY_LEFT_SOFTKEY:
+				if (!release)
+					break;
 				// Reads as "Options" on the grid's softkey bar.
 				open_details_for_selection();
 				draw();
 				return;
 			case VM_KEY_RIGHT_SOFTKEY:
+				if (!release)
+					break;
 				// Reads as "Back" on the grid's softkey bar.
 				do_back();
 				draw();
 				return;
 			case VM_KEY_OK:
+				if (!release)
+					break;
 				// Reads as "Choose" on the grid's softkey bar.
 				activate(m_i);
 				draw();
@@ -1968,6 +1984,8 @@ namespace NativeApps::Menu::AppSelector {
 			case VM_KEY_NUM8:
 			case VM_KEY_NUM9:
 			case VM_KEY_NUM0:
+				if (!release)
+					break;
 				jump_by_letter(keycode);
 				break;
 			}
