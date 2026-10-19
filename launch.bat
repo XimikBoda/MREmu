@@ -109,8 +109,10 @@ if not exist "bin\Release\MREmu.exe" (
   goto menu
 )
 echo.
+echo Copying to MREmu.build_run.exe...
+copy /y "bin\Release\MREmu.exe" "bin\Release\MREmu.build_run.exe" >nul
 echo Starting MREmu (Release)...
-start "" "bin\Release\MREmu.exe"
+start "" "bin\Release\MREmu.build_run.exe"
 if defined once exit /b 0
 goto menu
 
@@ -121,8 +123,10 @@ if not exist "bin\Debug\MREmu.exe" (
   goto menu
 )
 echo.
+echo Copying to MREmu.build_run.exe...
+copy /y "bin\Debug\MREmu.exe" "bin\Debug\MREmu.build_run.exe" >nul
 echo Starting MREmu (Debug)...
-start "" "bin\Debug\MREmu.exe"
+start "" "bin\Debug\MREmu.build_run.exe"
 if defined once exit /b 0
 goto menu
 
@@ -131,7 +135,9 @@ echo.
 echo Cleaning build artifacts...
 if exist build rmdir /s /q build
 if exist bin\Release\MREmu.exe del /q bin\Release\MREmu.exe
+if exist bin\Release\MREmu.build_run.exe del /q bin\Release\MREmu.build_run.exe
 if exist bin\Debug\MREmu.exe del /q bin\Debug\MREmu.exe
+if exist bin\Debug\MREmu.build_run.exe del /q bin\Debug\MREmu.build_run.exe
 echo Cleaned.
 if defined once exit /b 0
 goto menu
