@@ -322,7 +322,7 @@ std::string tool_result_json(const std::string& json) {
 // Tool schemas are emitted as one line. MCP is JSON-RPC over a line-delimited
 // stream, so a literal newline anywhere in a reply would split one response into
 // two unparseable frames.
-const char* TOOLS = R"JSON([{"name":"emu_status","description":"Current state: running app, run_state, VM call count, stepped instructions, PC, screen size and last error."},{"name":"emu_list_apps","description":"List every loaded app with index, name and run state."},{"name":"emu_load_vxp","description":"Load a VXP file into the emulator by absolute path."},{"name":"emu_close_app","description":"Close a loaded app by index."},{"name":"emu_regs","description":"Read all CPU registers plus CPSR flags."},{"name":"emu_set_reg","description":"Write one CPU register by name (r0-r12, sp, lr, pc, cpsr)."},{"name":"emu_step","description":"Run at most N instructions, then yield. Makes pending app timers due first, so an otherwise-idle app actually runs."},{"name":"emu_pause","description":"Pause or resume. Paused apps still receive timer ticks but yield at each slice instead of executing."},{"name":"emu_screen","description":"Get the emulated screen as a PNG, optionally downscaled."},{"name":"emu_errors","description":"Read errors the emulator recorded since the last clear."},{"name":"emu_trace_control","description":"Enable, disable, clear or query the VM API call tracer."},{"name":"emu_trace_dump","description":"Read recorded VM API calls: name, PC, arguments and return value."}])JSON";
+const char* TOOLS = R"JSON([{"name":"emu_status","description":"Current state: running app, run_state, VM call count, stepped instructions, PC, screen size and last error."},{"name":"emu_list_apps","description":"List every loaded app with index, name and run state."},{"name":"emu_load_vxp","description":"Load a VXP file into the emulator by absolute path."},{"name":"emu_close_app","description":"Close a loaded app by index."},{"name":"emu_regs","description":"Read all CPU registers plus CPSR flags."},{"name":"emu_set_reg","description":"Write one CPU register by name (r0-r12, sp, lr, pc, cpsr)."},{"name":"emu_step","description":"Run at most N instructions, then yield. Makes pending app timers due first, so an otherwise-idle app actually runs."},{"name":"emu_pause","description":"Pause or resume. Paused apps still receive timer ticks but yield at each slice instead of executing."},{"name":"emu_screen","description":"Get the emulated screen as a PNG, optionally downscaled."},{"name":"emu_errors","description":"Read errors the emulator recorded since the last clear."},{"name":"emu_trace_control","description":"Enable, disable, clear or query the VM API call tracer."},{"name":"emu_trace_dump","description":"Read recorded VM API calls: name, PC, arguments and return value."},{"name":"emu_key","description":"Inject a key event (press, release, or click) by VM keycode."}])JSON";
 
 } // namespace
 
@@ -469,6 +469,21 @@ static std::string handle_tool(Control& ctl, const std::string& name, const JPtr
 		size_t lim = (size_t)arg_n("limit", 50);
 		if (!H || !H->trace_dump) return tool_result_text("error: tracing not supported");
 		return tool_result_text(H->trace_dump(off, lim));
+	}
+
+	if (name == "emu_key") {
+		long long key = arg_n("key", 0);
+		std::string action = arg_s("action");
+		if (!H || !H->inject_key) return tool_result_text("error: key injection not supported");
+		if (action == "up") {
+			H->inject_key((int)key, false);
+		} else if (action == "down") {
+			H->inject_key((int)key, true);
+		} else {
+			H->inject_key((int)key, true);
+			H->inject_key((int)key, false);
+		}
+		return tool_result_text("key event sent");
 	}
 
 	return "{\"content\":[{\"type\":\"text\",\"text\":" + jstr("error: unknown tool " + name) + "}],\"isError\":true}";
