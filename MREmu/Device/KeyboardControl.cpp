@@ -3,6 +3,9 @@
 #include <vmio.h>
 #include <vector>
 
+App* get_active_app();
+extern MREngine::Graphic* graphic;
+
 KeyboardControl::pkey_t::pkey_t(int key_code, key_source source) {
 	this->key_code = key_code;
 	this->source = source;
@@ -37,7 +40,8 @@ void KeyboardControl::press_key(int key_code, key_source source) {
 #endif
 
 		pkey.push_back(pkey_t(key_code, source));
-		add_keyboard_event(VM_KEY_EVENT_DOWN, key_code);
+		if(key_code <= VM_KEY_QWERTY_MENU)
+			add_keyboard_event(VM_KEY_EVENT_DOWN, key_code);
 	}
 }
 
@@ -45,7 +49,8 @@ void KeyboardControl::unpress_key(int key_code) {
 	int i = find_key(key_code);
 	if (i != -1) {
 		pkey.erase(pkey.begin() + i);
-		add_keyboard_event(VM_KEY_EVENT_UP, key_code);
+		if (key_code <= VM_KEY_QWERTY_MENU)
+			add_keyboard_event(VM_KEY_EVENT_UP, key_code);
 	}
 }
 
@@ -58,7 +63,8 @@ void KeyboardControl::unpress_by_source(key_source source) {
 			}
 #endif
 
-			add_keyboard_event(VM_KEY_EVENT_UP, pkey[i].key_code);
+			if (pkey[i].key_code <= VM_KEY_QWERTY_MENU)
+				add_keyboard_event(VM_KEY_EVENT_UP, pkey[i].key_code);
 			pkey.erase(pkey.begin() + i);
 			--i;
 		}

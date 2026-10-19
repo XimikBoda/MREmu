@@ -7,6 +7,8 @@
 #include "imgui.h"
 #include "imgui-SFML.h"
 
+Keyboard::Keyboard(KeyboardControl& keyboardControl) : kc(keyboardControl) {}
+
 struct Keys {
 	char name[20] = "";
 	int code = 0;
@@ -38,27 +40,31 @@ const Keys keys_imgui[3 * 7] =
 
 const std::map<sf::Keyboard::Key, int> key_to_key =
 {
-	{sf::Keyboard::Up, VM_KEY_UP},
-	{sf::Keyboard::Down, VM_KEY_DOWN},
-	{sf::Keyboard::Left, VM_KEY_LEFT},
-	{sf::Keyboard::Right, VM_KEY_RIGHT},
-	{sf::Keyboard::Slash, VM_KEY_LEFT_SOFTKEY},
-	{sf::Keyboard::RShift, VM_KEY_RIGHT_SOFTKEY},
-	{sf::Keyboard::Enter, VM_KEY_OK},
-	{sf::Keyboard::BackSpace, VM_KEY_CLEAR},
-	{sf::Keyboard::Escape, VM_KEY_BACK},
-	{sf::Keyboard::Numpad7, VM_KEY_NUM1},
-	{sf::Keyboard::Numpad8, VM_KEY_NUM2},
-	{sf::Keyboard::Numpad9, VM_KEY_NUM3},
-	{sf::Keyboard::Numpad4, VM_KEY_NUM4},
-	{sf::Keyboard::Numpad5, VM_KEY_NUM5},
-	{sf::Keyboard::Numpad6, VM_KEY_NUM6},
-	{sf::Keyboard::Numpad1, VM_KEY_NUM7},
-	{sf::Keyboard::Numpad2, VM_KEY_NUM8},
-	{sf::Keyboard::Numpad3, VM_KEY_NUM9},
-	{sf::Keyboard::Divide, VM_KEY_STAR},
-	{sf::Keyboard::Numpad0, VM_KEY_NUM0},
-	{sf::Keyboard::Multiply, VM_KEY_POUND},
+	{sf::Keyboard::Up,			VM_KEY_UP},
+	{sf::Keyboard::Down,		VM_KEY_DOWN},
+	{sf::Keyboard::Left,		VM_KEY_LEFT},
+	{sf::Keyboard::Right,		VM_KEY_RIGHT},
+	{sf::Keyboard::Slash,		VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::RShift,		VM_KEY_RIGHT_SOFTKEY},
+	{sf::Keyboard::Enter,		VM_KEY_OK},
+	{sf::Keyboard::BackSpace,	VM_KEY_CLEAR},
+	{sf::Keyboard::Escape,		VM_KEY_BACK},
+	{sf::Keyboard::Numpad7,		VM_KEY_NUM1},
+	{sf::Keyboard::Numpad8,		VM_KEY_NUM2},
+	{sf::Keyboard::Numpad9,		VM_KEY_NUM3},
+	{sf::Keyboard::Numpad4,		VM_KEY_NUM4},
+	{sf::Keyboard::Numpad5,		VM_KEY_NUM5},
+	{sf::Keyboard::Numpad6,		VM_KEY_NUM6},
+	{sf::Keyboard::Numpad1,		VM_KEY_NUM7},
+	{sf::Keyboard::Numpad2,		VM_KEY_NUM8},
+	{sf::Keyboard::Numpad3,		VM_KEY_NUM9},
+	{sf::Keyboard::Divide,		VM_KEY_STAR},
+	{sf::Keyboard::Numpad0,		VM_KEY_NUM0},
+	{sf::Keyboard::Multiply,	VM_KEY_POUND},
+	{sf::Keyboard::Add,			VM_KEY_VOL_UP},
+	{sf::Keyboard::Subtract,	VM_KEY_VOL_DOWN},
+
+	{sf::Keyboard::F2,			MREMU_KEY_PRINTSCREEN},
 };
 
 bool Keyboard::event(sf::Event& event) {

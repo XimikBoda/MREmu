@@ -8,6 +8,7 @@ class Device {
 	Keyboard keyboard;
 	Menubar menubar;
 	Touch touch;
+	KeyboardControl keyboardControl;
 
 	sf::RenderWindow& win;
 	MREngine::Graphic& graphic;

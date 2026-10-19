@@ -1,19 +1,18 @@
 #pragma once
-#include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/Graphics/RenderTexture.hpp>
-#include <SFML/Graphics/Sprite.hpp>
 #include <vmio.h>
+#include <SFML/System/Clock.hpp>
 
 #ifdef ANDROID
 #include "../jni/Vibration.h"
 #endif
 
-#define MREMU_KEY_SEND (VM_KEY_QWERTY_MENU + 1)
-#define MREMU_KEY_POWER (MREMU_KEY_SEND + 1)
-#define MREMU_KEY_NONE (MREMU_KEY_POWER + 1)
+#define MREMU_KEY_SEND			(VM_KEY_QWERTY_MENU + 1)
+#define MREMU_KEY_POWER			(MREMU_KEY_SEND + 1)
+#define MREMU_KEY_PRINTSCREEN	(MREMU_KEY_POWER + 1)
+#define MREMU_KEY_NONE			(MREMU_KEY_PRINTSCREEN + 1)
 
-#define MREMU_NEGATIVE_KEY_COUNT VM_KEY_BACK
-#define MREMU_FULL_KEY_COUNT (MREMU_KEY_POWER + 1 + MREMU_NEGATIVE_KEY_COUNT)
+#define MREMU_NEGATIVE_KEY_COUNT (-VM_KEY_BACK)
+#define MREMU_FULL_KEY_COUNT	(MREMU_KEY_PRINTSCREEN + 1 + MREMU_NEGATIVE_KEY_COUNT)
 
 class KeyboardControl {
 public:

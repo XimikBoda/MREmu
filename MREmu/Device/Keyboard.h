@@ -7,22 +7,24 @@
 #include "KeyboardControl.h"
 
 class Keyboard {
-public:
 	struct key_t {
 		sf::Vector2f v[4];
 		int key_code;
 	};
 	key_t keys_nav[5];
 
-	KeyboardControl kc; // I don't remember why I separate this
+	KeyboardControl& kc;
 
 	sf::RenderTexture frontend_layer_left; // numpad
 	sf::RenderTexture frontend_layer_right; // dpad
+public:
 
 	sf::Sprite sp_left;
 	sf::Sprite sp_right;
 
 	sf::Sprite *screen;
+
+	Keyboard(KeyboardControl& kc);
 
 	bool event(sf::Event& event);
 

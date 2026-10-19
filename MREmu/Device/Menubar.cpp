@@ -8,7 +8,7 @@ App* get_active_app();
 
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c);
 
-Menubar::Menubar() {
+Menubar::Menubar(KeyboardControl& keyboardControl) : kc(keyboardControl){
 	screen_corner = ScreenCorner().getRadius();
 }
 
@@ -34,7 +34,89 @@ void Menubar::draw(sf::RenderTarget* rt) {
 		rt->draw(sp);
 	}
 
+	for (int i = 0; i < kc.pkey.size(); ++i)
+		draw_press_key(rt, kc.pkey[i].key_code);
+
 	rt->draw(buttons_sp);
+}
+
+void Menubar::draw_press_key(sf::RenderTarget* rt, int key) {
+	sf::Color c(160, 75, 160);
+
+	int x = -1;
+	float kw = base_size * scale;
+
+	switch (key) {
+	case VM_KEY_VOL_UP:
+		x = 0;
+		break;
+	case VM_KEY_VOL_DOWN:
+		x = 1;
+		break;
+	case MREMU_KEY_PRINTSCREEN:
+		x = 2;
+		break;
+	default:
+		return;
+	}
+
+	sf::RectangleShape rs;
+	rs.setSize({ kw, kw });
+	rs.setPosition(buttons_sp.getPosition());
+	rs.setFillColor(c);
+	rs.move(kw * x, 0);
+
+	rt->draw(rs);
+}
+
+static bool in_box(int x, int y, int bx, int by, int bw, int bh) {
+	return x >= bx && y >= by && x < bx + bw && y < by + bh;
+}
+
+static bool in_box(int x, int y, sf::Sprite sp) {
+	return in_box(x, y, sp.getPosition().x, sp.getPosition().y, sp.getTextureRect().width, sp.getTextureRect().height);
+}
+
+const int key_map[4] = {
+	VM_KEY_VOL_UP, VM_KEY_VOL_DOWN, MREMU_KEY_PRINTSCREEN, MREMU_KEY_NONE
+};
+
+int Menubar::find_key_by_pos(int px, int py) {
+	if (in_box(px, py, buttons_sp)) {
+		int x = buttons_sp.getPosition().x;
+		int y = buttons_sp.getPosition().y;
+		int w = buttons_sp.getTextureRect().width;
+		int h = buttons_sp.getTextureRect().height;
+
+		float kw = (float)w / 4;
+
+		int kpx = (px - x) / kw;
+
+		return key_map[kpx];
+	}
+
+	return MREMU_KEY_NONE;
+}
+
+bool Menubar::event(sf::Event& event) {
+	switch (event.type) {
+	case sf::Event::MouseButtonPressed:
+		if (event.mouseButton.button == sf::Mouse::Button::Left)
+			kc.press_key(find_key_by_pos(event.mouseButton.x, event.mouseButton.y), kc.Mouse);
+		return true;
+	case sf::Event::MouseButtonReleased:
+		if (event.mouseButton.button == sf::Mouse::Button::Left)
+			kc.unpress_by_source(kc.Mouse);
+		return true;
+	case sf::Event::TouchBegan:
+		kc.press_key(find_key_by_pos(event.touch.x, event.touch.y),
+			(KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
+		return true;
+	case sf::Event::TouchEnded:
+		kc.unpress_by_source((KeyboardControl::key_source)(kc.Touch0 + event.touch.finger));
+		return true;
+	}
+	return false;
 }
 
 static void add_line(std::vector<sf::Vertex>& v, float x1, float y1, float x2, float y2) {

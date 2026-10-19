@@ -1,7 +1,7 @@
 #include "Device.h"
 
 Device::Device(sf::RenderWindow& win_device, MREngine::Graphic& graphic_) 
-	: win(win_device), graphic(graphic_) 
+	: win(win_device), graphic(graphic_), keyboard(keyboardControl), menubar(keyboardControl)
 {
 	update_size();
 }
@@ -10,6 +10,7 @@ void Device::process_events() {
 	sf::Event event;
 	while (win.pollEvent(event)) {
 		keyboard.event(event);
+		menubar.event(event);
 		touch.sf_event(event);
 		switch (event.type) {
 		case sf::Event::Closed:
