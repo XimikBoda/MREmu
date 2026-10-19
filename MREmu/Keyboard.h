@@ -40,6 +40,13 @@ public:
 		int8_t key_status = VM_KEY_EVENT_DOWN;
 		key_source source = Unknow;
 
+		// Auto-repeat bookkeeping. The first repeat fires after 500 ms; each
+		// subsequent repeat fires sooner, so a held key accelerates.
+		bool repeat_started = false;
+		int repeat_delay_ms = 300;   // delay between repeats after the initial 500 ms
+		static constexpr int REPEAT_DELAY_MIN = 50;
+		static constexpr int REPEAT_DELAY_STEP = 50;
+
 		pkey_t() = default;
 		pkey_t(int key_code, key_source source);
 	};

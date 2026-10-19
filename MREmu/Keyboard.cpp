@@ -14,12 +14,24 @@ KeyboardControl::pkey_t::pkey_t(int key_code, key_source source) {
 }
 
 void KeyboardControl::update() {
-	for (int i = 0; i < pkey.size(); ++i)
-		if (pkey[i].tim.getElapsedTime().asMilliseconds() >= 500) {
+	for (int i = 0; i < pkey.size(); ++i) {
+		int threshold = pkey[i].repeat_started ? pkey[i].repeat_delay_ms : 500;
+		if (pkey[i].tim.getElapsedTime().asMilliseconds() >= threshold) {
 			pkey[i].tim.restart();
-			if (pkey[i].key_status < VM_KEY_EVENT_REPEAT)
-				pkey[i].key_status++;
+			if (!pkey[i].repeat_started) {
+				// First repeat after the initial 500 ms hold.
+				pkey[i].repeat_started = true;
+				pkey[i].repeat_delay_ms = 300;
+			}
+			else {
+				// Accelerate: shorten the delay for the next repeat.
+				pkey[i].repeat_delay_ms = std::max(
+					pkey_t::REPEAT_DELAY_MIN,
+					pkey[i].repeat_delay_ms - pkey_t::REPEAT_DELAY_STEP);
+			}
+			add_keyboard_event(VM_KEY_EVENT_REPEAT, pkey[i].key_code);
 		}
+	}
 }
 
 int KeyboardControl::find_key(int key_code) {
@@ -371,6 +383,10 @@ const char16_t* keys_marks_right[3][3] = {
 	{u"\u2B05", u"OK", u"\u2B95"},
 	{u"\u232B", u"\u2B07", u"\u21A9"},
 };
+
+void Keyboard::update() {
+	kc.update();
+}
 
 void Keyboard::update_resize(int win_w, int win_h) {
 	int screen_x = screen->getPosition().x;

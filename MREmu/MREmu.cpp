@@ -618,6 +618,8 @@ static void run_mcp_window(MREngine::Graphic& graphic, Keyboard& keyboard, Touch
 			touch.sf_event(ev);
 		}
 
+		keyboard.update();
+
 		const Mcp::Snapshot snap = ctl.snapshot();
 
 		// Same order as the GUI loop: refresh the texture from the framebuffer the
@@ -1276,6 +1278,8 @@ int main(int argc, char** argv) {
 			ImGui::End();
 		}
 #endif
+
+		keyboard.update();
 
 		repaint_device();
 
