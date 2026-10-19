@@ -5,6 +5,12 @@ bool Vibration::isAvailable() const { return false; }
 
 void Vibration::vibrate(sf::Time) {}
 
+void Vibration::stop() {}
+
+void mremu_vibrate(sf::Time) {}
+
+void mremu_vibrate_stop() {}
+
 #else
 
 namespace {
@@ -23,6 +29,12 @@ bool ensure_env(JNIEnv*& env, JavaVM* vm) {
 } // namespace
 
 Vibration::Vibration() : vm_(nullptr), activityClass_(nullptr), activityObject_(nullptr), vibrateMethod_(nullptr), isAvailable_(-1) {
+    init();
+}
+
+void Vibration::init() {
+    if (vm_ && activityObject_ && vibrateMethod_) return;
+
     ANativeActivity* activity = sf::getNativeActivity();
     if (!activity || !activity->vm) return;
 
@@ -76,6 +88,8 @@ Vibration::Vibration() : vm_(nullptr), activityClass_(nullptr), activityObject_(
             env->ExceptionClear();
         else
             isAvailable_ = hasVib ? 1 : 0;
+    } else {
+        isAvailable_ = 1;
     }
 }
 
@@ -94,6 +108,9 @@ bool Vibration::isAvailable() const {
 }
 
 void Vibration::vibrate(sf::Time duration) {
+    if (!vm_ || !activityObject_ || !vibrateMethod_) {
+        init();
+    }
     if (isAvailable_ != 1 || !vm_ || !activityClass_ || !activityObject_ || !vibrateMethod_) return;
 
     JNIEnv* env = nullptr;
@@ -107,4 +124,24 @@ void Vibration::vibrate(sf::Time duration) {
     if (env->ExceptionCheck())
         env->ExceptionClear();
 }
+
+void Vibration::stop() {
+    vibrate(sf::Time::Zero);
+}
+
+namespace {
+Vibration& get_global_vibration() {
+    static Vibration s_vib;
+    return s_vib;
+}
+} // namespace
+
+void mremu_vibrate(sf::Time duration) {
+    get_global_vibration().vibrate(duration);
+}
+
+void mremu_vibrate_stop() {
+    get_global_vibration().stop();
+}
+
 #endif

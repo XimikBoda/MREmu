@@ -8,6 +8,7 @@ public:
 	bool isAvailable() const;
 
 	void vibrate(sf::Time);
+	void stop();
 };
 
 #else
@@ -23,7 +24,10 @@ public:
 
 	bool isAvailable() const;
 	void vibrate(sf::Time duration);
+	void stop();
 private:
+    void init();
+
     JavaVM* vm_;
     jclass activityClass_;
     jobject activityObject_;
@@ -32,3 +36,6 @@ private:
 };
 
 #endif
+
+void mremu_vibrate(sf::Time duration);
+void mremu_vibrate_stop();

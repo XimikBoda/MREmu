@@ -9,8 +9,7 @@
 #include <cstring>
 #include <filesystem>
 #include <SFML/System/Clock.hpp>
-
-#include <cstring>
+#include "../jni/Vibration.h"
 
 namespace fs = std::filesystem;
 
@@ -205,12 +204,15 @@ VMUINT vm_get_mre_version(void) {
 
 void vm_vibrator_once(void) {
 	spdlog::debug("vm_vibrator_once called");
+	mremu_vibrate(sf::milliseconds(1000));
 }
 
 void vm_vibrator_on(void) {
 	spdlog::debug("vm_vibrator_on called");
+	mremu_vibrate(sf::milliseconds(5000));
 }
 
 void vm_vibrator_off(void) {
 	spdlog::debug("vm_vibrator_off called");
+	mremu_vibrate_stop();
 }
