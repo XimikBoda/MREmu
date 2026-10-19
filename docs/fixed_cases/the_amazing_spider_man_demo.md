@@ -75,3 +75,17 @@ VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
 | VM calls at 7s | Over 9,300 VM calls executed; continuous game loop running (`vm_graphic_blt`, `vm_graphic_fill_rect`, `vm_graphic_flush_layer`, `vm_create_timer_ex`) |
 | Fault status | `faulted: false`, `last_error: ""` |
 | MCP Test Suite (`test_mcp.py`) | All checks passed (`ALL CHECKS PASSED`) |
+
+## Input Navigation & Gameplay Flow
+
+1. **Language Selection Screen**:
+   - Use Up/Down arrows to highlight a language, then press **OK** (`Enter` / `Space` / `VM_KEY_OK`).
+2. **Sound Prompt ("DO YOU WANT SOUND? YES / NO")**:
+   - This prompt requires **Left Softkey** (`VM_KEY_LEFT_SOFTKEY`, mapped to `Q`, `F1`, `/`, or the `Left S` button in the ImGui virtual keypad) to confirm "SELECT".
+   - Pressing **OK** on this dialog does nothing because Gameloft's dialog routine specifically listens for Left Softkey / Right Softkey rather than OK.
+   - Touch/mouse clicks on the screen are ignored because Spider-Man's registered pen callback is a no-op stub (`bx lr`).
+3. **Title Splash Screen**:
+   - Displays "PRESS 5 TO CONTINUE". Press `5` (or NumPad `5`) to advance to the main menu.
+4. **Frame Rate / Timing**:
+   - Spider-Man drives its main loop via `vm_create_timer_ex` with a 57 ms interval (~17.5 FPS), typical of 2014 MediaTek feature phone titles. This is the intended game tick rate, not a performance regression or bottleneck.
+
