@@ -151,7 +151,10 @@ VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
 	if (data == 0)
 		return -1;
 
-	if(offset + size >= resources.file_context->size())
+	if (resources.local_offsets)
+		offset += resources.vm_res_offset;
+
+	if(offset + size > resources.file_context->size() || offset + size < offset)
 		return -1;
 
 	memcpy(data, resources.file_context->data() + offset, size);
@@ -166,7 +169,12 @@ VMUINT vm_get_resource_offset(char* res_name) {
 
 	if (!res)
 		return 0;
-	
+
+	auto offset = res->offset;
+
+	if (resources.local_offsets)
+		offset -= resources.vm_res_offset;
+
 	return res->offset;
 }
 
@@ -175,7 +183,7 @@ VMUINT vm_get_resource_offset_from_file(VMWSTR filename, char* res_name) {
 }
 
 VMINT vm_get_res_header() {
-	return 8;
+	return 0;
 }
 
 VMINT32 vm_res_init(void) {
