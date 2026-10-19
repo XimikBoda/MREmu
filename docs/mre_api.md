@@ -116,6 +116,25 @@ Implemented in [`MREngine/SIM.cpp`](../MREmu/MREngine/SIM.cpp).
 
 ---
 
+## 5b. Vibration APIs
+
+Implemented in [`MREngine/System.cpp`](../MREmu/MREngine/System.cpp), forwarding to the
+host vibrator through [`jni/Vibration.cpp`](../MREmu/jni/Vibration.cpp).
+
+| Function | Signature | Description |
+| :--- | :--- | :--- |
+| `vm_vibrator_once` | `void vm_vibrator_once(void)` | Fires a single 40 ms tick. |
+| `vm_vibrator_on` | `void vm_vibrator_on(void)` | Starts a 5 s sustained buzz. |
+| `vm_vibrator_off` | `void vm_vibrator_off(void)` | Cancels any buzz in flight. |
+
+48 of the 142 installed packages use these, and two of them
+(`DangerDash`, `SubwaySurfers`) drive the motor through the `on`/`off` pair as a
+timer-controlled pulse rather than calling `once`. See [Vibration](vibration.md) for the
+per-package breakdown and for how the requested duration is reshaped on Android depending
+on whether the handset has a rotating-mass or a linear resonant actuator.
+
+---
+
 ## 6. Sensor & Hardware Stubs
 
 Implemented in [`MREngine/Sensor.cpp`](../MREmu/MREngine/Sensor.cpp).

@@ -19,6 +19,7 @@ The documentation is organized into modular guides following a simple, topic-foc
 | [**API Implementation TODO**](api_todo.md) | What to implement next and what to leave alone, ranked by which installed apps actually request each API rather than by subsystem size. |
 | [**Graphics Subsystem**](graphics.md) | 240×320 screen compositing, layer management, canvas memory buffers & signatures (`MTKCANVAS`), 2D drawing primitives, alpha blending, and GNU Unifont font rendering. |
 | [**Audio Subsystem**](audio.md) | Audio architecture, OPL3 MIDI synthesis via `libADLMIDI`, bitstream PCM streaming (`Bitstream`), and audio recording emulation (`BitstreamRecord`). |
+| [**Vibration**](vibration.md) | Which of the 142 installed packages use `vm_vibrator_*`, how each one's call sites were located by disassembly, and how MREmu shapes the waveform for the handset's motor. |
 | [**File System & I/O**](io_and_filesystem.md) | Virtual drive mapping (`C:\`, `D:\`, `E:\mre`), host path sandboxing, UCS-2 string handling, file descriptors, and directory search iterators. |
 | [**Networking & Sockets**](networking.md) | Asynchronous network stack powered by Asio: TCP/UDP socket lifecycle, event-driven callbacks, DNS resolution (`vm_soc_get_host_by_name`), and connectivity checks. |
 | [**Desktop & Headless Tooling**](desktop.md) | Desktop application features, dual-window interface (SFML + Dear ImGui), headless inspection flags (`--inspect`, `--json`, `--screen`, `--steps`), and GDB debugging. |
