@@ -120,6 +120,22 @@ decode cost for a layout the user may never open.
 Packages with no extractable icon (see [vxp_icons.md](vxp_icons.md)) get a
 procedural placeholder tile rather than a hole.
 
+## Switch tile glyph
+
+The trailing tile carries a list icon, embedded as a **coverage mask** rather
+than a PNG. `Image.cpp`'s `load_image()` sets `has_transparency = 0` and
+converts straight to 16-bit, so an embedded transparent PNG arrives as a black
+square — which is fine for the wallpaper, which has no alpha, and not fine here.
+The glyph is a solid shape on transparency, so only the coverage matters; the
+generator extracts the alpha channel, crops to it and emits 4 KB of it.
+
+Downsampling onto the tile is a box average, not a point sample: the mask is
+64×64 and the tile is about 48, and point sampling breaks the bars into dashes.
+The result is multiplied by the tile's own squircle coverage so the glyph is
+clipped by the tile instead of sitting over its corners.
+
+See [res/icons/README.md](../res/icons/README.md).
+
 ## Font limits
 
 `vm_graphic_set_font` is a no-op and `vm_font_set_font_style` returns success

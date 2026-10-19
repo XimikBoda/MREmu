@@ -1,6 +1,7 @@
 #include "AppSelector.h"
 #include "BottomSheet.h"
 #include "WallpaperData.h"
+#include "ListIconData.h"
 #include "../../MREngine/Image.h"
 #include "../../MREngine/VxpIcon.h"
 #include "../../AppManager.h"
@@ -1214,36 +1215,57 @@ namespace NativeApps::Menu::AppSelector {
 			std::max(1, radius / 2), VM_COLOR_888_TO_565(128, 137, 158), 255);
 	}
 
-	// Glyph naming the layout a switch tile will take you to: four blocks for
-	// the grid, three rules for the list.
-	void draw_layout_glyph(int x, int y, int size, View target) {
-		VMUINT16 ink = VM_COLOR_888_TO_565(44, 52, 76);
-		int pad = size / 4;
-		int inner = size - 2 * pad;
-		if (inner < 6)
+	// Glyph on the grid's "Switch to List View" tile: the list icon from
+	// res/icons/source/list-ul.png, as a coverage mask.
+	//
+	// The mask is 64x64 with the glyph fitted inside it at its own aspect, so
+	// the whole mask can be treated as the box scaled onto the tile and the
+	// zero-coverage padding needs no special case.
+	//
+	// Downsampling is a box average rather than a point sample: the mask is
+	// larger than the ~48px tile it lands on, and point sampling turns the
+	// bars into a dashed line. The per-pixel coverage is multiplied by the
+	// tile's own squircle coverage so the glyph is clipped by the tile rather
+	// than sitting on top of its corners.
+	void draw_list_glyph(int x, int y, int size, int radius) {
+		const int side = ListIcon::kSide;
+		const int box = std::max(4, size * 5 / 8);
+		const int ox = x + (size - box) / 2;
+		const int oy = y + (size - box) / 2;
+		if (box < 3)
 			return;
 
-		if (target == View::Grid) {
-			int bw = (inner - 3) / 4, bh = (inner - 3) / 2;
-			if (bw < 1 || bh < 1)
-				return;
-			for (int r = 0; r < 2; ++r)
-				for (int c = 0; c < 4; ++c) {
-					int bx = x + pad + c * (bw + 1);
-					int by = y + pad + r * (bh + 1);
-					for (int py = 0; py < bh; ++py)
-						for (int px = 0; px < bw; ++px)
-							blend_at(bx + px, by + py, ink, 255);
+		const VMUINT16 ink = VM_COLOR_888_TO_565(44, 52, 76);
+
+		for (int py = 0; py < box; ++py) {
+			int sy0 = py * side / box;
+			int sy1 = (py + 1) * side / box;
+			if (sy1 <= sy0)
+				sy1 = sy0 + 1;
+
+			for (int px = 0; px < box; ++px) {
+				int sx0 = px * side / box;
+				int sx1 = (px + 1) * side / box;
+				if (sx1 <= sx0)
+					sx1 = sx0 + 1;
+
+				int sum = 0, n = 0;
+				for (int sy = sy0; sy < sy1; ++sy) {
+					const unsigned char* row =
+						ListIcon::kMask + (size_t)sy * side;
+					for (int sx = sx0; sx < sx1; ++sx) {
+						sum += row[sx];
+						++n;
+					}
 				}
-		}
-		else {
-			int bar_h = std::max(1, inner / 9);
-			int gap = std::max(1, inner / 8);
-			for (int b = 0; b < 3; ++b) {
-				int by = y + pad + b * (bar_h + gap);
-				for (int py = 0; py < bar_h; ++py)
-					for (int px = 0; px < inner; ++px)
-						blend_at(x + pad + px, by + py, ink, 255);
+
+				int alpha = sum / n;
+				if (!alpha)
+					continue;
+
+				int cov = tile_coverage(ox - x + px, oy - y + py, size, radius);
+				if (cov)
+					blend_at(ox + px, oy + py, ink, alpha * cov / 255);
 			}
 		}
 	}
@@ -1277,7 +1299,7 @@ namespace NativeApps::Menu::AppSelector {
 
 		if (is_switch_item(index)) {
 			blend_rounded_rect(x, y, size, radius, VM_COLOR_888_TO_565(236, 240, 248), 235);
-			draw_layout_glyph(x, y, size, view == View::Grid ? View::List : View::Grid);
+			draw_list_glyph(x, y, size, radius);
 		}
 		else if (vxps[index].is_dir) {
 			draw_folder_tile(x, y, size, radius);
