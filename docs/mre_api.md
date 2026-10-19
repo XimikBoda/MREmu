@@ -2,6 +2,10 @@
 
 This document provides a comprehensive guide to the **MediaTek MRE C Runtime APIs** emulated by **MREmu**, detailing how they are structured, mapped through the symbol bridge, and implemented natively.
 
+For the other side of the ledger - the APIs MREmu does *not* implement, and
+the ones that resolve but quietly do nothing - see
+[**Unimplemented MRE APIs**](unimplemented_apis.md).
+
 ---
 
 ## 1. Symbol Resolution Architecture
