@@ -49,10 +49,154 @@ namespace NativeApps::Menu::AppSelector {
 
 	VMUINT16 gray = VM_COLOR_888_TO_565(50, 50, 50);
 
-	// The selection outline and the selected app's name share one light blue,
-	// which is what ties the title bar to the focus ring. Both used to be plain
-	// white, so the two read as unrelated.
-	const VMUINT16 accent_blue = VM_COLOR_888_TO_565(126, 178, 242);
+	// =========================================================================
+	// Grid appearance
+	//
+	// Everything that decides how the grid looks, gathered here so it can be
+	// tuned without reading the drawing code.
+	//
+	// A name ending in Pct is a percentage, a one ending in Px is already in
+	// pixels, and one ending in Div is an integer divisor - percentages are
+	// used only where the underlying expression really was a percentage, since
+	// for the rest the round number does not give the same integer split.
+	// =========================================================================
+
+	// --- Shape of the grid --------------------------------------------------
+
+	constexpr int grid_cols = 4;
+	constexpr int grid_rows_per_page = 4;
+
+	// Space left between neighbouring tiles, as a percentage of the cell pitch,
+	// floored at kMinGapPx.
+	//
+	// Rows and columns are separate constants because they are separate design
+	// decisions - a deeper row gap reads as grouping, a wider column gap as
+	// columns. Be aware of the geometry, though: the tile is square and so is
+	// the cell, so the tile is sized from the *larger* of the two and the
+	// smaller is absorbed by the centring. Differing values do nothing until
+	// the pitch is made rectangular.
+	static constexpr int kColGapPct = 20;
+	static constexpr int kRowGapPct = 20;
+	static constexpr int kMinGapPx = 2;
+
+	// Bounds on the cell pitch, so the grid neither collapses nor turns into a
+	// handful of enormous tiles on a stepped-up screen.
+	static constexpr int kMinCellPx = 12;
+	static constexpr int kMaxCellPx = 64;
+
+	// Height of the title and softkey bars: the text height plus this much
+	// breathing room.
+	static constexpr int kBarPadPx = 6;
+
+	// Both bars are the same flat dark fill rather than a dim over the
+	// wallpaper: a translucent one lets the wallpaper show through the text.
+	static constexpr int kBarBgR = 12, kBarBgG = 16, kBarBgB = 28;
+
+	// Inset of the outermost softkey label from the screen edge, and of the
+	// title's text from the left.
+	static constexpr int kBarMarginPx = 4;
+
+	// A held softkey gets a block behind it, not just a colour change on the
+	// letters. It hugs the text - sized to the glyph cell rather than the whole
+	// bar, or it fills the strip and the label appears to float on it.
+	static constexpr int kPressPadXPx = 5;
+	static constexpr int kPressPadYPx = 1;
+	static constexpr int kPressR = 232, kPressG = 236, kPressB = 243;
+
+	// Letters on a pressed softkey, dark against that block.
+	static constexpr int kPressInkR = 10, kPressInkG = 12, kPressInkB = 20;
+
+	// --- Tile shape ---------------------------------------------------------
+
+	// Superellipse exponent for the corners. They are continuous curves rather
+	// than circular arcs, which is what makes them read as one shape with the
+	// straight edges instead of a circle tangent to four lines.
+	//
+	// n and the radius are a pair, not independent knobs: raising n fills the
+	// corner in, so a big radius at n = 4 still leaves the tip looking square.
+	// n = 3 with kCornerRadiusPct is round enough to read as rounded while
+	// keeping the continuous curve a circle does not have.
+	static constexpr float kSquircleN = 3.0f;
+
+	// Corner radius, as a percentage of the tile's side, floored so a very
+	// small tile still has a corner to round.
+	static constexpr int kCornerRadiusPct = 44;
+	static constexpr int kMinRadiusPx = 2;
+
+	// --- Selection ----------------------------------------------------------
+
+	// Accent blue, shared by the selection outline and the title bar's text so
+	// the two read as one thing. Both used to be plain white, so they read as
+	// unrelated.
+	static constexpr int kAccentR = 126, kAccentG = 178, kAccentB = 242;
+
+	// Thickness of the outline around the selected tile, in pixels.
+	//
+	// Drawn as a slightly larger squircle *underneath* the tile rather than as
+	// a frame on top of it. vm_graphic_roundrect has circular corners, so a
+	// frame from it sits on a squircle as a visibly different shape; growing
+	// the tile's own mask instead follows the curve exactly at any size.
+	static constexpr int kFocusRimPx = 2;
+	static constexpr int kFocusAlpha = 235;
+
+	// --- Tile chrome --------------------------------------------------------
+
+	// Drop shadow: a dark squircle offset down and slightly right. Kept faint -
+	// the icons sit almost flat on the wallpaper, and a strong shadow smears
+	// into the gutter and makes the rows look ragged.
+	static constexpr int kShadowOffsetX = -1;
+	static constexpr int kShadowOffsetY = 1;
+	static constexpr int kShadowAlpha = 55;
+
+	// The "Switch to List View" tile gets a pale plate instead of app artwork,
+	// so that it does not read as another entry.
+	static constexpr int kSwitchPlateR = 236, kSwitchPlateG = 240, kSwitchPlateB = 248;
+	static constexpr int kSwitchPlateAlpha = 235;
+
+	// Glyph box on that tile, as a fraction of the tile side, centred.
+	static constexpr int kGlyphBoxNum = 5;
+	static constexpr int kGlyphBoxDen = 8;
+
+	// Ink for every glyph the grid draws itself, on a pale plate.
+	static constexpr int kInkR = 44, kInkG = 52, kInkB = 76;
+
+	// --- Folder and placeholder tiles ---------------------------------------
+	//
+	// Neither is real artwork. A package with no extractable icon gets the
+	// placeholder, a directory gets the folder; see docs/vxp_icons.md for why
+	// some packages are in that state.
+
+	static constexpr int kFolderPlateR = 226, kFolderPlateG = 230, kFolderPlateB = 238;
+	static constexpr int kFolderTabR = 246, kFolderTabG = 202, kFolderTabB = 74;
+	static constexpr int kFolderBodyR = 250, kFolderBodyG = 214, kFolderBodyB = 100;
+	static constexpr int kFolderEdgeR = 176, kFolderEdgeG = 132, kFolderEdgeB = 30;
+
+	// Folder body, as a fraction of the tile. Kept clear of the plate's own
+	// corner curve: at three quarters of the tile the body's right edge ran
+	// into it and got chopped off, which made the folder look broken rather
+	// than merely tight.
+	static constexpr int kFolderGlyphWPct = 64;
+	static constexpr int kFolderGlyphHPct = 42;
+	static constexpr int kFolderGlyphYDiv = 16;  // pushed down, as size / 16
+	static constexpr int kFolderTabWPct = 45;
+	static constexpr int kFolderLipDiv = 5;     // lip thickness, as gh / 5
+
+	// The darker band along the folder's bottom edge. Kept faint: at full
+	// strength it read as a separate stripe under the folder rather than as its
+	// shaded edge.
+	static constexpr int kFolderEdgeAlpha = 110;
+
+	// Placeholder mark. An inset block rather than an outline:
+	// vm_graphic_roundrect draws a one-pixel frame with a coarse corner test,
+	// which at tile scale came out looking like a smudge instead of a mark.
+	static constexpr int kPlaceholderPlateR = 214, kPlaceholderPlateG = 219,
+		kPlaceholderPlateB = 230;
+	static constexpr int kPlaceholderMarkR = 128, kPlaceholderMarkG = 137,
+		kPlaceholderMarkB = 158;
+	static constexpr int kPlaceholderInsetPct = 25;
+	static constexpr int kMinInsetPx = 2;
+
+	const VMUINT16 accent_blue = VM_COLOR_888_TO_565(kAccentR, kAccentG, kAccentB);
 
 	int m_i = 0;
 
@@ -93,13 +237,11 @@ namespace NativeApps::Menu::AppSelector {
 	int tile = 0;       // icon size inside a cell
 	int grid_icon = 0;  // size the grid icons are decoded at
 
-	constexpr int grid_cols = 4;
-
 	// Rows shown at once. The grid pages: it is always exactly 4x4 icons, and the
 	// offset is always a whole number of pages. A partially scrolled grid looks
 	// like a broken one - a half row of icons under the title bar reads as a
 	// clipping bug rather than as content continuing past the fold.
-	constexpr int grid_rows_per_page = 4;
+	// grid_cols and grid_rows_per_page are with the other grid constants.
 
 	// Wallpaper behind both layouts. Two buffers because the list needs the image
 	// pushed further back than the grid does; see kGridDim and kListDim.
@@ -394,8 +536,8 @@ namespace NativeApps::Menu::AppSelector {
 		b_h = c_h * 2;
 		img_wh = b_h - 2;
 
-		title_h = c_h + 6;
-		softkey_h = c_h + 6;
+		title_h = c_h + kBarPadPx;
+		softkey_h = c_h + kBarPadPx;
 		grid_top = title_h;
 		grid_h = std::max(1, h - title_h - softkey_h);
 
@@ -403,14 +545,17 @@ namespace NativeApps::Menu::AppSelector {
 		// decoded without knowing how many entries scan() will find. Capped by the
 		// page height too, so four rows always fit between the bars.
 		int pitch = std::min(w / grid_cols, grid_h / grid_rows_per_page);
-		cell = std::max(12, std::min(pitch, 64));
+		cell = std::max(kMinCellPx, std::min(pitch, kMaxCellPx));
 
-		// Leave roughly a fifth of the pitch as gutter between icons, with
-		// the tile centred in its cell. Drawing the icon flush to the cell origin
-		// instead would crowd it against the column to its left and leave a wider
-		// gap on the right.
-		int gutter = std::max(2, cell / 5);
-		tile = cell - gutter;
+		// Gutter between tiles, and the tile centred in its cell. Drawing the icon
+		// flush to the cell origin instead would crowd it against the column to its
+		// left and leave a wider gap on the right.
+		//
+		// The tile is square and so is the cell, so one gap governs both axes:
+		// see kRowGapPct for why the two are still spelled separately.
+		int gap_x = std::max(kMinGapPx, cell * kColGapPct / 100);
+		int gap_y = std::max(kMinGapPx, cell * kRowGapPct / 100);
+		tile = cell - std::max(gap_x, gap_y);
 		grid_icon = tile;
 
 		build_wallpaper(wallpaper, kGridDim);
@@ -1013,13 +1158,9 @@ namespace NativeApps::Menu::AppSelector {
 	// point where a circular arc begins. That is the superellipse
 	// |x|^n + |y|^n = 1, which is what a squircle is.
 	//
-	// n and the radius are a pair, not independent knobs: raising n fills the
-	// corner in, so a big radius at n = 4 still leaves the tip looking square.
-	// n = 3 with the radius below is round enough to read as rounded while
-	// keeping the continuous curve a circle does not have.
+	// kSquircleN and kCornerRadiusPct are with the other grid constants; they
+	// are a pair, and a large radius does not compensate for too small an n.
 	// -------------------------------------------------------------------------
-
-	static constexpr float kSquircleN = 3.0f;
 
 	// Coverage of a squircle at (px, py) inside a [size]x[size] tile, 0..255.
 	//
@@ -1170,49 +1311,42 @@ namespace NativeApps::Menu::AppSelector {
 	// reads at tile size and matches how the real icons sit on their own
 	// backgrounds.
 	void draw_folder_tile(int x, int y, int size, int radius) {
-		VMUINT16 plate = VM_COLOR_888_TO_565(226, 230, 238);
-		VMUINT16 tab_c = VM_COLOR_888_TO_565(246, 202, 74);
-		VMUINT16 body_c = VM_COLOR_888_TO_565(250, 214, 100);
-		VMUINT16 edge_c = VM_COLOR_888_TO_565(176, 132, 30);
+		VMUINT16 plate = VM_COLOR_888_TO_565(kFolderPlateR, kFolderPlateG, kFolderPlateB);
+		VMUINT16 tab_c = VM_COLOR_888_TO_565(kFolderTabR, kFolderTabG, kFolderTabB);
+		VMUINT16 body_c = VM_COLOR_888_TO_565(kFolderBodyR, kFolderBodyG, kFolderBodyB);
+		VMUINT16 edge_c = VM_COLOR_888_TO_565(kFolderEdgeR, kFolderEdgeG, kFolderEdgeB);
 
 		blend_rounded_rect(x, y, size, radius, plate, 255);
 
-		// Glyph box, inset from the plate on every side. Sized to leave a clear
-		// margin: at 3/4 of the tile the body's right edge ran into the plate's
-		// own corner curve and got chopped off, which made the folder look broken
-		// rather than merely tight.
-		int gw = size * 64 / 100;
-		int gh = size * 42 / 100;
+		int gw = size * kFolderGlyphWPct / 100;
+		int gh = size * kFolderGlyphHPct / 100;
 		int gx = x + (size - gw) / 2;
-		int gy = y + (size - gh) / 2 + size / 16;
+		int gy = y + (size - gh) / 2 + size / kFolderGlyphYDiv;
 
 		// Tab: the short raised strip at the top left, tucked behind the body.
-		blend_rect_round(gx, gy - gh / 3, gw * 45 / 100, gh / 2 + 1,
+		blend_rect_round(gx, gy - gh / 3, gw * kFolderTabWPct / 100, gh / 2 + 1,
 			std::max(1, radius / 3), tab_c, 255);
 
 		// Body.
 		blend_rect_round(gx, gy, gw, gh, std::max(1, radius / 2), body_c, 255);
 
-		// A darker band along the bottom edge gives the folder a visible lip. Kept
-		// faint: at full strength it read as a separate stripe under the folder
-		// rather than as its shaded edge.
-		int lip = std::max(1, gh / 5);
-		blend_rect(gx, gy + gh - lip, gw, lip, edge_c, 110);
+		int lip = std::max(1, gh / kFolderLipDiv);
+		blend_rect(gx, gy + gh - lip, gw, lip, edge_c, kFolderEdgeAlpha);
 	}
 
 	// Stand-in for the handful of packages that ship a stub icon with no image
 	// in it at all (see docs/vxp_icons.md): a plain plate with a mark on it, so
 	// the grid has no holes in it.
 	void draw_placeholder_tile(int x, int y, int size, int radius) {
-		VMUINT16 plate = VM_COLOR_888_TO_565(214, 219, 230);
+		VMUINT16 plate = VM_COLOR_888_TO_565(
+			kPlaceholderPlateR, kPlaceholderPlateG, kPlaceholderPlateB);
 		blend_rounded_rect(x, y, size, radius, plate, 255);
 
-		// A darker inset block rather than an outline: vm_graphic_roundrect draws
-		// a one-pixel frame with a coarse corner test, which at tile scale came
-		// out looking like a smudge instead of a mark.
-		int inset = std::max(2, size / 4);
+		int inset = std::max(kMinInsetPx, size * kPlaceholderInsetPct / 100);
 		blend_rounded_rect(x + inset, y + inset, size - 2 * inset,
-			std::max(1, radius / 2), VM_COLOR_888_TO_565(128, 137, 158), 255);
+			std::max(1, radius / 2),
+			VM_COLOR_888_TO_565(kPlaceholderMarkR, kPlaceholderMarkG, kPlaceholderMarkB),
+			255);
 	}
 
 	// Glyph on the grid's "Switch to List View" tile: the list icon from
@@ -1229,13 +1363,13 @@ namespace NativeApps::Menu::AppSelector {
 	// than sitting on top of its corners.
 	void draw_list_glyph(int x, int y, int size, int radius) {
 		const int side = ListIcon::kSide;
-		const int box = std::max(4, size * 5 / 8);
+		const int box = std::max(4, size * kGlyphBoxNum / kGlyphBoxDen);
 		const int ox = x + (size - box) / 2;
 		const int oy = y + (size - box) / 2;
 		if (box < 3)
 			return;
 
-		const VMUINT16 ink = VM_COLOR_888_TO_565(44, 52, 76);
+		const VMUINT16 ink = VM_COLOR_888_TO_565(kInkR, kInkG, kInkB);
 
 		for (int py = 0; py < box; ++py) {
 			int sy0 = py * side / box;
@@ -1276,29 +1410,21 @@ namespace NativeApps::Menu::AppSelector {
 	// of squares.
 	void draw_tile(int index, int x, int y) {
 		int size = tile;
-		// Paired with kSquircleN = 3: a small radius at that exponent looks
-		// square, and this one keeps a short straight run on each side of the tile
-		// so it still reads as a rounded square rather than a circle.
-		int radius = std::max(2, size * 44 / 100);
+		int radius = std::max(kMinRadiusPx, size * kCornerRadiusPct / 100);
 
-		// Drop shadow: a dark squircle offset down and slightly right. Kept faint -
-		// the icons sit almost flat on the wallpaper, and a strong
-		// shadow here smears into the gutter and makes the rows look ragged.
-		blend_rounded_rect(x - 1, y + 1, size, radius, VM_COLOR_888_TO_565(0, 0, 0), 55);
+		blend_rounded_rect(x + kShadowOffsetX, y + kShadowOffsetY, size, radius,
+			VM_COLOR_888_TO_565(0, 0, 0), kShadowAlpha);
 
 		if (index == m_i) {
-			// Focus ring, drawn as a slightly larger squircle *underneath* the tile
-			// rather than as a frame on top of it. vm_graphic_roundrect has circular
-			// corners, so a frame from it sits on a squircle as a visibly different
-			// shape; growing the tile's own mask instead means the ring follows the
-			// curve exactly at any size.
-			const int rim = 2;
-			blend_rounded_rect(x - rim, y - rim, size + 2 * rim, radius + rim,
-				accent_blue, 235);
+			blend_rounded_rect(x - kFocusRimPx, y - kFocusRimPx,
+				size + 2 * kFocusRimPx, radius + kFocusRimPx,
+				accent_blue, kFocusAlpha);
 		}
 
 		if (is_switch_item(index)) {
-			blend_rounded_rect(x, y, size, radius, VM_COLOR_888_TO_565(236, 240, 248), 235);
+			blend_rounded_rect(x, y, size, radius,
+				VM_COLOR_888_TO_565(kSwitchPlateR, kSwitchPlateG, kSwitchPlateB),
+				kSwitchPlateAlpha);
 			draw_list_glyph(x, y, size, radius);
 		}
 		else if (vxps[index].is_dir) {
@@ -1342,7 +1468,7 @@ namespace NativeApps::Menu::AppSelector {
 		// A flat dark band rather than a dim over the wallpaper. The real menu
 		// has no rule here, but its bar is opaque, and a translucent one lets the
 		// wallpaper gradient show through the text.
-		VMUINT16 bg = VM_COLOR_888_TO_565(12, 16, 28);
+		VMUINT16 bg = VM_COLOR_888_TO_565(kBarBgR, kBarBgG, kBarBgB);
 		for (int y = 0; y < title_h; ++y) {
 			uint16_t* row = (uint16_t*)layer_buf + (size_t)y * w;
 			for (int x = 0; x < w; ++x)
@@ -1352,7 +1478,8 @@ namespace NativeApps::Menu::AppSelector {
 		std::u16string label = item_label(m_i);
 		if (label.empty())
 			label = current_dir;
-		draw_marquee_text(4, (title_h - c_h) / 2, w - 8, title_h, label, accent_blue);
+		draw_marquee_text(kBarMarginPx, (title_h - c_h) / 2, w - 2 * kBarMarginPx,
+			title_h, label, accent_blue);
 	}
 
 	// The centre softkey is set larger than the outer two.
@@ -1364,16 +1491,13 @@ namespace NativeApps::Menu::AppSelector {
 	// larger label rather than merely a fatter one; the softkey bar is only ~22px
 	// tall, so a real 2x scale would not fit.
 	void draw_softkey_label(bool pressed, bool big, int x, int y, const std::u16string& text) {
-		VMUINT16 fg = pressed ? VM_COLOR_888_TO_565(10, 12, 20) : 0xFFFF;
+		VMUINT16 fg = pressed ? VM_COLOR_888_TO_565(kPressInkR, kPressInkG, kPressInkB) : 0xFFFF;
 
 		if (pressed) {
-			// A held softkey gets a block behind it, not
-			// just a colour change on the letters. It hugs the text: sized to the
-			// 16px glyph cell rather than the whole bar, or it filled the strip and
-			// the label appeared to float on it.
 			int tw = vm_graphic_get_string_width((VMWSTR)text.c_str()) + (big ? 1 : 0);
-			vm_graphic_fill_rect(layer_buf, x - 5, y - 1, tw + 10, c_h + 1,
-				VM_COLOR_888_TO_565(232, 236, 243), VM_COLOR_888_TO_565(232, 236, 243));
+			VMUINT16 block = VM_COLOR_888_TO_565(kPressR, kPressG, kPressB);
+			vm_graphic_fill_rect(layer_buf, x - kPressPadXPx, y - kPressPadYPx,
+				tw + 2 * kPressPadXPx, c_h + kPressPadYPx, block, block);
 		}
 
 		vm_graphic_textout(layer_buf, x, y, (VMWSTR)text.c_str(), 100, fg);
@@ -1386,7 +1510,7 @@ namespace NativeApps::Menu::AppSelector {
 
 	void draw_softkeys() {
 		int y0 = h - softkey_h;
-		VMUINT16 bg = VM_COLOR_888_TO_565(12, 16, 28);
+		VMUINT16 bg = VM_COLOR_888_TO_565(kBarBgR, kBarBgG, kBarBgB);
 		for (int y = y0; y < h; ++y) {
 			uint16_t* row = (uint16_t*)layer_buf + (size_t)y * w;
 			for (int x = 0; x < w; ++x)
@@ -1405,9 +1529,9 @@ namespace NativeApps::Menu::AppSelector {
 		int mw = vm_graphic_get_string_width((VMWSTR)mid.c_str()) + 1;
 		int rw = vm_graphic_get_string_width((VMWSTR)right.c_str());
 
-		draw_softkey_label(softkey_press == 1, false, 4, ty, left);
+		draw_softkey_label(softkey_press == 1, false, kBarMarginPx, ty, left);
 		draw_softkey_label(softkey_press == 2, true, (w - mw) / 2, ty, mid);
-		draw_softkey_label(softkey_press == 3, false, w - rw - 4, ty, right);
+		draw_softkey_label(softkey_press == 3, false, w - rw - kBarMarginPx, ty, right);
 	}
 
 	void draw_grid() {
