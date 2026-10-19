@@ -87,6 +87,43 @@ The dim pulls toward the UI's own dark blue rather than scaling to black. On
 5/6/5-bit data a straight multiply to black crushes the channels to zero and takes
 the hue with it, so the wallpaper goes grey.
 
+## Tuning
+
+Everything that decides how the grid looks is a named constant in one block at
+the top of `AppSelector.cpp`, under the `Grid appearance` heading — so it can be
+adjusted without reading the drawing code.
+
+The suffix tells you what kind of number it is: **`Pct` is a percentage**, `Px`
+is already in pixels, and `Div` is an integer divisor. That distinction is not
+pedantry — several of the original expressions were integer divisions that a
+round-looking percentage does **not** reproduce. `size / 16` against
+`size * 6 / 100` gives 3 where it should give 2, and the switch tile's `size * 5 / 8`
+glyph box becomes `size * 62 / 100`. Those are `kFolderGlyphYDiv` and the
+`kGlyphBoxNum` / `kGlyphBoxDen` pair for exactly that reason.
+
+The ones worth reaching for:
+
+| Constant | Default | What it moves |
+| --- | --- | --- |
+| `kColGapPct`, `kRowGapPct` | 20 | Gap between tiles, as a percentage of the cell pitch |
+| `kCornerRadiusPct`, `kSquircleN` | 44, 3.0 | Tile corner roundness — a pair, not independent knobs |
+| `kFocusRimPx` | 2 | Thickness of the outline around the selected tile |
+| `kFocusAlpha` | 235 | How solid that outline is |
+| `kAccentR/G/B` | 126, 178, 242 | The outline's colour, shared with the title text |
+| `kShadowAlpha`, `kShadowOffsetX/Y` | 55, −1, +1 | The drop shadow under each tile |
+| `kMaxCellPx` | 64 | Ceiling on the cell pitch, so tiles stay tile-sized |
+| `kGridDim`, `kListDim` | 64, 70 | How far each layout pushes the wallpaper back |
+| `kPressR/G/B` | 232, 236, 243 | The block behind a held softkey |
+
+One geometry note on `kRowGapPct`: the tile is square and the cell is square, so
+the tile is sized from the **larger** of the two gaps and the smaller is
+absorbed by the centring. They are separate constants because row and column
+spacing are separate design decisions, but giving them different values has no
+effect until the cell pitch itself is made rectangular.
+
+Changing any of this was verified to be pixel-identical at the defaults — see
+[Checking it](#checking-it).
+
 ## Tile shape
 
 The tiles are **squircles**, not rounded rectangles. Their corners are continuous
