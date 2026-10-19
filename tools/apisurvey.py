@@ -29,10 +29,18 @@ import glob
 import os
 import re
 import sys
+import zlib
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIDGE = os.path.join(REPO, "MREmu", "Bridge.cpp")
+ARMODULE = os.path.join(REPO, "MREmu", "ARModule.cpp")
 DOC = os.path.join(REPO, "docs", "unimplemented_apis.md")
+
+# Declared by the SDK but never resolved by the guest, so counting it as
+# unimplemented would be misleading. vm_main is the application entry point:
+# MREmu calls it from the VXP metadata, it is not looked up via
+# vm_get_sym_entry, and it appears nowhere in the engine.
+NOT_GUEST_RESOLVED = {"vm_main"}
 
 # Headers grouped by subsystem so the generated table reads as a map of what
 # MREmu does and does not cover, rather than 50 unrelated lists. Anything not
@@ -198,12 +206,20 @@ def declared_apis(inc):
     return by_name, dict(by_header), all_headers
 
 
-def registered_apis(bridge):
-    """Names present in func_map, which is what vm_get_sym_entry resolves."""
+def registered_apis(bridge, armodule=None):
+    """Names the guest can actually resolve.
+
+    func_map covers most of the surface, but vm_get_sym_entry falls through to
+    ARModule when func_map misses, and ARModule resolves a few more from its
+    own table - vm_vsprintf, vm_sprintf and vm_sscanf. Ignoring that fallback
+    reports three APIs as unimplemented when they resolve fine.
+    """
     names = set(re.findall(r"\{FUNCN(?:_FIX)?\((\w+)\)", bridge))
     # Entries written as {"name", NULL, lambda} carry no C function.
     names |= set(re.findall(r'\{"(\w+)",\s*NULL', bridge))
-    return names
+    if armodule:
+        names |= set(re.findall(r'fn_m\["(\w+)"\]', armodule))
+    return names - NOT_GUEST_RESOLVED
 
 
 def repo_sources():
@@ -326,8 +342,9 @@ def build(sdk):
         sys.exit("SDK headers not found at %s - set MRE_SDK." % inc)
 
     declared, by_header, all_headers = declared_apis(inc)
+    declared = {k: v for k, v in declared.items() if k not in NOT_GUEST_RESOLVED}
     bridge = read(BRIDGE)
-    reg = registered_apis(bridge)
+    reg = registered_apis(bridge, read(ARMODULE))
     defs = find_definitions(reg)
     lambdas = find_bridge_lambdas(bridge)
 
@@ -416,9 +433,11 @@ def render(declared, reg, missing, inert, implemented, inc, defs, by_header,
     a("- **Declared** - every `vm_*` prototype in the SDK headers under")
     a("  `$MRE_SDK/include` (this run: `%s`)." % inc.replace("\\", "/"))
     a("- **Resolved** - every name in `func_map`, including the")
-    a("  `FUNCN_FIX` variants, which expose a guest name such as")
-    a("  `vm_graphic_create_canvas` while the C++ function is")
-    a("  `vm_graphic_create_canvas_FIX`.")
+    a("    `FUNCN_FIX` variants, which expose a guest name such as")
+    a("    `vm_graphic_create_canvas` while the C++ function is")
+    a("    `vm_graphic_create_canvas_FIX`, plus the handful `ARModule`")
+    a("    resolves from its own table when `func_map` misses")
+    a("    (`vm_vsprintf`, `vm_sprintf`, `vm_sscanf`).")
     a("- **Inert** - the resolved name's body was parsed and judged to do no")
     a("  work: either empty, or nothing but a `return` of a constant once")
     a("  logging calls are discounted.")
@@ -547,12 +566,86 @@ def _code_rows(names, width=96):
     return "\n".join(out)
 
 
+VXP_DIR = os.path.join(REPO, "bin", "Release", "fs", "e", "mre")
+
+# Same app shipped at several sizes is one consumer, not three. Counting the
+# three PeanutVXP builds separately would triple its apparent demand.
+SAME_APP = [("peanutvxp", "PeanutVXP"), ("opera mini 4.4", "Opera Mini 4.4"),
+            ("gravity defied", "Gravity Defied")]
+
+_ZHEAD = (0x01, 0x5e, 0x9c, 0xda)
+_ASCII_RUN = re.compile(rb"[\x20-\x7e]{4,}")
+_UCS2_RUN = re.compile(rb"(?:[\x20-\x7e]\x00){4,}")
+_SYM = re.compile(r"^vm_[a-z0-9_]+$")
+
+
+def _inflate(data):
+    """Pull every zlib stream out of a package.
+
+    Compressed packages hide their whole payload, so a raw string scan finds
+    nothing at all. Four of the installed packages are ads_compressed, and they
+    are exactly the ones that had boot problems - an invisible app is an
+    unmeasured app. Brute-forcing the stream offsets is crude but fine here:
+    we want the strings, not a faithful parse.
+    """
+    out = []
+    for i in range(len(data) - 2):
+        if data[i] == 0x78 and data[i + 1] in _ZHEAD:
+            try:
+                buf = zlib.decompressobj().decompress(data[i:])
+                if len(buf) > 256:
+                    out.append(buf)
+            except Exception:
+                pass
+    return out
+
+
+def _symbols_in(blobs):
+    names = set()
+    for blob in blobs:
+        for rx, enc in ((_ASCII_RUN, "latin-1"), (_UCS2_RUN, "utf-16-le")):
+            for m in rx.finditer(blob):
+                for tok in re.findall(r"vm_[A-Za-z0-9_]+",
+                                      m.group(0).decode(enc, "ignore")):
+                    if _SYM.match(tok):
+                        names.add(tok)
+    return names
+
+
+def scan_demand(vxp_dir, missing):
+    """Which unimplemented APIs do the installed apps actually ask for?
+
+    A vm_* string in a package is a proxy for what the app resolves at
+    start-up, not proof that it calls it - so this over-counts slightly. It is
+    still far better evidence than guessing, and it is the only signal here
+    that separates 'nobody wants this' from 'one app badly wants this'.
+    """
+    want = {}
+    for path in sorted(glob.glob(os.path.join(vxp_dir, "*.vxp"))):
+        with open(path, "rb") as fh:
+            data = fh.read()
+        base = os.path.basename(path)[:-4]
+        for prefix, name in SAME_APP:
+            if base.lower().startswith(prefix):
+                base = name
+                break
+        names = _symbols_in([data]) | _symbols_in(_inflate(data))
+        want.setdefault(base, set()).update(names)
+    return ({api: {app for app in want if api in want[app]}
+             for api in missing
+             if any(api in names for names in want.values())}, want)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sdk", default=os.environ.get(
         "MRE_SDK", r"C:\MRE_SDK"))
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--list-missing", metavar="PREFIX")
+    ap.add_argument("--demand", action="store_true",
+                    help="rank unimplemented APIs by how many installed apps "
+                         "ask for them")
+    ap.add_argument("--vxp-dir", default=VXP_DIR)
     args = ap.parse_args()
 
     (declared, reg, missing, inert, implemented, inc, defs, by_header,
@@ -566,6 +659,34 @@ def main():
             for n in sorted(names):
                 if n.startswith(prefix):
                     print(n)
+        return
+
+    if args.demand:
+        want_all = set(declared) - reg
+        demand, want = scan_demand(args.vxp_dir, want_all)
+        if not os.path.isdir(args.vxp_dir):
+            sys.exit("no packages at %s - pass --vxp-dir" % args.vxp_dir)
+        print("apps scanned : %d" % len(want))
+        print("unimplemented: %d" % len(want_all))
+        print("demanded     : %d" % len(demand))
+        print("never wanted : %d" % (len(want_all) - len(demand)))
+        print()
+        multi = [a for a in demand if len(demand[a]) >= 2]
+        print("wanted by 2+ apps: %d   by 3+ apps: %d"
+              % (len(multi), len([a for a in demand if len(demand[a]) >= 3])))
+        print()
+        print("%-46s %-11s %s" % ("API", "header", "apps"))
+        for api in sorted(demand, key=lambda a: (-len(demand[a]), a)):
+            if len(demand[api]) < 2:
+                continue
+            print("%-46s %-11s %s" % (api, declared[api],
+                                      ", ".join(sorted(demand[api]))))
+        print()
+        print("--- wanted by exactly one app ---")
+        by_app = collections.Counter(next(iter(v)) for v in demand.values()
+                                     if len(v) == 1)
+        for app, c in by_app.most_common():
+            print("  %-30s %d" % (app, c))
         return
 
     text, _ = render(declared, reg, missing, inert, implemented, inc, defs,

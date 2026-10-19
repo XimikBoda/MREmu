@@ -6,12 +6,12 @@ not edit by hand; run the script instead.
 
 | | Count |
 | --- | ---: |
-| APIs declared by the SDK | 894 |
-| Resolved by `vm_get_sym_entry` | 263 |
-| **Unimplemented** (guest gets NULL) | **647** |
+| APIs declared by the SDK | 893 |
+| Resolved by `vm_get_sym_entry` | 266 |
+| **Unimplemented** (guest gets NULL) | **643** |
 | Registered but doing nothing | 29 |
 | Registered but partial (hand-maintained) | 13 |
-| Implemented | 218 |
+| Implemented | 221 |
 
 ## What a missing API does to an app
 
@@ -41,9 +41,11 @@ below.
 - **Declared** - every `vm_*` prototype in the SDK headers under
   `$MRE_SDK/include` (this run: `C:/MRE_SDK/include`).
 - **Resolved** - every name in `func_map`, including the
-  `FUNCN_FIX` variants, which expose a guest name such as
-  `vm_graphic_create_canvas` while the C++ function is
-  `vm_graphic_create_canvas_FIX`.
+    `FUNCN_FIX` variants, which expose a guest name such as
+    `vm_graphic_create_canvas` while the C++ function is
+    `vm_graphic_create_canvas_FIX`, plus the handful `ARModule`
+    resolves from its own table when `func_map` misses
+    (`vm_vsprintf`, `vm_sprintf`, `vm_sscanf`).
 - **Inert** - the resolved name's body was parsed and judged to do no
   work: either empty, or nothing but a `return` of a constant once
   logging calls are discounted.
@@ -59,7 +61,7 @@ would have: camera, Bluetooth, telephony, SMS, payment.
 
 | Subsystem | Headers | Declared | Missing |
 | --- | ---: | ---: | ---: |
-| Core system, memory, files | 6 | 209 | 119 |
+| Core system, memory, files | 6 | 209 | 115 |
 | Graphics | 2 | 172 | 80 |
 | Audio, video and media | 5 | 133 | 108 |
 | Text, charset and UI | 8 | 96 | 89 |
@@ -158,7 +160,7 @@ it, rather than crashing.
 `vm_editor_set_update_text_with_cursor_rect_callback`, `vm_editor_show`,
 `vm_editor_show_from_first_line`
 
-### `vmsys.h` - 38 missing
+### `vmsys.h` - 37 missing
 
 `vm_appmgr_activate_launcher`, `vm_appmgr_activate_screen_lock`, `vm_appmgr_activate_wallpaper`,
 `vm_appmgr_get_install_info`, `vm_appmgr_get_mem_size`, `vm_appmgr_install`,
@@ -168,7 +170,7 @@ it, rather than crashing.
 `vm_appmgr_is_wallpaper_activated`, `vm_appmgr_uninstall`, `vm_exit_and_update_app`,
 `vm_get_battery_level`, `vm_get_customer_name`, `vm_get_device_info`,
 `vm_get_mainlcd_brightness`, `vm_get_mre_modules`, `vm_get_mre_version`,
-`vm_get_origin_release_verno`, `vm_get_utc`, `vm_is_support_downloadable_app_icon`, `vm_main`,
+`vm_get_origin_release_verno`, `vm_get_utc`, `vm_is_support_downloadable_app_icon`,
 `vm_malloc_nc`, `vm_malloc_nc_topmost`, `vm_malloc_topmost`, `vm_realloc_topmost`,
 `vm_reg_func_callback`, `vm_set_mainlcd_brightness`, `vm_set_touch_feedback`,
 `vm_sla_custom_logging`, `vm_update_cancel`, `vm_update_check_launch`,
@@ -204,15 +206,14 @@ it, rather than crashing.
 `vm_startup_email`, `vm_storage_close`, `vm_storage_open`, `vm_storage_read`,
 `vm_storage_write`, `vm_uriagent_uri_request`
 
-### `vmstdlib.h` - 29 missing
+### `vmstdlib.h` - 26 missing
 
 `vm_cache_read_char`, `vm_create_array_stack`, `vm_create_linked_stack`, `vm_destroy_stack`,
 `vm_ends_with`, `vm_get_filename`, `vm_get_path`, `vm_is_empty_stack`, `vm_is_exist_stack`,
 `vm_lower_case`, `vm_memcpy`, `vm_peek_stack`, `vm_popup_stack`, `vm_push_stack`,
-`vm_read_cache`, `vm_read_line`, `vm_reset_stack`, `vm_sprintf`, `vm_sscanf`,
-`vm_string_equals_ignore_case`, `vm_tmp_filename`, `vm_upper_case`, `vm_vsprintf`,
-`vm_vwsprintf`, `vm_wends_with`, `vm_write_cache`, `vm_wsprintf`, `vm_wstarts_with`,
-`vm_wstrcmp_ignore_case`
+`vm_read_cache`, `vm_read_line`, `vm_reset_stack`, `vm_string_equals_ignore_case`,
+`vm_tmp_filename`, `vm_upper_case`, `vm_vwsprintf`, `vm_wends_with`, `vm_write_cache`,
+`vm_wsprintf`, `vm_wstarts_with`, `vm_wstrcmp_ignore_case`
 
 ### `vmhttp.h` - 20 missing
 
