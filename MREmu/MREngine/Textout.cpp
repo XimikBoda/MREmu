@@ -408,4 +408,94 @@ VMINT vm_graphic_get_highest_char_height_of_all_language(void) {
 
 VMINT vm_graphic_get_char_height_alllang(VMINT size) {
 	return vm_graphic_get_character_height();
+}
+
+VMUINT vm_graphic_get_char_num_in_width_ex(VMWCHAR* string, VMUINT width, VMINT checklinebreak, VMUINT gap) {
+	if (!string)
+		return 0;
+
+	VMUINT current_width = 0;
+	VMUINT count = 0;
+
+	for (int i = 0; string[i]; ++i) {
+		VMWCHAR c = string[i];
+		if (checklinebreak && (c == '\r' || c == '\n')) {
+			break;
+		}
+
+		int char_w = vm_graphic_get_character_width(c);
+		VMUINT next_width = current_width + char_w + (count > 0 ? gap : 0);
+		if (next_width > width) {
+			break;
+		}
+
+		current_width = next_width;
+		count++;
+	}
+
+	return count;
+}
+
+VMUINT vm_get_string_width_height_ex(
+	VMWCHAR* string,
+	VMINT gap,
+	VMINT n,
+	VMINT *pWidth,
+	VMINT *pHeight,
+	VMINT max_width,
+	VMUINT8 checkLineBreak,
+	VMUINT8 checkCompleteWord)
+{
+	if (pWidth) *pWidth = 0;
+	if (pHeight) *pHeight = vm_graphic_get_character_height();
+	if (!string) return 0;
+
+	int total_chars = 0;
+	while (string[total_chars] && (n < 0 || total_chars < n)) {
+		total_chars++;
+	}
+
+	int fit_chars = 0;
+	int fit_width = 0;
+
+	int last_word_boundary_chars = -1;
+	int last_word_boundary_width = 0;
+
+	int current_width = 0;
+	int count = 0;
+
+	for (int i = 0; i < total_chars; ++i) {
+		VMWCHAR c = string[i];
+		if (checkLineBreak && (c == '\r' || c == '\n')) {
+			break;
+		}
+
+		int char_w = vm_graphic_get_character_width(c);
+		int next_width = current_width + char_w + (count > 0 ? gap : 0);
+
+		if (max_width > 0 && next_width > max_width) {
+			if (checkCompleteWord && last_word_boundary_chars > 0) {
+				fit_chars = last_word_boundary_chars;
+				fit_width = last_word_boundary_width;
+			} else {
+				fit_chars = count;
+				fit_width = current_width;
+			}
+			if (pWidth) *pWidth = fit_width;
+			return fit_chars;
+		}
+
+		current_width = next_width;
+		count++;
+
+		if (checkCompleteWord && (c == ' ' || c == '\t')) {
+			last_word_boundary_chars = count;
+			last_word_boundary_width = current_width;
+		}
+	}
+
+	fit_chars = count;
+	fit_width = current_width;
+	if (pWidth) *pWidth = fit_width;
+	return fit_chars;
 }

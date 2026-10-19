@@ -12,6 +12,7 @@
 #include "MREngine/Log.h"
 #include "MREngine/System.h"
 #include "MREngine/SystemTextBox.h"
+#include "MREngine/IO.h"
 
 #include "Cpu.h"
 #include "GDB.h"
@@ -192,6 +193,24 @@ namespace Bridge {
 					(void*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
 					(int*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
 		}},
+		{FUNCN(vm_get_multi_tags), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_multi_tags(
+					(short*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(struct multi_tag_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
+		}},
+		{FUNCN(vm_get_mre_version), [](uc_engine* uc) {
+			write_ret(uc, vm_get_mre_version());
+		}},
+		{FUNCN(vm_vibrator_once), [](uc_engine* uc) {
+			vm_vibrator_once();
+		}},
+		{FUNCN(vm_vibrator_on), [](uc_engine* uc) {
+			vm_vibrator_on();
+		}},
+		{FUNCN(vm_vibrator_off), [](uc_engine* uc) {
+			vm_vibrator_off();
+		}},
 		{FUNCN(vm_switch_power_saving_mode), [](uc_engine* uc) {
 			write_ret(uc, vm_switch_power_saving_mode((power_saving_mode_enum)read_arg(uc, 0)));
 		}},
@@ -280,6 +299,9 @@ namespace Bridge {
 			vm_reg_keyboard_callback(
 				(vm_key_handler_t)read_arg(uc, 0));
 		}},
+		{FUNCN(vm_kbd_set_mode), [](uc_engine* uc) {
+			write_ret(uc, vm_kbd_set_mode(read_arg(uc, 0)));
+		}},
 		{FUNCN(vm_reg_pen_callback), [](uc_engine* uc) {
 			vm_reg_pen_callback(
 				(vm_pen_handler_t)read_arg(uc, 0));
@@ -339,6 +361,9 @@ namespace Bridge {
 		{FUNCN(vm_file_mkdir),  [](uc_engine* uc) {
 			write_ret(uc, vm_file_mkdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{FUNCN(vm_file_rmdir),  [](uc_engine* uc) {
+			write_ret(uc, vm_file_rmdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
 		{FUNCN(vm_file_set_attributes),  [](uc_engine* uc) {
 			write_ret(uc, vm_file_set_attributes(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
@@ -386,6 +411,9 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_get_system_driver), [](uc_engine* uc) {
 			write_ret(uc, vm_get_system_driver());
+		}},
+		{FUNCN(vm_get_default_folder_path), [](uc_engine* uc) {
+			write_ret(uc, ADDRESS_TO_EMU((void*)vm_get_default_folder_path((vm_fmgr_default_folder_enum)read_arg(uc, 0))));
 		}},
 		{FUNCN(vm_get_disk_free_space), [](uc_engine* uc) {
 			uint32_t arg0 = read_arg(uc, 0);
@@ -1031,6 +1059,26 @@ namespace Bridge {
 			write_ret(uc, vm_graphic_get_string_height(
 				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
+		{FUNCN(vm_graphic_get_char_num_in_width_ex), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_char_num_in_width_ex(
+				(VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				read_arg(uc, 3)
+			));
+		}},
+		{FUNCN(vm_get_string_width_height_ex), [](uc_engine* uc) {
+			write_ret(uc, vm_get_string_width_height_ex(
+				(VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				read_arg(uc, 1),
+				read_arg(uc, 2),
+				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
+				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 4)),
+				read_arg(uc, 5),
+				(VMUINT8)read_arg(uc, 6),
+				(VMUINT8)read_arg(uc, 7)
+			));
+		}},
 		{FUNCN(vm_graphic_measure_character), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_measure_character(
 				read_arg(uc, 0),
@@ -1122,6 +1170,14 @@ namespace Bridge {
 				ADDRESS_TO_EMU(vm_load_resource(
 					(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
+				)));
+		}},
+		{FUNCN(vm_load_resource_from_file), [](uc_engine* uc) {
+			write_ret(uc,
+				ADDRESS_TO_EMU(vm_load_resource_from_file(
+					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+					(char*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
+					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))
 				)));
 		}},
 		{FUNCN(vm_resource_get_data), [](uc_engine* uc) {
@@ -1331,6 +1387,18 @@ namespace Bridge {
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
 				));
+		}},
+		{FUNCN(vm_get_filename), [](uc_engine* uc) {
+			vm_get_filename(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
+			);
+		}},
+		{FUNCN(vm_get_path), [](uc_engine* uc) {
+			write_ret(uc, vm_get_path(
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
+				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
+			));
 		}},
 
 
@@ -1613,6 +1681,16 @@ namespace Bridge {
 		{FUNCN(vm_udp_close), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_udp_close(read_arg(uc, 0)));
+		}},
+		{FUNCN(vm_get_default_apn_info), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_default_apn_info(
+					(vm_apn_info_ext*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
+		}},
+		{FUNCN(vm_get_apn_info), [](uc_engine* uc) {
+			write_ret(uc,
+				vm_get_apn_info(
+					(vm_apn_info_ext*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
 		}},
 
 

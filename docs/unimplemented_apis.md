@@ -7,11 +7,11 @@ not edit by hand; run the script instead.
 | | Count |
 | --- | ---: |
 | APIs declared by the SDK | 893 |
-| Resolved by `vm_get_sym_entry` | 266 |
-| **Unimplemented** (guest gets NULL) | **643** |
-| Registered but doing nothing | 29 |
+| Resolved by `vm_get_sym_entry` | 281 |
+| **Unimplemented** (guest gets NULL) | **628** |
+| Registered but doing nothing | 32 |
 | Registered but partial (hand-maintained) | 13 |
-| Implemented | 221 |
+| Implemented | 233 |
 
 ## What a missing API does to an app
 
@@ -61,11 +61,11 @@ would have: camera, Bluetooth, telephony, SMS, payment.
 
 | Subsystem | Headers | Declared | Missing |
 | --- | ---: | ---: | ---: |
-| Core system, memory, files | 6 | 209 | 115 |
-| Graphics | 2 | 172 | 80 |
-| Audio, video and media | 5 | 133 | 108 |
+| Core system, memory, files | 6 | 209 | 107 |
+| Graphics | 2 | 172 | 78 |
+| Audio, video and media | 5 | 133 | 105 |
 | Text, charset and UI | 8 | 96 | 89 |
-| Network, sockets and telephony | 6 | 109 | 97 |
+| Network, sockets and telephony | 6 | 109 | 95 |
 | Messaging | 2 | 21 | 21 |
 | Bluetooth, location and radio | 5 | 46 | 46 |
 | Platform services and identity | 9 | 60 | 49 |
@@ -81,25 +81,23 @@ it, rather than crashing.
 
 ## Unimplemented by header
 
-### `vmgraph.h` - 64 missing
+### `vmgraph.h` - 62 missing
 
-`vm_frm_screen_rotate`, `vm_get_string_width_height_ex`, `vm_graphic_async_blt_start`,
-`vm_graphic_async_blt_stop`, `vm_graphic_canvas_set_trans_color_argb`,
-`vm_graphic_create_layer_cf_double`, `vm_graphic_draw_abm_text`,
-`vm_graphic_draw_gif_image_from_memory`, `vm_graphic_draw_image_from_file`,
-`vm_graphic_draw_image_from_memory`, `vm_graphic_draw_resized_gif_image_from_memory`,
-`vm_graphic_draw_resized_image_from_file`, `vm_graphic_draw_resized_image_from_memory`,
-`vm_graphic_ellipse_cf`, `vm_graphic_ellipse_ex`, `vm_graphic_fill_ellipse_cf`,
-`vm_graphic_fill_ellipse_ex`, `vm_graphic_fill_rect_cf`, `vm_graphic_fill_roundrect_cf`,
-`vm_graphic_flatten_canvas`, `vm_graphic_flatten_canvas_ex`, `vm_graphic_flatten_layer_ex`,
-`vm_graphic_flush_layer_ex`, `vm_graphic_flush_layer_non_block`,
+`vm_frm_screen_rotate`, `vm_graphic_async_blt_start`, `vm_graphic_async_blt_stop`,
+`vm_graphic_canvas_set_trans_color_argb`, `vm_graphic_create_layer_cf_double`,
+`vm_graphic_draw_abm_text`, `vm_graphic_draw_gif_image_from_memory`,
+`vm_graphic_draw_image_from_file`, `vm_graphic_draw_image_from_memory`,
+`vm_graphic_draw_resized_gif_image_from_memory`, `vm_graphic_draw_resized_image_from_file`,
+`vm_graphic_draw_resized_image_from_memory`, `vm_graphic_ellipse_cf`, `vm_graphic_ellipse_ex`,
+`vm_graphic_fill_ellipse_cf`, `vm_graphic_fill_ellipse_ex`, `vm_graphic_fill_rect_cf`,
+`vm_graphic_fill_roundrect_cf`, `vm_graphic_flatten_canvas`, `vm_graphic_flatten_canvas_ex`,
+`vm_graphic_flatten_layer_ex`, `vm_graphic_flush_layer_ex`, `vm_graphic_flush_layer_non_block`,
 `vm_graphic_flush_layer_non_block_ex`, `vm_graphic_get_blt_layer`,
-`vm_graphic_get_char_num_in_width_ex`, `vm_graphic_get_img_property_from_file`,
-`vm_graphic_get_layer_count`, `vm_graphic_get_layer_position`, `vm_graphic_get_pixel_cf`,
-`vm_graphic_getcolor`, `vm_graphic_getcolor_argb`, `vm_graphic_getpen`,
-`vm_graphic_layer_set_trans_color`, `vm_graphic_layer_set_trans_color_argb`,
-`vm_graphic_layer_toggle_double`, `vm_graphic_line_cf`, `vm_graphic_line_style`,
-`vm_graphic_load_gif_frame`, `vm_graphic_load_gif_frame_cf`,
+`vm_graphic_get_img_property_from_file`, `vm_graphic_get_layer_count`,
+`vm_graphic_get_layer_position`, `vm_graphic_get_pixel_cf`, `vm_graphic_getcolor`,
+`vm_graphic_getcolor_argb`, `vm_graphic_getpen`, `vm_graphic_layer_set_trans_color`,
+`vm_graphic_layer_set_trans_color_argb`, `vm_graphic_layer_toggle_double`, `vm_graphic_line_cf`,
+`vm_graphic_line_style`, `vm_graphic_load_gif_frame`, `vm_graphic_load_gif_frame_cf`,
 `vm_graphic_load_gif_frame_resized`, `vm_graphic_load_gif_frame_resized_by_percent`,
 `vm_graphic_load_gif_frame_resized_by_percent_cf`, `vm_graphic_load_gif_frame_resized_cf`,
 `vm_graphic_load_gif_resized_by_percent`, `vm_graphic_load_gif_resized_by_percent_cf`,
@@ -111,22 +109,21 @@ it, rather than crashing.
 `vm_graphic_textout_by_baseline_cf`, `vm_graphic_textout_cf`,
 `vm_graphic_textout_to_layer_by_baseline`
 
-### `vmsock.h` - 49 missing
+### `vmsock.h` - 47 missing
 
 `vm_accept`, `vm_bearer_close`, `vm_bearer_open`, `vm_bearer_open_ex`, `vm_bind`,
 `vm_cbm_hold_bearer`, `vm_cbm_release_bearer`, `vm_closesocket`, `vm_connect`,
-`vm_dtacct_select`, `vm_dtacct_set`, `vm_get_apn_info`, `vm_get_cust_apn_info`,
-`vm_get_default_apn_info`, `vm_get_encoded_dtacct_id`, `vm_getpeername`, `vm_getsockname`,
-`vm_getsockopt`, `vm_htonl`, `vm_htons`, `vm_inet_addr`, `vm_inet_ntoa`, `vm_inet_ntop`,
-`vm_inet_pton`, `vm_listen`, `vm_preload_cancel`, `vm_preload_download`,
-`vm_preload_download_ex`, `vm_preload_query`, `vm_recv`, `vm_recvfrom`, `vm_select`, `vm_send`,
-`vm_sendto`, `vm_set_cust_apn_info`, `vm_setsockopt`, `vm_shutdown`,
+`vm_dtacct_select`, `vm_dtacct_set`, `vm_get_cust_apn_info`, `vm_get_encoded_dtacct_id`,
+`vm_getpeername`, `vm_getsockname`, `vm_getsockopt`, `vm_htonl`, `vm_htons`, `vm_inet_addr`,
+`vm_inet_ntoa`, `vm_inet_ntop`, `vm_inet_pton`, `vm_listen`, `vm_preload_cancel`,
+`vm_preload_download`, `vm_preload_download_ex`, `vm_preload_query`, `vm_recv`, `vm_recvfrom`,
+`vm_select`, `vm_send`, `vm_sendto`, `vm_set_cust_apn_info`, `vm_setsockopt`, `vm_shutdown`,
 `vm_soc_get_account_localip`, `vm_soc_get_account_localipv6`, `vm_soc_get_last_error`,
 `vm_soc_getaddrinfo`, `vm_soc_gethostbynamev6`, `vm_socket`, `vm_socket_ex`,
 `vm_srv_nw_info_get_protocol`, `vm_wlan_loc_get_connected_info`, `vm_wlan_loc_search`,
 `vm_wlan_loc_search_abort`, `vm_wlan_perfer`
 
-### `vmmm.h` - 43 missing
+### `vmmm.h` - 40 missing
 
 `vm_audio_bytes_duration`, `vm_audio_clear_interrupt_callback`, `vm_audio_duration`,
 `vm_audio_get_time`, `vm_audio_is_app_playing`, `vm_audio_is_calling`, `vm_audio_mixed_close`,
@@ -140,7 +137,7 @@ it, rather than crashing.
 `vm_audio_vocal_removal_turn_off`, `vm_audio_vocal_removal_turn_on`, `vm_get_key_tone_state`,
 `vm_midi_resume`, `vm_midi_set_type`, `vm_record_pause`, `vm_record_resume`, `vm_record_start`,
 `vm_record_stop`, `vm_set_key_tone_off`, `vm_set_key_tone_on`, `vm_set_key_tone_state`,
-`vm_set_ringtone`, `vm_vibrator_off`, `vm_vibrator_on`, `vm_vibrator_once`
+`vm_set_ringtone`
 
 ### `vmeditor.h` - 39 missing
 
@@ -160,22 +157,6 @@ it, rather than crashing.
 `vm_editor_set_update_text_with_cursor_rect_callback`, `vm_editor_show`,
 `vm_editor_show_from_first_line`
 
-### `vmsys.h` - 37 missing
-
-`vm_appmgr_activate_launcher`, `vm_appmgr_activate_screen_lock`, `vm_appmgr_activate_wallpaper`,
-`vm_appmgr_get_install_info`, `vm_appmgr_get_mem_size`, `vm_appmgr_install`,
-`vm_appmgr_is_launcher_activated`, `vm_appmgr_is_screen_lock_activated`,
-`vm_appmgr_is_support_launcher`, `vm_appmgr_is_support_screen_lock`,
-`vm_appmgr_is_support_wallpaper`, `vm_appmgr_is_support_widget`,
-`vm_appmgr_is_wallpaper_activated`, `vm_appmgr_uninstall`, `vm_exit_and_update_app`,
-`vm_get_battery_level`, `vm_get_customer_name`, `vm_get_device_info`,
-`vm_get_mainlcd_brightness`, `vm_get_mre_modules`, `vm_get_mre_version`,
-`vm_get_origin_release_verno`, `vm_get_utc`, `vm_is_support_downloadable_app_icon`,
-`vm_malloc_nc`, `vm_malloc_nc_topmost`, `vm_malloc_topmost`, `vm_realloc_topmost`,
-`vm_reg_func_callback`, `vm_set_mainlcd_brightness`, `vm_set_touch_feedback`,
-`vm_sla_custom_logging`, `vm_update_cancel`, `vm_update_check_launch`,
-`vm_update_check_version`, `vm_update_download`, `vm_update_update_file`
-
 ### `vmcamera.h` - 36 missing
 
 `vm_camera_capture`, `vm_camera_enable_osd_layer`, `vm_camera_get_capture_data`,
@@ -193,27 +174,41 @@ it, rather than crashing.
 `vm_camera_update_parameter`, `vm_create_camera_instance`, `vm_get_camera_status`,
 `vm_release_camera_instance`
 
-### `vmio.h` - 33 missing
+### `vmsys.h` - 36 missing
 
-`vm_camera_startup`, `vm_file_copy`, `vm_file_copy_abort`, `vm_file_rmdir`, `vm_fs_async_abort`,
+`vm_appmgr_activate_launcher`, `vm_appmgr_activate_screen_lock`, `vm_appmgr_activate_wallpaper`,
+`vm_appmgr_get_install_info`, `vm_appmgr_get_mem_size`, `vm_appmgr_install`,
+`vm_appmgr_is_launcher_activated`, `vm_appmgr_is_screen_lock_activated`,
+`vm_appmgr_is_support_launcher`, `vm_appmgr_is_support_screen_lock`,
+`vm_appmgr_is_support_wallpaper`, `vm_appmgr_is_support_widget`,
+`vm_appmgr_is_wallpaper_activated`, `vm_appmgr_uninstall`, `vm_exit_and_update_app`,
+`vm_get_battery_level`, `vm_get_customer_name`, `vm_get_device_info`,
+`vm_get_mainlcd_brightness`, `vm_get_mre_modules`, `vm_get_origin_release_verno`, `vm_get_utc`,
+`vm_is_support_downloadable_app_icon`, `vm_malloc_nc`, `vm_malloc_nc_topmost`,
+`vm_malloc_topmost`, `vm_realloc_topmost`, `vm_reg_func_callback`, `vm_set_mainlcd_brightness`,
+`vm_set_touch_feedback`, `vm_sla_custom_logging`, `vm_update_cancel`, `vm_update_check_launch`,
+`vm_update_check_version`, `vm_update_download`, `vm_update_update_file`
+
+### `vmio.h` - 30 missing
+
+`vm_camera_startup`, `vm_file_copy`, `vm_file_copy_abort`, `vm_fs_async_abort`,
 `vm_fs_async_close`, `vm_fs_async_commit`, `vm_fs_async_delete`,
 `vm_fs_async_get_working_buf_size`, `vm_fs_async_open`, `vm_fs_async_read`, `vm_fs_async_seek`,
-`vm_fs_async_write`, `vm_get_default_folder_path`, `vm_get_default_store_path_by_type`,
-`vm_get_keypad_type`, `vm_is_finger_touch_version`, `vm_is_support_camera_sensor`,
-`vm_is_support_gsensor`, `vm_kbd_is_key_supported`, `vm_kbd_set_mode`,
-`vm_multi_touch_get_mode`, `vm_multi_touch_register_proc`, `vm_multi_touch_set_mode`,
-`vm_pen_configure_sampling_period`, `vm_selector_run`, `vm_start_native_browser`,
-`vm_startup_email`, `vm_storage_close`, `vm_storage_open`, `vm_storage_read`,
-`vm_storage_write`, `vm_uriagent_uri_request`
+`vm_fs_async_write`, `vm_get_default_store_path_by_type`, `vm_get_keypad_type`,
+`vm_is_finger_touch_version`, `vm_is_support_camera_sensor`, `vm_is_support_gsensor`,
+`vm_kbd_is_key_supported`, `vm_multi_touch_get_mode`, `vm_multi_touch_register_proc`,
+`vm_multi_touch_set_mode`, `vm_pen_configure_sampling_period`, `vm_selector_run`,
+`vm_start_native_browser`, `vm_startup_email`, `vm_storage_close`, `vm_storage_open`,
+`vm_storage_read`, `vm_storage_write`, `vm_uriagent_uri_request`
 
-### `vmstdlib.h` - 26 missing
+### `vmstdlib.h` - 24 missing
 
 `vm_cache_read_char`, `vm_create_array_stack`, `vm_create_linked_stack`, `vm_destroy_stack`,
-`vm_ends_with`, `vm_get_filename`, `vm_get_path`, `vm_is_empty_stack`, `vm_is_exist_stack`,
-`vm_lower_case`, `vm_memcpy`, `vm_peek_stack`, `vm_popup_stack`, `vm_push_stack`,
-`vm_read_cache`, `vm_read_line`, `vm_reset_stack`, `vm_string_equals_ignore_case`,
-`vm_tmp_filename`, `vm_upper_case`, `vm_vwsprintf`, `vm_wends_with`, `vm_write_cache`,
-`vm_wsprintf`, `vm_wstarts_with`, `vm_wstrcmp_ignore_case`
+`vm_ends_with`, `vm_is_empty_stack`, `vm_is_exist_stack`, `vm_lower_case`, `vm_memcpy`,
+`vm_peek_stack`, `vm_popup_stack`, `vm_push_stack`, `vm_read_cache`, `vm_read_line`,
+`vm_reset_stack`, `vm_string_equals_ignore_case`, `vm_tmp_filename`, `vm_upper_case`,
+`vm_vwsprintf`, `vm_wends_with`, `vm_write_cache`, `vm_wsprintf`, `vm_wstarts_with`,
+`vm_wstrcmp_ignore_case`
 
 ### `vmhttp.h` - 20 missing
 
@@ -381,11 +376,6 @@ it, rather than crashing.
 `vm_cell_close`, `vm_cell_get_cur_cell_info`, `vm_cell_get_nbr_cell_info`,
 `vm_cell_get_nbr_num`, `vm_cell_open`
 
-### `vmgettag.h` - 5 missing
-
-`vm_check_md5`, `vm_get_multi_tags`, `vm_get_multi_tags_by_lang_id`, `vm_get_tag_by_lang_id`,
-`vm_get_vm_tag_from_rom`
-
 ### `vmsim.h` - 5 missing
 
 `vm_get_imei_ext`, `vm_nw_info_get_nw_plmn`, `vm_sim_cphs_get_msisdn_number`,
@@ -398,6 +388,11 @@ it, rather than crashing.
 ### `vmdes.h` - 4 missing
 
 `vm_des_decrypt`, `vm_des_encrypt`, `vm_des_reset_key`, `vm_des_set_key`
+
+### `vmgettag.h` - 4 missing
+
+`vm_check_md5`, `vm_get_multi_tags_by_lang_id`, `vm_get_tag_by_lang_id`,
+`vm_get_vm_tag_from_rom`
 
 ### `vmsensor.h` - 4 missing
 
@@ -420,11 +415,6 @@ it, rather than crashing.
 
 `vm_create_buyer`, `vm_purchase_item`, `vm_release_buyer`
 
-### `vmres.h` - 3 missing
-
-`vm_load_resource_from_file`, `vm_load_resource_use_outside_memory`,
-`vm_resource_get_data_from_file`
-
 ### `vmalarm.h` - 2 missing
 
 `vm_alarm_cancel`, `vm_alarm_set`
@@ -440,6 +430,10 @@ it, rather than crashing.
 ### `vmjava.h` - 2 missing
 
 `vm_java_is_removed`, `vm_process_java_app`
+
+### `vmres.h` - 2 missing
+
+`vm_load_resource_use_outside_memory`, `vm_resource_get_data_from_file`
 
 ### `vmsrvmng.h` - 1 missing
 
@@ -461,7 +455,7 @@ and proceeds as though the call worked.
 | `vm_audio_suspend_bg_play` | no behaviour | `nothing` | `MREmu/MREngine/Audio.cpp:256` | Empty body. Background audio state is not tracked, so an app cannot be suspended this way. |
 | `vm_font_set_font_size` | fixed answer | `VM_GDI_SUCCEED` | `MREmu/MREngine/Textout.cpp:230` | Reports success and does nothing - there is only one bitmap face. |
 | `vm_font_set_font_style` | fixed answer | `VM_GDI_SUCCEED` | `MREmu/MREngine/Textout.cpp:234` | Reports success and does nothing - bold, italic and underline are all ignored. |
-| `vm_get_cache_free_space` | fixed answer | `16 * 1024 * 1024` | `MREmu/Bridge.cpp:42` | Fixed 16 MiB. |
+| `vm_get_cache_free_space` | fixed answer | `16 * 1024 * 1024` | `MREmu/Bridge.cpp:43` | Fixed 16 MiB. |
 | `vm_get_language` | fixed answer | `ENGLISH` | `MREmu/MREngine/CharSet.cpp:79` | Always English. Fine for the shipping apps. |
 | `vm_get_operator` | fixed answer | `UNKOWN_OPERATOR` | `MREmu/MREngine/SIM.cpp:17` | Returns a fixed unknown-operator string. |
 | `vm_get_sys_scene` | fixed answer | `0` | `MREmu/MREngine/System.cpp:81` | Always 0; there is no scene stack. |
@@ -471,11 +465,11 @@ and proceeds as though the call worked.
 | `vm_graphic_is_use_vector_font` | fixed answer | `FALSE` | `MREmu/MREngine/Textout.cpp:257` | Correct - the face is a bitmap. |
 | `vm_graphic_set_font` | no behaviour | `nothing` | `MREmu/MREngine/Textout.cpp:144` | No-op. Font selection is not implemented; text is always drawn in the built-in unifont face. |
 | `vm_has_sim_card` | fixed answer | `1` | `MREmu/MREngine/SIM.cpp:21` | Claims a SIM is present. The SIM stubs return plausible fixed values, so apps take the SIM path with fabricated data. |
-| `vm_input_set_vk_default_enlarge` | no behaviour | `nothing` | `MREmu/Bridge.cpp:1661` | Empty bridge lambda. |
-| `vm_is_support_keyborad` | fixed answer | `1` | `MREmu/MREngine/IO.cpp:763` | Claims a keypad is present. |
-| `vm_is_support_pen_touch` | fixed answer | `1` | `MREmu/MREngine/IO.cpp:767` | Claims pen touch is present. |
+| `vm_input_set_vk_default_enlarge` | no behaviour | `nothing` | `MREmu/Bridge.cpp:1739` | Empty bridge lambda. |
+| `vm_is_support_keyborad` | fixed answer | `1` | `MREmu/MREngine/IO.cpp:820` | Claims a keypad is present. |
+| `vm_is_support_pen_touch` | fixed answer | `1` | `MREmu/MREngine/IO.cpp:824` | Claims pen touch is present. |
 | `vm_is_support_wifi` | fixed answer | `1` | `MREmu/MREngine/Sock.cpp:305` | Claims Wi-Fi is present. |
-| `vm_set_app_desired_input_mode` | no behaviour | `nothing` | `MREmu/Bridge.cpp:1653` | Empty bridge lambda. |
+| `vm_set_app_desired_input_mode` | no behaviour | `nothing` | `MREmu/Bridge.cpp:1731` | Empty bridge lambda. |
 | `vm_sim_card_count` | fixed answer | `1` | `MREmu/MREngine/SIM.cpp:33` | One fake SIM. |
 | `vm_sim_get_active_sim_card` | fixed answer | `1` | `MREmu/MREngine/SIM.cpp:55` | One fake SIM. |
 | `vm_sim_get_prefer_sim_card` | fixed answer | `1` | `MREmu/MREngine/SIM.cpp:63` | One fake SIM. |
@@ -483,7 +477,10 @@ and proceeds as though the call worked.
 | `vm_srv_sensor_is_available` | fixed answer | `0` | `MREmu/MREngine/Sensor.cpp:3` | Reports no sensors. |
 | `vm_start_app_with_para` | no behaviour | `nothing` | `MREmu/MREngine/ProgramManager.cpp:35` | Empty body, unlike `vm_start_app`, which really launches. An app cannot pass a start parameter to the next app. |
 | `vm_switch_power_saving_mode` | fixed answer | `0` | `MREmu/MREngine/System.cpp:183` | Always returns 0 and changes no state; power saving is not modelled. |
-| `vm_sys_file_get_space` | fixed answer | `128 * 1024 * 1024` | `MREmu/MREngine/IO.cpp:759` | Fixed 128 MiB. |
+| `vm_sys_file_get_space` | fixed answer | `128 * 1024 * 1024` | `MREmu/MREngine/IO.cpp:816` | Fixed 128 MiB. |
+| `vm_vibrator_off` | no behaviour | `nothing` | `MREmu/MREngine/System.cpp:214` |  |
+| `vm_vibrator_on` | no behaviour | `nothing` | `MREmu/MREngine/System.cpp:210` |  |
+| `vm_vibrator_once` | no behaviour | `nothing` | `MREmu/MREngine/System.cpp:206` |  |
 | `vm_wifi_is_connected` | fixed answer | `1` | `MREmu/MREngine/Sock.cpp:309` | Claims a connection; the socket layer is real regardless. |
 
 Two kinds, and they are not equally serious. **No behaviour** is an
@@ -502,9 +499,12 @@ The unambiguous stubs - empty bodies, no behaviour at all:
 - `vm_audio_resume_bg_play` (MREmu/MREngine/Audio.cpp:254) - Empty body. Counterpart to the suspend stub.
 - `vm_audio_suspend_bg_play` (MREmu/MREngine/Audio.cpp:256) - Empty body. Background audio state is not tracked, so an app cannot be suspended this way.
 - `vm_graphic_set_font` (MREmu/MREngine/Textout.cpp:144) - No-op. Font selection is not implemented; text is always drawn in the built-in unifont face.
-- `vm_input_set_vk_default_enlarge` (MREmu/Bridge.cpp:1661) - Empty bridge lambda.
-- `vm_set_app_desired_input_mode` (MREmu/Bridge.cpp:1653) - Empty bridge lambda.
+- `vm_input_set_vk_default_enlarge` (MREmu/Bridge.cpp:1739) - Empty bridge lambda.
+- `vm_set_app_desired_input_mode` (MREmu/Bridge.cpp:1731) - Empty bridge lambda.
 - `vm_start_app_with_para` (MREmu/MREngine/ProgramManager.cpp:35) - does nothing and reports nothing
+- `vm_vibrator_off` (MREmu/MREngine/System.cpp:214) - does nothing and reports nothing
+- `vm_vibrator_on` (MREmu/MREngine/System.cpp:210) - does nothing and reports nothing
+- `vm_vibrator_once` (MREmu/MREngine/System.cpp:206) - does nothing and reports nothing
 
 ## Registered but partial
 
@@ -518,14 +518,14 @@ not a proof.
 | `vm_open_wap_url` | `MREmu/MREngine/System.cpp:196` | Logs the request and returns 0 - which is `VM_OPEN_WAP_URL_SUCCESS`. It reports the browser opened the URL when nothing was opened at all. |
 | `vm_get_sys_property` | `MREmu/MREngine/System.cpp:162` | Handles 2 of the 9 `MRE_SYS_*` keys (`MRE_SYS_EQUIPMENT_ID`, `MRE_SYS_HOST_MAX_MEM`). The rest, including `MRE_SYS_SUBSCRIBER_ID`, yield an empty string and a written length of 0, which is a valid answer rather than an error. |
 | `vm_appmgr_get_installed_list` | `MREmu/MREngine/System.cpp:191` | Reports 0, which the SDK defines as success, with the count zeroed - so an app is told 'no apps installed' rather than 'query failed'. |
-| `vm_file_set_attributes` | `MREmu/MREngine/IO.cpp:414` | Resolves the path and then ignores it, always reporting failure. Read attributes work; writes do not. |
+| `vm_file_set_attributes` | `MREmu/MREngine/IO.cpp:471` | Resolves the path and then ignores it, always reporting failure. Read attributes work; writes do not. |
 | `vm_post_msg` | `MREmu/MREngine/ProgramManager.cpp:24` | Always returns 1. The SDK defines 1 as queued and 0 as queue-full, so the queue can never be reported full. |
 | `vm_start_app_with_para` | `MREmu/MREngine/ProgramManager.cpp:35` | Empty body, unlike `vm_start_app`, which really launches. An app cannot pass a start parameter to the next app. |
-| `vm_get_resource_offset_from_file` | `MREmu/MREngine/Resources.cpp:175` | Ignores the filename argument and resolves against the running app's own resources, so it cannot read another file's resource table. |
-| `vm_res_init` | `MREmu/MREngine/Resources.cpp:190` | Hardcodes language 44 instead of the system language, and never calls `vm_res_init_with_language`. |
+| `vm_get_resource_offset_from_file` | `MREmu/MREngine/Resources.cpp:231` | Ignores the filename argument and resolves against the running app's own resources, so it cannot read another file's resource table. |
+| `vm_res_init` | `MREmu/MREngine/Resources.cpp:246` | Hardcodes language 44 instead of the system language, and never calls `vm_res_init_with_language`. |
 | `vm_graphic_textout_by_baseline` | `MREmu/MREngine/Textout.cpp:226` | Ignores the baseline argument and draws from the top of the cell. |
 | `vm_graphic_release_canvas_ex` | `MREmu/MREngine/Canvas.cpp:206` | Ignores its extra arguments and behaves as the plain release. |
-| `vm_get_vm_tag` | `MREmu/MREngine/IO.cpp:772` | Carries a TODO marker. The `@` ROM form and plain-file reads both work; the edge cases are simply unverified. |
+| `vm_get_vm_tag` | `MREmu/MREngine/IO.cpp:829` | Carries a TODO marker. The `@` ROM form and plain-file reads both work; the edge cases are simply unverified. |
 | `vm_graphic_flush_layer` | `MREmu/MREngine/Blt.cpp:216` | Composites correctly but also sleeps to hold 30fps, which is why it is the usual suspect when stepping or pausing looks wedged. |
 | `vm_pmng_get_current_handle` | `MREmu/MREngine/ProgramManager.cpp:10` | Returns the handle the engine recorded, and is marked TODO: there is no separate OS process behind the handle. |
 

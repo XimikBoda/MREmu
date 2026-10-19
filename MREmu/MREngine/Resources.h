@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <cstdint>
+#include <vmsys.h>
 
 typedef uint8_t* (*res_provider_t)(int resid, int* len);
 

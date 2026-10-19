@@ -1,8 +1,12 @@
 #include "Resources.h"
+#include "IO.h"
 #include "../Bridge.h"
 #include "../Cpu.h"
 #include "../AppManager.h"
 #include <cstring>
+#include <fstream>
+#include <sstream>
+#include <elfio/elfio.hpp>
 #include <vmres.h>
 #include <vm4res.h>
 #include <vmgraph.h>
@@ -144,6 +148,58 @@ VMUINT8* vm_load_resource(char* res_name, VMINT* res_size) {
 	memcpy(adr, resources.get_file_context() + res->offset, res->size);
 
 	return (VMUINT8*)adr;
+}
+
+VMUINT8* vm_load_resource_from_file(VMWSTR filename, char* res_name, VMINT* res_size) {
+	if (!filename || filename[0] == 0) {
+		return vm_load_resource(res_name, res_size);
+	}
+
+	fs::path path = path_from_emu(UCS2_to_path(filename));
+	std::ifstream file(path, std::ios::binary | std::ios::ate);
+	if (!file.is_open()) {
+		return vm_load_resource(res_name, res_size);
+	}
+
+	std::streamsize fsize = file.tellg();
+	file.seekg(0, std::ios::beg);
+	std::vector<unsigned char> fcontext((size_t)fsize);
+	if (!file.read((char*)fcontext.data(), fsize)) {
+		return 0;
+	}
+
+	MREngine::Resources other_res;
+	other_res.file_context = &fcontext;
+
+	if (fcontext.size() >= 4 && fcontext[0] == 0x7F && fcontext[1] == 'E' && fcontext[2] == 'L' && fcontext[3] == 'F') {
+		ELFIO::elfio elf;
+		std::stringstream ss(std::string((char*)fcontext.data(), fcontext.size()));
+		if (elf.load(ss)) {
+			for (size_t i = 0; i < elf.sections.size(); ++i) {
+				ELFIO::section* psec = elf.sections[i];
+				if (psec->get_name() == ".vm_res") {
+					other_res.vm_res_offset = (uint32_t)psec->get_offset();
+					other_res.vm_res_size = (uint32_t)psec->get_size();
+					break;
+				}
+			}
+		}
+	}
+
+	if (other_res.vm_res_size > 0) {
+		other_res.scan();
+		MREngine::res_el* res = other_res.find_by_name(to_lower(res_name));
+		if (res) {
+			*res_size = res->size;
+			void* adr = vm_malloc(res->size);
+			if (!adr)
+				return 0;
+			memcpy(adr, fcontext.data() + res->offset, res->size);
+			return (VMUINT8*)adr;
+		}
+	}
+
+	return vm_load_resource(res_name, res_size);
 }
 
 VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {

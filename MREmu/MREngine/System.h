@@ -18,6 +18,13 @@ namespace MREngine {
 
 MREngine::SystemCallbacks& get_current_app_system_callbacks();
 
-VMINT vm_global_get_max_alloc_size(void);
-void* vm_global_malloc(unsigned int size);
-void vm_global_free(void* ptr);
+extern "C" {
+	VMINT vm_global_get_max_alloc_size(void);
+	void* vm_global_malloc(unsigned int size);
+	void vm_global_free(void* ptr);
+
+	VMUINT vm_get_mre_version(void);
+	void vm_vibrator_once(void);
+	void vm_vibrator_on(void);
+	void vm_vibrator_off(void);
+}

@@ -45,8 +45,8 @@ bool validate_path(fs::path path) {
 	return std::regex_match(path.string(), pr);
 }
 
-fs::path UCS2_to_path(const VMWSTR wstr) {
-	auto u8str = ucs2_to_utf8(wstr);
+fs::path UCS2_to_path(const VMWCHAR* wstr) {
+	auto u8str = ucs2_to_utf8((VMWSTR)wstr);
 #ifndef WIN32
 	std::replace(u8str.begin(), u8str.end(), '\\', '/');
 #endif
@@ -92,7 +92,7 @@ fs::path path_from_emu(fs::path path) { // TODO rewrite this
 	return res;
 }
 
-fs::path path_from_emu(const VMWSTR str) {
+fs::path path_from_emu(const VMWCHAR* str) {
 	return path_from_emu(UCS2_to_path(str));
 }
 
@@ -409,6 +409,63 @@ VMINT vm_file_mkdir(const VMWSTR dirname) {
 		return 0;
 	else
 		return -1;
+}
+
+VMINT vm_file_rmdir(const VMWSTR dirname) {
+	fs::path path = path_from_emu(dirname);
+	std::error_code ec;
+	fs::remove_all(path, ec);
+	if (!ec)
+		return 0;
+	else
+		return -1;
+}
+
+const VMWCHAR* vm_get_default_folder_path(vm_fmgr_default_folder_enum type) {
+	static const VMWCHAR p_ebooks[] = { 'e', ':', '\\', 'e', 'b', 'o', 'o', 'k', 's', '\\', 0 };
+	static const VMWCHAR p_images[] = { 'e', ':', '\\', 'i', 'm', 'a', 'g', 'e', 's', '\\', 0 };
+	static const VMWCHAR p_audio[]  = { 'e', ':', '\\', 'a', 'u', 'd', 'i', 'o', '\\', 0 };
+	static const VMWCHAR p_video[]  = { 'e', ':', '\\', 'v', 'i', 'd', 'e', 'o', '\\', 0 };
+	static const VMWCHAR p_swflash[]= { 'e', ':', '\\', 's', 'w', 'f', 'l', 'a', 's', 'h', '\\', 0 };
+	static const VMWCHAR p_langln[] = { 'e', ':', '\\', 'l', 'a', 'n', 'g', 'l', 'n', '\\', 0 };
+	static const VMWCHAR p_temp[]   = { 'e', ':', '\\', 't', 'e', 'm', 'p', '\\', 0 };
+	static const VMWCHAR p_themes[] = { 'e', ':', '\\', 't', 'h', 'e', 'm', 'e', 's', '\\', 0 };
+	static const VMWCHAR p_barcode[]= { 'e', ':', '\\', 'b', 'a', 'r', 'c', 'o', 'd', 'e', '\\', 0 };
+	static const VMWCHAR p_mmsbox[] = { 'e', ':', '\\', 'm', 'm', 's', 'b', 'o', 'x', '\\', 0 };
+	static const VMWCHAR p_root[]   = { 'e', ':', '\\', 0 };
+
+	const VMWCHAR* res = p_root;
+	switch (type) {
+	case VM_FMGR_DEFAULT_FOLDER_EBOOKS:  res = p_ebooks; break;
+	case VM_FMGR_DEFAULT_FOLDER_IMAGES:  res = p_images; break;
+	case VM_FMGR_DEFAULT_FOLDER_AUDIO:   res = p_audio; break;
+	case VM_FMGR_DEFAULT_FOLDER_VIDEO:   res = p_video; break;
+	case VM_FMGR_DEFAULT_FOLDER_SWFLASH: res = p_swflash; break;
+	case VM_FMGR_DEFAULT_FOLDER_LANGLN:  res = p_langln; break;
+	case VM_FMGR_DEFAULT_FOLDER_TEMP:    res = p_temp; break;
+	case VM_FMGR_DEFAULT_FOLDER_THEMES:  res = p_themes; break;
+	case VM_FMGR_DEFAULT_FOLDER_BARCODE: res = p_barcode; break;
+	case VM_FMGR_DEFAULT_FOLDER_MMSBOX:  res = p_mmsbox; break;
+	case VM_FMGR_DEFAULT_FOLDER_ROOT:    res = p_root; break;
+	default:                             res = p_root; break;
+	}
+
+	fs::path host_path = path_from_emu(res);
+	std::error_code ec;
+	fs::create_directories(host_path, ec);
+
+	static VMWCHAR* guest_buf = nullptr;
+	if (!guest_buf) {
+		guest_buf = (VMWCHAR*)Memory::shared_malloc(256);
+	}
+	int len = 0;
+	while (res[len]) {
+		guest_buf[len] = res[len];
+		len++;
+	}
+	guest_buf[len] = 0;
+
+	return guest_buf;
 }
 
 VMINT vm_file_set_attributes(const VMWSTR filename, VMBYTE attributes) {
@@ -862,4 +919,40 @@ fs::path get_current_app_real_path() {
 std::string get_current_app_name() {
 	fs::path p = get_current_app_path();
 	return p.stem().string();
+}
+
+#pragma pack(push, 1)
+struct multi_tag_emu {
+	VMINT tag_id[10];
+	VMINT tag_len[10];
+	uint32_t tag_content[10];
+};
+#pragma pack(pop)
+
+VMINT vm_get_multi_tags(short* filename, struct multi_tag_t* tag_req) {
+	if (!tag_req) return GET_TAG_ERROR;
+	multi_tag_emu* req = (multi_tag_emu*)tag_req;
+	VMINT result = GET_TAG_TRUE;
+
+	for (int i = 0; i < 10; i++) {
+		if (req->tag_id[i] == 0)
+			continue;
+		void* buf = (void*)ADDRESS_FROM_EMU(req->tag_content[i]);
+		int buf_size = req->tag_len[i];
+		VMINT ret = vm_get_vm_tag(filename, req->tag_id[i], buf, &buf_size);
+		if (ret == GET_TAG_TRUE) {
+			req->tag_len[i] = buf_size;
+		} else {
+			if (result == GET_TAG_TRUE)
+				result = ret;
+		}
+	}
+	return result;
+}
+
+static VMUINT8 g_kbd_mode = 0;
+
+VMINT vm_kbd_set_mode(VMUINT8 mode) {
+	g_kbd_mode = mode;
+	return 0; // VM_KBD_MODE_ERR_SUCCESS
 }

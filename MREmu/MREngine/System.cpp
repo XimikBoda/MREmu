@@ -198,3 +198,19 @@ VMINT vm_open_wap_url(VMWSTR url) {
 	spdlog::info("vm_open_wap_url(\"{}\")", (const char*)u8str.c_str());
 	return 0;
 }
+
+VMUINT vm_get_mre_version(void) {
+	return 0x030000;
+}
+
+void vm_vibrator_once(void) {
+	spdlog::debug("vm_vibrator_once called");
+}
+
+void vm_vibrator_on(void) {
+	spdlog::debug("vm_vibrator_on called");
+}
+
+void vm_vibrator_off(void) {
+	spdlog::debug("vm_vibrator_off called");
+}

@@ -447,3 +447,21 @@ VMINT vm_udp_close(VMINT hdl) {
     app_sock.udps.remove(hdl);
     return 0;
 }
+
+VMINT vm_get_default_apn_info(vm_apn_info_ext* apn_info) {
+    if (!apn_info)
+        return -1;
+    memset(apn_info, 0, sizeof(vm_apn_info_ext));
+    apn_info->apn_info_id = 1;
+    apn_info->proxy_port = 80;
+    strcpy(apn_info->operator_id, "00101");
+    strcpy(apn_info->operator_name, "MREmu");
+    strcpy(apn_info->proxy_ip, "127.0.0.1");
+    strcpy(apn_info->apn_proxy, "cmnet");
+    strcpy(apn_info->apn_no_proxy, "cmnet");
+    return 0;
+}
+
+VMINT vm_get_apn_info(vm_apn_info_ext* current_apn_info) {
+    return vm_get_default_apn_info(current_apn_info);
+}

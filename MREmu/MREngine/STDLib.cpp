@@ -154,3 +154,36 @@ VMINT vm_wstrcmp(VMWSTR str_1, VMWSTR str_2) {
 	else
 		return *str_2 - *str_1;
 }
+
+void vm_get_filename(VMWSTR path, VMWSTR filename) {
+	if (!path || !filename)
+		return;
+	int len = vm_wstrlen(path);
+	int last_sep = -1;
+	for (int i = 0; i < len; ++i) {
+		if (path[i] == (VMWCHAR)'\\' || path[i] == (VMWCHAR)'/')
+			last_sep = i;
+	}
+	if (last_sep >= 0)
+		vm_wstrcpy(filename, path + last_sep + 1);
+	else
+		vm_wstrcpy(filename, path);
+}
+
+VMINT vm_get_path(VMWSTR fullpath, VMWSTR path) {
+	if (!fullpath || !path)
+		return -1;
+	int len = vm_wstrlen(fullpath);
+	int last_sep = -1;
+	for (int i = 0; i < len; ++i) {
+		if (fullpath[i] == (VMWCHAR)'\\' || fullpath[i] == (VMWCHAR)'/')
+			last_sep = i;
+	}
+	if (last_sep >= 0) {
+		vm_wstrncpy(path, fullpath, last_sep + 1);
+		path[last_sep + 1] = 0;
+	} else {
+		path[0] = 0;
+	}
+	return 0;
+}

@@ -55,3 +55,12 @@ std::string get_current_app_name();
 
 void add_keyboard_event(int event, int keycode);
 fs::path path_from_emu(fs::path path);
+fs::path path_from_emu(const VMWCHAR* path);
+fs::path UCS2_to_path(const VMWCHAR* wstr);
+
+extern "C" {
+	VMINT vm_file_rmdir(const VMWSTR dirname);
+	const VMWCHAR* vm_get_default_folder_path(vm_fmgr_default_folder_enum type);
+	VMINT vm_get_multi_tags(short* filename, struct multi_tag_t* tag_req);
+	VMINT vm_kbd_set_mode(VMUINT8 mode);
+}
