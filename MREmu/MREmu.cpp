@@ -120,12 +120,9 @@ int main(int argc, char** argv) {
 	win_device.setFramerateLimit(60);
 
 	while (win_device.isOpen()) {
-		sf::Event event;
-		while (win_device.pollEvent(event)) {
-			if (event.type == sf::Event::Closed) {
-				win_device.close();
-			}
-		}
+        while (const std::optional event = win_device.pollEvent())
+            if (event->is<sf::Event::Closed>())
+                win_device.close();
 
 		int perm_state = storage_permission_state.load();
 

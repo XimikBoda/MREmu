@@ -7,10 +7,8 @@
 #include "imgui.h"
 #include "imgui-SFML.h"
 
-static sf::Texture null_tx;
-
 Keyboard::Keyboard(KeyboardControl& keyboardControl) 
-	: kc(keyboardControl), sp_left(null_tx), sp_right(null_tx){}
+	: kc(keyboardControl), sp_left(frontend_layer_left.getTexture()), sp_right(frontend_layer_right.getTexture()){}
 
 struct Keys {
 	char name[20] = "";

@@ -51,10 +51,6 @@ endif()
 
 if (ANDROID)
 	target_link_libraries(MREmu Android -Wl,--whole-archive sfml-main -Wl,--no-whole-archive)
-
-	add_library(AL SHARED IMPORTED) 
-	set_target_properties(AL PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/deps/SFML/extlibs/libs-android/${CMAKE_ANDROID_ARCH_ABI}/libopenal.so")
-	target_link_libraries(MREmu AL)
 endif()
 
 add_subdirectory (MREngine)
