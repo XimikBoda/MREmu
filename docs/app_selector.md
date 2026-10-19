@@ -151,6 +151,8 @@ The ones worth reaching for:
 | `kGridDim`, `kListDim` | 64, 70 | How far each layout pushes the wallpaper back |
 | `kPressR/G/B` | 232, 236, 243 | The block behind a held softkey |
 | `kGlyphBoxNum/Den` | 5, 8 | Size of the list glyph on the switch tile |
+| `kChooseScaleNum/Den` | 3, 2 | How much larger *Choose* is than the outer softkeys |
+| `kSoftkeyPadPx` | 4 | Breathing room in the softkey bar beyond its tallest label |
 | `kPlaceholderGlyphNum/Den` | 3, 4 | Size of the gamepad on a placeholder tile |
 
 One geometry note on `kRowGapPct`: the tile is square and the cell is square, so
@@ -247,15 +249,35 @@ See [res/icons/README.md](../res/icons/README.md).
 
 ## Font limits
 
-`vm_graphic_set_font` is a no-op and `vm_font_set_font_style` returns success
-without doing anything, so there is no bold and no larger face to ask for. The
-only weight and size available is drawing the 15px bitmap glyphs again at small
-offsets:
+`vm_graphic_set_font` is a no-op, `vm_font_set_font_style` returns success
+without doing anything, and `vm_font_set_font_size` does nothing either. So
+there is no bold and no larger face to ask for, and the only route is to
+rasterise the 15px bitmap glyphs and scale the pixels.
 
-- the centre softkey (*Choose*) is drawn four times at ±1px, which reads as a
-  larger label rather than a fatter one — the bar is ~22px tall, so a real 2x
-  scale would not fit;
-- there is no second pass for *Options* and *Back*.
+`draw_text_scaled()` does exactly that: it draws the label at 1× into a scratch
+layer, then blows the pixels up by `num/den` with nearest-neighbour sampling.
+Nearest, not bilinear — the glyphs are single-pixel strokes on a 240px screen,
+and any smoothing turns them grey and soft, which at this size reads as blur
+rather than as a bigger label.
+
+The centre softkey (*Choose*) is drawn at `kChooseScaleNum/Den` = 3/2. It used to
+be a 2×2 dilation, drawing each glyph four times at one-pixel offsets, which
+thickens the strokes in both axes and so reads as *heavier* rather than as
+larger — the glyphs stayed the same height. *Options* and *Back* stay at 1×.
+
+The softkey bar is sized from the scaled label rather than from `c_h`, so a
+larger *Choose* is never clipped: `choose_h = c_h * num / den` and
+`softkey_h = choose_h + kSoftkeyPadPx`.
+
+Two things about the scratch are easy to get wrong and both fail silently:
+
+- **It has to be a real layer, not a `vector`.** `vm_graphic_textout` runs
+  `find_canvas_signature` on whatever it is handed and draws nothing if that
+  returns null. Only a canvas-backed allocation has the header.
+- **The stride is the canvas width, not the text width.** `vm_graphic_textout`
+  indexes row-major at `cfp->width`. Clearing and reading back at the text width
+  picks the wrong pixels entirely, and the glyphs land where nothing is looking
+  for them — which looks exactly like the text simply not being drawn.
 
 ## Input
 

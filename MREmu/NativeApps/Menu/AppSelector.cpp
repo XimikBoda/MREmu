@@ -108,6 +108,37 @@ namespace NativeApps::Menu::AppSelector {
 	// Letters on a pressed softkey, dark against that block.
 	static constexpr int kPressInkR = 10, kPressInkG = 12, kPressInkB = 20;
 
+	// Vertical breathing room in the softkey bar, beyond the tallest label in it.
+	static constexpr int kSoftkeyPadPx = 4;
+
+	// The centre softkey, *Choose*, is set larger than the outer two: this scale
+	// over the 15px glyphs.
+	//
+	// There is no way to ask for a bigger face. vm_graphic_set_font is a no-op,
+	// vm_font_set_font_style returns success without doing anything, and
+	// vm_font_set_font_size does nothing either. The only route is to rasterise
+	// the glyphs and scale the pixels - see draw_text_scaled().
+	//
+	// This used to be a 2x2 dilation instead, drawing each glyph four times at one
+	// pixel offsets. That thickens the strokes in both axes, so it reads as heavier
+	// rather than as larger, and the glyphs stay the same height.
+	static constexpr int kChooseScaleNum = 3;
+	static constexpr int kChooseScaleDen = 2;
+
+	// Height of the *Choose* label once scaled. Derived from c_h in
+	// compute_screen_metrics(), and the softkey bar is sized from it so the
+	// enlarged glyph is never clipped.
+	int choose_h = 0;
+
+	// Scratch surface for rasterising a label at 1x before scaling it, one glyph
+	// cell tall and full width.
+	//
+	// It has to be a real layer rather than a vector: vm_graphic_textout runs
+	// find_canvas_signature on whatever it is handed and silently draws nothing
+	// if that fails, and only a canvas-backed allocation has the header.
+	int scratch_h = 0;
+	uint16_t* scratch_buf = nullptr;
+
 	// --- Tile shape ---------------------------------------------------------
 
 	// Superellipse exponent for the corners. They are continuous curves rather
@@ -549,7 +580,9 @@ namespace NativeApps::Menu::AppSelector {
 		img_wh = b_h - 2;
 
 		title_h = c_h + kBarPadPx;
-		softkey_h = c_h + kBarPadPx;
+		choose_h = c_h * kChooseScaleNum / kChooseScaleDen;
+		softkey_h = choose_h + kSoftkeyPadPx;
+		scratch_h = c_h;
 		grid_top = title_h;
 		grid_h = std::max(1, h - title_h - softkey_h);
 
@@ -607,6 +640,13 @@ namespace NativeApps::Menu::AppSelector {
 
 		layer_h = vm_graphic_create_layer(0, 0, w, h, -1);
 		layer_buf = vm_graphic_get_layer_buffer(layer_h);
+
+		// One glyph cell tall and full width, for rasterising a label before
+		// scaling it. See draw_text_scaled().
+		int scratch_layer = vm_graphic_create_layer(0, 0, w, scratch_h, -1);
+		scratch_buf = scratch_layer >= 0
+			? (uint16_t*)vm_graphic_get_layer_buffer(scratch_layer)
+			: nullptr;
 
 		scan();
 		draw();
@@ -1625,30 +1665,79 @@ namespace NativeApps::Menu::AppSelector {
 			title_h, label, accent_blue);
 	}
 
-	// The centre softkey is set larger than the outer two.
+	// Draws [text] with its glyph pixels scaled by [num]/[den], nearest neighbour.
 	//
-	// There is no way to scale it properly: vm_graphic_set_font is a no-op and
-	// vm_font_set_font_style returns success without doing anything, so the only
-	// weight and size available is drawing the 15px bitmap glyphs again at small
-	// offsets. A 2x2 dilation thickens the strokes in both axes, which reads as a
-	// larger label rather than merely a fatter one; the softkey bar is only ~22px
-	// tall, so a real 2x scale would not fit.
-	void draw_softkey_label(bool pressed, bool big, int x, int y, const std::u16string& text) {
-		VMUINT16 fg = pressed ? VM_COLOR_888_TO_565(kPressInkR, kPressInkG, kPressInkB) : 0xFFFF;
+	// The font is a 15px bitmap in a 16px cell and no API offers a larger face, so
+	// the label is rasterised once at 1x into the scratch layer and the pixels are
+	// blown up. Nearest rather than bilinear on purpose: the glyphs are
+	// single-pixel strokes on a 240px screen, and any smoothing turns them grey
+	// and soft, which at this size reads as blur rather than as a bigger label.
+	//
+	// Two details this depends on. vm_graphic_textout only ever writes the colour
+	// it is given and leaves the rest alone, so filling the scratch with 0 and
+	// drawing 0xFFFF makes a non-zero pixel mean "a glyph pixel is here". And it
+	// indexes row-major at the *canvas* width, so the stride here is w - using
+	// the text width clears and reads the wrong pixels entirely, and the glyphs
+	// land where nothing is looking for them.
+	void draw_text_scaled(const std::u16string& text, int x, int y,
+		int num, int den, VMUINT16 fg) {
+		const int tw = vm_graphic_get_string_width((VMWSTR)text.c_str());
+		const int th = scratch_h;
+		if (!scratch_buf || tw < 1 || th < 1 || tw > w)
+			return;
+
+		for (int i = 0; i < w * th; ++i)
+			scratch_buf[i] = 0;
+		vm_graphic_textout((unsigned char*)scratch_buf, 0, 0, (VMWSTR)text.c_str(),
+			100, 0xFFFF);
+
+		const int dw = tw * num / den;
+		const int dh = th * num / den;
+
+		for (int dy = 0; dy < dh; ++dy) {
+			const int sy = dy * den / num;
+			const int ly = y + dy;
+			if (ly < 0 || ly >= h)
+				continue;
+
+			uint16_t* row = (uint16_t*)layer_buf + (size_t)ly * w;
+			for (int dx = 0; dx < dw; ++dx) {
+				const int lx = x + dx;
+				if (lx < 0 || lx >= w)
+					continue;
+
+				if (scratch_buf[sy * w + dx * den / num])
+					row[lx] = fg;
+			}
+		}
+	}
+
+	// Width and height a label occupies once drawn by draw_text_scaled(), so the
+	// caller can centre it and size its press block to match.
+	void scaled_text_size(const std::u16string& text, int num, int den,
+		int* out_w, int* out_h) {
+		if (out_w)
+			*out_w = vm_graphic_get_string_width((VMWSTR)text.c_str()) * num / den;
+		if (out_h)
+			*out_h = scratch_h * num / den;
+	}
+
+	// One softkey label and, while it is held, the block behind it.
+	void draw_softkey_label(bool pressed, int x, int y, int tw, int th,
+		int num, int den, const std::u16string& text) {
+		VMUINT16 fg = pressed
+			? VM_COLOR_888_TO_565(kPressInkR, kPressInkG, kPressInkB)
+			: 0xFFFF;
 
 		if (pressed) {
-			int tw = vm_graphic_get_string_width((VMWSTR)text.c_str()) + (big ? 1 : 0);
+			// Hug the label: sized to the glyphs rather than the whole bar, or it
+			// fills the strip and the label appears to float on it.
 			VMUINT16 block = VM_COLOR_888_TO_565(kPressR, kPressG, kPressB);
 			vm_graphic_fill_rect(layer_buf, x - kPressPadXPx, y - kPressPadYPx,
-				tw + 2 * kPressPadXPx, c_h + kPressPadYPx, block, block);
+				tw + 2 * kPressPadXPx, th + 2 * kPressPadYPx, block, block);
 		}
 
-		vm_graphic_textout(layer_buf, x, y, (VMWSTR)text.c_str(), 100, fg);
-		if (big) {
-			vm_graphic_textout(layer_buf, x + 1, y, (VMWSTR)text.c_str(), 100, fg);
-			vm_graphic_textout(layer_buf, x, y + 1, (VMWSTR)text.c_str(), 100, fg);
-			vm_graphic_textout(layer_buf, x + 1, y + 1, (VMWSTR)text.c_str(), 100, fg);
-		}
+		draw_text_scaled(text, x, y, num, den, fg);
 	}
 
 	void draw_softkeys() {
@@ -1664,17 +1753,24 @@ namespace NativeApps::Menu::AppSelector {
 		static const std::u16string mid = u"Choose";
 		static const std::u16string right = u"Back";
 
-		// The dilation adds a pixel right and a pixel down, so the centre label is
-		// measured as one pixel wider and taller or it would sit half a pixel left
-		// of true centre.
-		int ty = y0 + (softkey_h - c_h) / 2 - (softkey_press == 2 ? 1 : 0);
-		int lw = vm_graphic_get_string_width((VMWSTR)left.c_str());
-		int mw = vm_graphic_get_string_width((VMWSTR)mid.c_str()) + 1;
-		int rw = vm_graphic_get_string_width((VMWSTR)right.c_str());
+		int lw, lh, mw, mh, rw, rh;
+		scaled_text_size(left, 1, 1, &lw, &lh);
+		scaled_text_size(mid, kChooseScaleNum, kChooseScaleDen, &mw, &mh);
+		scaled_text_size(right, 1, 1, &rw, &rh);
 
-		draw_softkey_label(softkey_press == 1, false, kBarMarginPx, ty, left);
-		draw_softkey_label(softkey_press == 2, true, (w - mw) / 2, ty, mid);
-		draw_softkey_label(softkey_press == 3, false, w - rw - kBarMarginPx, ty, right);
+		// Each label centres on its own height in the bar, so the enlarged centre
+		// label sits true rather than hanging off the top. The held one drops a
+		// pixel so the block reads as pressed.
+		const int hold = (softkey_press == 2) ? 1 : 0;
+		const int ly = y0 + (softkey_h - lh) / 2 + hold;
+		const int my = y0 + (softkey_h - mh) / 2 + hold;
+		const int ry = y0 + (softkey_h - rh) / 2 + hold;
+
+		draw_softkey_label(softkey_press == 1, kBarMarginPx, ly, lw, lh, 1, 1, left);
+		draw_softkey_label(softkey_press == 2, (w - mw) / 2, my, mw, mh,
+			kChooseScaleNum, kChooseScaleDen, mid);
+		draw_softkey_label(softkey_press == 3, w - rw - kBarMarginPx, ry, rw, rh,
+			1, 1, right);
 	}
 
 	void draw_grid() {
