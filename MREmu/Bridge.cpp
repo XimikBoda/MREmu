@@ -1008,6 +1008,17 @@ namespace Bridge {
 		{FUNCN(vm_graphic_get_character_height), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_get_character_height());
 		}},
+		{FUNCN(vm_graphic_get_character_height_ex), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_character_height_ex(
+				read_arg(uc, 0)));
+		}},
+		{FUNCN(vm_graphic_get_highest_char_height_of_all_language), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_highest_char_height_of_all_language());
+		}},
+		{FUNCN(vm_graphic_get_char_height_alllang), [](uc_engine* uc) {
+			write_ret(uc, vm_graphic_get_char_height_alllang(
+				read_arg(uc, 0)));
+		}},
 		{FUNCN(vm_graphic_get_character_width), [](uc_engine* uc) {
 			write_ret(uc, vm_graphic_get_character_width(
 				read_arg(uc, 0)));

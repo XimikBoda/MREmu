@@ -397,3 +397,15 @@ void raw_textout_to_buf(uint16_t* buf, int screen_w, int screen_h, int x, int y,
 VMINT vm_graphic_get_char_baseline_alllang(VMINT size) {
 	return vm_graphic_get_character_height();
 }
+
+VMINT vm_graphic_get_character_height_ex(VMUWCHAR c) {
+	return vm_graphic_get_character_height();
+}
+
+VMINT vm_graphic_get_highest_char_height_of_all_language(void) {
+	return vm_graphic_get_character_height();
+}
+
+VMINT vm_graphic_get_char_height_alllang(VMINT size) {
+	return vm_graphic_get_character_height();
+}
