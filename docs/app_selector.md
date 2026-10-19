@@ -114,6 +114,8 @@ The ones worth reaching for:
 | `kMaxCellPx` | 64 | Ceiling on the cell pitch, so tiles stay tile-sized |
 | `kGridDim`, `kListDim` | 64, 70 | How far each layout pushes the wallpaper back |
 | `kPressR/G/B` | 232, 236, 243 | The block behind a held softkey |
+| `kGlyphBoxNum/Den` | 5, 8 | Size of the list glyph on the switch tile |
+| `kPlaceholderGlyphNum/Den` | 3, 4 | Size of the gamepad on a placeholder tile |
 
 One geometry note on `kRowGapPct`: the tile is square and the cell is square, so
 the tile is sized from the **larger** of the two gaps and the smaller is
@@ -155,21 +157,29 @@ decoded on the first grid draw. Building both up front would double the cold-sta
 decode cost for a layout the user may never open.
 
 Packages with no extractable icon (see [vxp_icons.md](vxp_icons.md)) get a
-procedural placeholder tile rather than a hole.
+placeholder tile rather than a hole.
 
-## Switch tile glyph
+## Glyphs the grid draws for itself
 
-The trailing tile carries a list icon, embedded as a **coverage mask** rather
-than a PNG. `Image.cpp`'s `load_image()` sets `has_transparency = 0` and
-converts straight to 16-bit, so an embedded transparent PNG arrives as a black
-square — which is fine for the wallpaper, which has no alpha, and not fine here.
-The glyph is a solid shape on transparency, so only the coverage matters; the
-generator extracts the alpha channel, crops to it and emits 4 KB of it.
+Where there is no package artwork, the grid draws its own: a list icon on the
+trailing switch tile, and a gamepad on any package whose icon could not be
+extracted. Both are embedded as **coverage masks** rather than PNGs.
+`Image.cpp`'s `load_image()` sets `has_transparency = 0` and converts straight to
+16-bit, so a transparent PNG arrives as a black square — fine for the wallpaper,
+which has no alpha, and not fine here. A glyph is a solid shape on transparency,
+so only the coverage carries information; the generator extracts the alpha
+channel, crops to it and emits 4 KB of it per glyph.
 
-Downsampling onto the tile is a box average, not a point sample: the mask is
-64×64 and the tile is about 48, and point sampling breaks the bars into dashes.
-The result is multiplied by the tile's own squircle coverage so the glyph is
-clipped by the tile instead of sitting over its corners.
+`blend_mask_glyph()` is shared by both, so the two tiles differ only in which
+mask they pass and how big a box they ask for. Downsampling onto the tile is a
+box average, not a point sample: the masks are 64×64 and the tile is about 48,
+and point sampling breaks the strokes into dashes. The result is multiplied by
+the tile's own squircle coverage so a glyph is clipped by the tile instead of
+sitting over its corners.
+
+The gamepad gets a larger box than the list glyph, because it is the
+placeholder tile's only content — a mark sized to sit alongside artwork looks
+lost on its own.
 
 See [res/icons/README.md](../res/icons/README.md).
 

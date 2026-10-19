@@ -1,7 +1,7 @@
 #include "AppSelector.h"
 #include "BottomSheet.h"
 #include "WallpaperData.h"
-#include "ListIconData.h"
+#include "IconsData.h"
 #include "../../MREngine/Image.h"
 #include "../../MREngine/VxpIcon.h"
 #include "../../AppManager.h"
@@ -186,15 +186,15 @@ namespace NativeApps::Menu::AppSelector {
 	// shaded edge.
 	static constexpr int kFolderEdgeAlpha = 110;
 
-	// Placeholder mark. An inset block rather than an outline:
-	// vm_graphic_roundrect draws a one-pixel frame with a coarse corner test,
-	// which at tile scale came out looking like a smudge instead of a mark.
+	// Placeholder mark: the gamepad from res/icons/source/gamepad.png. Its ink
+	// matches kInk so both of the grid's own glyphs read as one set, but it is a
+	// separate constant because a plate that light can take a heavier mark.
 	static constexpr int kPlaceholderPlateR = 214, kPlaceholderPlateG = 219,
 		kPlaceholderPlateB = 230;
-	static constexpr int kPlaceholderMarkR = 128, kPlaceholderMarkG = 137,
-		kPlaceholderMarkB = 158;
-	static constexpr int kPlaceholderInsetPct = 25;
-	static constexpr int kMinInsetPx = 2;
+	static constexpr int kPlaceholderInkR = 44, kPlaceholderInkG = 52,
+		kPlaceholderInkB = 76;
+	static constexpr int kPlaceholderGlyphNum = 3;
+	static constexpr int kPlaceholderGlyphDen = 4;
 
 	const VMUINT16 accent_blue = VM_COLOR_888_TO_565(kAccentR, kAccentG, kAccentB);
 
@@ -364,6 +364,12 @@ namespace NativeApps::Menu::AppSelector {
 	void build_wallpaper(std::vector<uint16_t>& out, int dim);
 	void update_details_sheet(const vxp& app);
 	void update_dir_details_sheet(const vxp& dir);
+
+	// This is a namespace, not a struct, so a call needs the definition or at
+	// least a declaration ahead of it. The placeholder tile draws a mask glyph
+	// and sits above it.
+	void blend_mask_glyph(int x, int y, int size, int radius,
+		const unsigned char* mask, int side, int num, int den, VMUINT16 ink);
 
 	// --- Scrolling ----------------------------------------------------
 	//
@@ -1335,41 +1341,39 @@ namespace NativeApps::Menu::AppSelector {
 	}
 
 	// Stand-in for the handful of packages that ship a stub icon with no image
-	// in it at all (see docs/vxp_icons.md): a plain plate with a mark on it, so
-	// the grid has no holes in it.
+	// in it at all (see docs/vxp_icons.md): a plain plate with a gamepad on it,
+	// so the grid has no holes in it.
+	//
+	// The gamepad is res/icons/source/gamepad.png, as a coverage mask like every
+	// other glyph the grid draws itself.
 	void draw_placeholder_tile(int x, int y, int size, int radius) {
 		VMUINT16 plate = VM_COLOR_888_TO_565(
 			kPlaceholderPlateR, kPlaceholderPlateG, kPlaceholderPlateB);
 		blend_rounded_rect(x, y, size, radius, plate, 255);
 
-		int inset = std::max(kMinInsetPx, size * kPlaceholderInsetPct / 100);
-		blend_rounded_rect(x + inset, y + inset, size - 2 * inset,
-			std::max(1, radius / 2),
-			VM_COLOR_888_TO_565(kPlaceholderMarkR, kPlaceholderMarkG, kPlaceholderMarkB),
-			255);
+		// Bigger box than the switch tile's glyph gets: this is the tile's only
+		// content, so a mark sized to sit alongside artwork looks lost here.
+		blend_mask_glyph(x, y, size, radius,
+			Icons::kPlaceholderMask, Icons::kPlaceholderSide,
+			kPlaceholderGlyphNum, kPlaceholderGlyphDen,
+			VM_COLOR_888_TO_565(kPlaceholderInkR, kPlaceholderInkG, kPlaceholderInkB));
 	}
 
-	// Glyph on the grid's "Switch to List View" tile: the list icon from
-	// res/icons/source/list-ul.png, as a coverage mask.
+	// A coverage-mask glyph (see res/icons) drawn centred in a box [num]/[den] of
+	// the tile, in [ink], clipped by the tile's squircle.
 	//
-	// The mask is 64x64 with the glyph fitted inside it at its own aspect, so
-	// the whole mask can be treated as the box scaled onto the tile and the
-	// zero-coverage padding needs no special case.
-	//
-	// Downsampling is a box average rather than a point sample: the mask is
-	// larger than the ~48px tile it lands on, and point sampling turns the
-	// bars into a dashed line. The per-pixel coverage is multiplied by the
-	// tile's own squircle coverage so the glyph is clipped by the tile rather
-	// than sitting on top of its corners.
-	void draw_list_glyph(int x, int y, int size, int radius) {
-		const int side = ListIcon::kSide;
-		const int box = std::max(4, size * kGlyphBoxNum / kGlyphBoxDen);
+	// Downsampling is a box average rather than a point sample: the masks are
+	// 64x64 and the tile is about 48, and point sampling turns the glyphs into
+	// dashed lines. The per-pixel coverage is multiplied by the tile's own
+	// squircle coverage so a glyph is clipped by the tile rather than sitting on
+	// top of its corners.
+	void blend_mask_glyph(int x, int y, int size, int radius,
+		const unsigned char* mask, int side, int num, int den, VMUINT16 ink) {
+		const int box = std::max(4, size * num / den);
 		const int ox = x + (size - box) / 2;
 		const int oy = y + (size - box) / 2;
 		if (box < 3)
 			return;
-
-		const VMUINT16 ink = VM_COLOR_888_TO_565(kInkR, kInkG, kInkB);
 
 		for (int py = 0; py < box; ++py) {
 			int sy0 = py * side / box;
@@ -1385,8 +1389,7 @@ namespace NativeApps::Menu::AppSelector {
 
 				int sum = 0, n = 0;
 				for (int sy = sy0; sy < sy1; ++sy) {
-					const unsigned char* row =
-						ListIcon::kMask + (size_t)sy * side;
+					const unsigned char* row = mask + (size_t)sy * side;
 					for (int sx = sx0; sx < sx1; ++sx) {
 						sum += row[sx];
 						++n;
@@ -1402,6 +1405,15 @@ namespace NativeApps::Menu::AppSelector {
 					blend_at(ox + px, oy + py, ink, alpha * cov / 255);
 			}
 		}
+	}
+
+	// Glyph on the grid's "Switch to List View" tile: the list icon from
+	// res/icons/source/list-ul.png.
+	void draw_list_glyph(int x, int y, int size, int radius) {
+		blend_mask_glyph(x, y, size, radius,
+			Icons::kListMask, Icons::kListSide,
+			kGlyphBoxNum, kGlyphBoxDen,
+			VM_COLOR_888_TO_565(kInkR, kInkG, kInkB));
 	}
 
 	// One grid tile. The icon is composited by hand rather than with
