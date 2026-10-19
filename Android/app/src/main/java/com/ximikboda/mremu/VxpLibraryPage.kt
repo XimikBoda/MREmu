@@ -61,8 +61,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +74,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.animation.animateContentSize
 import androidx.compose.material3.TextField
@@ -82,6 +83,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.io.File
+
+// Shared by the filter chips and the sort control. The sort button is a hand-built row
+// rather than a FilterChip because FilterChip has no trailing slot for the direction
+// arrow, so without these constants the two would slowly drift apart in appearance.
+private val ChipSelectedFill = Color(0xFF3B3B42)
+private val ChipUnselectedFill = Color(0xFF1F1F23)
+private val ChipSelectedBorder = Color(0xFF5A5A65)
+private val ChipUnselectedBorder = Color(0xFF34343A)
+private val ChipLabel = Color(0xFF8E8E93)
 
 enum class VxpSort(val label: String) {
     Name("Name"),
@@ -98,10 +108,14 @@ fun VxpLibraryPage(
 ) {
     val context = LocalContext.current
     val repository = remember { VxpRepository(context) }
-    // Point the icon loader at the on-disk cache once, so icons survive process death
-    // instead of being decoded again on every launch.
-    LaunchedEffect(Unit) { VxpIconLoader.init(context.applicationContext) }
-    var items by remember { mutableStateOf<List<VxpItem>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+
+    // The library is loaded as one unit: scan the directories *and* resolve every icon
+    // before anything is shown. Doing icons per-row instead meant scrolling back and
+    // forth re-decoded them as rows were recycled, because a row that scrolled out of
+    // view lost its bitmap.
+    var library by remember { mutableStateOf<LibraryState>(LibraryState.Loading) }
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedSort by remember { mutableStateOf(VxpSort.Name) }
     var sortAscending by remember { mutableStateOf(true) }
@@ -113,12 +127,29 @@ fun VxpLibraryPage(
     var renameText by remember { mutableStateOf("") }
 
     fun refreshList() {
-        items = repository.loadAllVxps()
+        scope.launch {
+            // Shows the list-wide spinner again; icon caches make this fast after the
+            // first pass, since VxpIconLoader serves from disk or memory.
+            library = LibraryState.Loading
+            library = withContext(Dispatchers.IO) {
+                val list = repository.loadAllVxps()
+                val icons = HashMap<String, ImageBitmap>(list.size)
+                for (item in list) {
+                    VxpIconLoader.load(item.file)?.let { icons[item.path] = it }
+                }
+                LibraryState.Ready(list, icons)
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
+        // Point the icon loader at the on-disk cache once, so icons survive process
+        // death instead of being decoded again on every launch.
+        VxpIconLoader.init(context.applicationContext)
         refreshList()
     }
+
+    val items = (library as? LibraryState.Ready)?.items ?: emptyList()
 
     val filteredItems = remember(items, searchQuery, selectedSort, sortAscending, onlyRecents) {
         var result = items.asSequence()
@@ -217,14 +248,14 @@ fun VxpLibraryPage(
                 onClick = { onlyRecents = false },
                 label = { Text(stringResource(R.string.vxp_filter_all), style = MaterialTheme.typography.bodySmall) },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(0xFF3B3B42),
+                    selectedContainerColor = ChipSelectedFill,
                     selectedLabelColor = Color.White,
-                    containerColor = Color(0xFF1F1F23),
-                    labelColor = Color(0xFF8E8E93)
+                    containerColor = ChipUnselectedFill,
+                    labelColor = ChipLabel
                 ),
                 border = FilterChipDefaults.filterChipBorder(
-                    borderColor = Color(0xFF34343A),
-                    selectedBorderColor = Color(0xFF5A5A65),
+                    borderColor = ChipUnselectedBorder,
+                    selectedBorderColor = ChipSelectedBorder,
                     enabled = true,
                     selected = !onlyRecents
                 )
@@ -234,14 +265,14 @@ fun VxpLibraryPage(
                 onClick = { onlyRecents = true },
                 label = { Text(stringResource(R.string.vxp_filter_recents), style = MaterialTheme.typography.bodySmall) },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(0xFF3B3B42),
+                    selectedContainerColor = ChipSelectedFill,
                     selectedLabelColor = Color.White,
-                    containerColor = Color(0xFF1F1F23),
-                    labelColor = Color(0xFF8E8E93)
+                    containerColor = ChipUnselectedFill,
+                    labelColor = ChipLabel
                 ),
                 border = FilterChipDefaults.filterChipBorder(
-                    borderColor = Color(0xFF34343A),
-                    selectedBorderColor = Color(0xFF5A5A65),
+                    borderColor = ChipUnselectedBorder,
+                    selectedBorderColor = ChipSelectedBorder,
                     enabled = true,
                     selected = onlyRecents
                 )
@@ -249,35 +280,40 @@ fun VxpLibraryPage(
 
             Spacer(Modifier.weight(1f))
 
-            // Sort selector dropdown
             var sortMenuOpen by remember { mutableStateOf(false) }
-            Box {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF232327))
-                        .border(1.dp, Color(0xFF34343A), RoundedCornerShape(12.dp))
-                        .clickable { sortMenuOpen = true }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+
+            // Sort control. Styled to match the filter chips exactly - same 32dp height,
+                // 8dp radius (FilterChip's default shape) and the shared fill and
+                // border colours. A hand-built row rather than a FilterChip because
+                // that widget has no trailing slot for the direction arrow.
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ChipSelectedFill)
+                            .border(1.dp, ChipSelectedBorder, RoundedCornerShape(8.dp))
+                            .clickable { sortMenuOpen = true }
+                            .padding(start = 12.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Sort,
                         contentDescription = null,
-                        tint = Color(0xFF8E8E93),
+                        tint = ChipLabel,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = selectedSort.label,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFE6E1E5)
+                        color = Color.White
                     )
                     Icon(
                         imageVector = if (sortAscending)
                             Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                         contentDescription = null,
-                        tint = Color(0xFF8E8E93),
+                        tint = ChipLabel,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -326,7 +362,23 @@ fun VxpLibraryPage(
         Spacer(Modifier.height(8.dp))
 
         // VXP File List
-        if (filteredItems.isEmpty()) {
+        if (library is LibraryState.Loading) {
+            // One spinner for the whole list, covering the directory scan and every
+            // icon decode. Per-row spinners meant the list looked half-broken while it
+            // filled in, and rows that scrolled back into view re-decoded.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 220.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    color = Color(0xFF8E8E93),
+                    strokeWidth = 2.dp
+                )
+            }
+        } else if (filteredItems.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -376,6 +428,9 @@ fun VxpLibraryPage(
                         val index = filteredItems.indexOf(item)
                         VxpItemRow(
                             item = item,
+                            // Already decoded during the library load, so rows recycle
+                            // their icon instead of decoding it again.
+                            icon = (library as? LibraryState.Ready)?.icons?.get(item.path),
                             divider = index < filteredItems.lastIndex,
                             onLaunch = { onLaunch(item) },
                             onRename = {
@@ -613,16 +668,19 @@ private fun VxpContextMenuItem(
     )
 }
 
-/** Icon states for a library row. Kept explicit so "not yet known" is not confused with "none". */
-private sealed interface LoadState {
-    data object Loading : LoadState
-    data class Ready(val bitmap: ImageBitmap) : LoadState
-    data object Missing : LoadState
+/**
+ * Library-wide loading state. Icons are resolved as part of loading rather than per row,
+ * so a row never has to show its own spinner and never re-decodes when it is recycled.
+ */
+private sealed interface LibraryState {
+    data object Loading : LibraryState
+    data class Ready(val items: List<VxpItem>, val icons: Map<String, ImageBitmap>) : LibraryState
 }
 
 @Composable
 private fun VxpItemRow(
     item: VxpItem,
+    icon: ImageBitmap?,
     divider: Boolean,
     onLaunch: () -> Unit,
     onRename: () -> Unit,
@@ -631,16 +689,6 @@ private fun VxpItemRow(
     onReveal: () -> Unit
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-
-    // Decoding starts off the main thread: this parses the VXP container and decodes an
-    // image, neither of which belongs in a scroll frame. Sealed (null) until resolved,
-    // and null for good when the package has no decodable icon.
-    val loadState by produceState<LoadState>(LoadState.Loading, item.path, item.lastModified) {
-        value = withContext(Dispatchers.IO) {
-            val bitmap = VxpIconLoader.load(item.file)
-            if (bitmap != null) LoadState.Ready(bitmap) else LoadState.Missing
-        }
-    }
 
     Surface(
         onClick = onLaunch,
@@ -655,27 +703,22 @@ private fun VxpItemRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // The icon slot is a fixed-size box whichever state it is in. Sizing it to the
-                // content instead would make every row's text shift sideways as each
-                // icon resolved, which is very visible while scrolling.
+                // The icon slot is a fixed-size box whether or not this package has an icon, so
+                // rows keep the same text alignment either way.
                 Box(
                     modifier = Modifier.size(40.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    when (val state = loadState) {
-                        is LoadState.Ready -> Image(
-                            bitmap = state.bitmap,
+                    if (icon != null) {
+                        Image(
+                            bitmap = icon,
                             contentDescription = null,
                             // Package icons are 45x45 but drawn at 40dp, so scale down
                             // rather than stretching the bitmap to fill the box.
                             modifier = Modifier.size(40.dp)
                         )
-                        LoadState.Loading -> CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = Color(0xFF8E8E93),
-                            strokeWidth = 2.dp
-                        )
-                        LoadState.Missing -> Icon(
+                    } else {
+                        Icon(
                             imageVector = Icons.Filled.SportsEsports,
                             contentDescription = null,
                             tint = Color(0xFF5A5A65),

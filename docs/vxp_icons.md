@@ -85,11 +85,13 @@ stub but it ships a real `logo.png`. Formats handled: GIF (8), PNG (8).
 
 ## Android list details
 
-- The icon slot is a **fixed 40dp box** in every state. Sizing it to content made each
-  row's text shift sideways as icons resolved, which was very visible while scrolling.
-- A centred `CircularProgressIndicator` shows while decoding. States are a sealed
-  `LoadState` (`Loading` / `Ready` / `Missing`) so "not yet known" is never confused
-  with "this package has no icon".
+- The whole library is loaded as **one unit**: the directory scan and every icon decode
+  complete before anything is shown, under a single centred spinner in place of the list.
+  Resolving icons per row instead meant scrolling back and forth re-decoded them, because
+  a row that scrolled out of view lost its bitmap.
+- The icon slot is a **fixed 40dp box** whether or not a package has an icon, so rows keep
+  the same text alignment either way. Sizing it to content made each row's text shift
+  sideways as icons arrived.
 - Icons are cached in two tiers: an in-memory `LruCache`, and PNGs written under
   `cacheDir/vxp_icons/`. Without the disk tier every cold start re-parsed and re-decoded
   every VXP before the first row could paint. Keys include path, mtime and size.

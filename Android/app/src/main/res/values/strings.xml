@@ -47,6 +47,8 @@
     <string name="vxp_filter_all">All</string>
     <string name="vxp_filter_recents">Recents</string>
     <string name="vxp_browser">VXP Browser</string>
+    <string name="vxp_import">Import VXP…</string>
+    <string name="import_failed">Could not open that file</string>
     <string name="vxp_browser_placeholder">VXP Browser</string>
     <string name="vxp_browser_placeholder_desc">Coming soon</string>
 

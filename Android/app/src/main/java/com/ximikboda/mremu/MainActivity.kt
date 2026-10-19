@@ -1,6 +1,7 @@
 package com.ximikboda.mremu
 
 import android.Manifest
+import android.app.Activity
 import android.app.NativeActivity
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -58,11 +59,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
@@ -183,6 +187,7 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         private const val STORAGE_PERMISSION_CODE = 100
         private const val MANAGE_STORAGE_REQUEST_CODE = 101
         private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
+        private const val PICK_VXP_REQUEST_CODE = 102
 
         init {
             System.loadLibrary("MREmu")
@@ -245,6 +250,7 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
                         onAbout = { dialog.dismiss() },
                         onQuit = { dialog.dismiss(); finish() },
                         onOpenVxpBrowser = { dialog.dismiss(); openVxpBrowser() },
+                        onImportVxp = { dialog.dismiss(); openVxpPicker() },
                         onDismiss = { dialog.dismiss() }
                     )
                 }
@@ -318,13 +324,23 @@ class MainActivity : NativeActivity(), LifecycleOwner, ViewModelStoreOwner, Save
         startActivity(Intent(this, VxpBrowserActivity::class.java))
     }
 
-    /** Copies [text] to the clipboard, confirming briefly. */
-    private fun copyToClipboard(text: String) {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(TAG, text))
-        // Android 13+ shows its own copy confirmation, so only toast on older releases.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Toast.makeText(this, getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
+    /**
+ * Copies [text] to the clipboard. Returns false if the clipboard was unavailable.
+ *
+ * The caller is responsible for confirming in the UI. A system toast was tried first
+ * and was not dependable: on Android 13+ it is suppressed unless the app is in the
+ * foreground, and this dialog lives in its own window, so pressing Copy looked like it
+ * did nothing at all.
+ */
+    private fun copyToClipboard(text: String): Boolean {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+            ?: return false
+        return try {
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText(TAG, text))
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Clipboard write failed", e)
+            false
         }
     }
 
@@ -548,6 +564,7 @@ private enum class OptionsPage(val title: String) {
         onAbout: () -> Unit,
         onQuit: () -> Unit,
         onOpenVxpBrowser: () -> Unit,
+        onImportVxp: () -> Unit,
         onDismiss: () -> Unit
     ) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -655,6 +672,28 @@ private enum class OptionsPage(val title: String) {
                                         onClick = {
                                             libraryMenuOpen = false
                                             onOpenVxpBrowser()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                    )
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = stringResource(R.string.vxp_import),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = Color(0xFFE6E1E5)
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Filled.FileOpen,
+                                                contentDescription = null,
+                                                tint = Color(0xFFE6E1E5),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            libraryMenuOpen = false
+                                            onImportVxp()
                                         },
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                                     )
@@ -1012,7 +1051,7 @@ private enum class OptionsPage(val title: String) {
     @Composable
     private fun ErrorDialog(
         message: String,
-        onCopy: () -> Unit,
+        onCopy: () -> Boolean,
         onDismiss: () -> Unit
     ) {
         Box(
@@ -1069,6 +1108,17 @@ private enum class OptionsPage(val title: String) {
 
                     Spacer(Modifier.height(20.dp))
 
+                    // Confirmation lives in the dialog. A toast was not dependable
+                    // here: this is a separate window, so the system's own clipboard
+                    // confirmation is frequently suppressed and the button looked dead.
+                    var copied by remember { mutableStateOf(false) }
+                    LaunchedEffect(copied) {
+                        if (copied) {
+                            kotlinx.coroutines.delay(1500)
+                            copied = false
+                        }
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1076,7 +1126,15 @@ private enum class OptionsPage(val title: String) {
                             .background(Color(0xFF2F2F36))
                             .border(1.dp, Color(0xFF34343A), RoundedCornerShape(16.dp))
                     ) {
-                        ErrorDialogAction(stringResource(R.string.copy)) { onCopy() }
+                        ErrorDialogAction(
+                            label = stringResource(
+                                if (copied) R.string.copied_to_clipboard else R.string.copy
+                            ),
+                            icon = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                            onClick = {
+                                if (onCopy()) copied = true
+                            }
+                        )
                         HorizontalDivider(color = Color(0xFF34343A))
                         ErrorDialogAction(stringResource(R.string.ok), primary = true, onClick = onDismiss)
                     }
@@ -1089,8 +1147,9 @@ private enum class OptionsPage(val title: String) {
     @Composable
     private fun ErrorDialogAction(
         label: String,
+        onClick: () -> Unit,
         primary: Boolean = false,
-        onClick: () -> Unit
+        icon: androidx.compose.ui.graphics.vector.ImageVector? = null
     ) {
         Surface(
             onClick = onClick,
@@ -1103,12 +1162,25 @@ private enum class OptionsPage(val title: String) {
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (primary) Color.White else Color(0xFFC7C5D0)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (icon != null) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = if (primary) Color.White else Color(0xFFC7C5D0),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (primary) Color.White else Color(0xFFC7C5D0)
+                    )
+                }
             }
         }
     }
@@ -1222,6 +1294,18 @@ private enum class OptionsPage(val title: String) {
                     notifyPermissionState(false)
                 }
             }
+        } else if (requestCode == PICK_VXP_REQUEST_CODE) {
+            if (resultCode != Activity.RESULT_OK) return
+            val uri = data?.data ?: return
+            // Persist the read grant so a later recreation can still reopen the document.
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: SecurityException) {
+                Log.w("MREmu", "Could not persist read grant for $uri", e)
+            }
+            importVxpUri(uri)
         }
     }
 
@@ -1272,6 +1356,16 @@ private enum class OptionsPage(val title: String) {
         // originally-opened app.
         intent.action = null
 
+        importVxpUri(uri)
+    }
+
+    /**
+     * Copies a picked .vxp into the cache, records it as recent, and launches it.
+     *
+     * Shared by the VIEW intent and the library's "Import VXP..." menu item, so both
+     * routes behave identically.
+     */
+    private fun importVxpUri(uri: Uri) {
         Thread {
             try {
                 val input = contentResolver.openInputStream(uri)
@@ -1281,7 +1375,7 @@ private enum class OptionsPage(val title: String) {
                     // 0-byte image with no visible error.
                     Log.w("MREmu", "Could not open $uri")
                     runOnUiThread {
-                        Toast.makeText(this, "Could not open that file", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, R.string.import_failed, Toast.LENGTH_SHORT).show()
                     }
                     return@Thread
                 }
@@ -1306,9 +1400,31 @@ private enum class OptionsPage(val title: String) {
                 nativeLoadVxpFile(realPosixPath)
             } catch (e: Exception) {
                 Log.e("MREmu", "Copy to cache error", e)
+                runOnUiThread {
+                    Toast.makeText(this, R.string.import_failed, Toast.LENGTH_SHORT).show()
+                }
             }
         }.start()
     }
+
+    /** Opens the system file picker so a .vxp can be added to the library. */
+    private fun openVxpPicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            // Feature phones have no registered MIME type for .vxp, and several
+            // document providers report them as octet-stream or with no type at all,
+            // so filter by extension rather than trusting a MIME type.
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/octet-stream", "application/zip"))
+        }
+        try {
+            startActivityForResult(intent, PICK_VXP_REQUEST_CODE)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.import_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    
 
     /**
      * Plays a predefined haptic pattern for the Options button.
