@@ -2,7 +2,7 @@
 
 ## The short version
 
-`Facebook Messenger.vxp` (internal name `Messenger`) crashed on boot with:
+`Messenger.vxp` (internal name `Messenger`) crashed on boot with:
 1. Initially at VM call 147: `[Messenger] [error] uc_emu_start returned 7 (Invalid memory write (UC_ERR_WRITE_UNMAPPED)) at PC=0x00000DD4`.
 2. Once the first crash was mitigated, at VM call 259: `[Messenger] [error] uc_emu_start returned 6 (Invalid memory read (UC_ERR_READ_UNMAPPED)) at PC=0x000025F4`.
 
@@ -146,7 +146,7 @@ Updated `vm_create_dyn_array`, `vm_dyn_array_add`, `vm_dyn_array_del`, and `vm_f
 ## Verification
 
 1. **Boot Health**:
-   - `Facebook Messenger.vxp` boots cleanly without faults (`faulted: false`, `last_error: ""`).
+   - `Messenger.vxp` boots cleanly without faults (`faulted: false`, `last_error: ""`).
    - Reaches steady state in the event loop at 449+ VM calls (`run_state: "running"`, `pc: "0x00003978"`).
 2. **Visual Presentation**:
    - `emu_screen` captured the Facebook Messenger login interface:

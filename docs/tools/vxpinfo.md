@@ -21,7 +21,7 @@ python tools/vxpinfo.py <path> [<path> ...] [--summary] [--recursive] [--json]
 - a single `.vxp` file
 - several files at once
 - a **directory** (every `*.vxp` inside it, matched case-insensitively, so
-  `Gameloft_Live_240x320.Vxp` is found too)
+  `Show_picture.VXP` is found too)
 - a **wildcard**, e.g. `bin/Release/fs/e/mre/Peanut*.vxp`
 
 ### Options
@@ -35,11 +35,11 @@ python tools/vxpinfo.py <path> [<path> ...] [--summary] [--recursive] [--json]
 ## Full report
 
 ```text
-python tools/vxpinfo.py "Opera Mini 6.1.vxp"
+python tools/vxpinfo.py "Opera Mini (6.1).vxp"
 ```
 
 ```text
-File:        ...\Opera Mini 6.1.vxp
+File:        ...\Opera Mini (6.1).vxp
 Size:        2041317 bytes
 SHA256:      53fb5b91b24a5c655bce6979341c22566ff1eed9bddbe10c0b7b73356c9edf26
 Magic:       7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00
@@ -78,11 +78,11 @@ python tools/vxpinfo.py bin/Release/fs/e/mre --summary
 ```text
 NAME                     VERSION    RAM(KB)  CONTAINER        ICON       SIZE  FILE
 Calculator               0.0.111       1024  elf_uncompressed png      132033  Calculator.vxp
-Facebook                 16.1.0         570  elf_uncompressed png      227657  Facebook 2.5.1.vxp
-Messenger                0.1.0          800  ads_compressed   gif      409416  Facebook Messenger.vxp
-GravityDefied            1.0.0          900  pe_dll           -        924220  Gravity Defied (x86).vxp
+Facebook                 16.1.0         570  elf_uncompressed png      227657  Facebook.vxp
+Messenger                0.1.0          800  ads_compressed   gif      409416  Messenger.vxp
+GravityDefied            1.0.0          900  pe_dll           -        924220  GravityDefied (1.0.0).vxp
 Mrecp                    1.0.0         1500  elf_uncompressed -        232915  Mrecp.vxp
-Opera Mini               4.4.0         1500  elf_uncompressed gif      637265  Opera Mini 4.4.vxp
+Opera Mini               4.4.0         1500  elf_uncompressed gif      637265  Opera Mini (4.4).vxp
 ```
 
 ## Behaviour notes
@@ -115,7 +115,7 @@ The container is decided from the file magic, not from the tag table:
 | :--- | :--- |
 | `elf_uncompressed` | Magic `7F 45 4C 46`. |
 | `ads_compressed` | A valid 36-byte `compress_ads_elf_info` descriptor precedes the tags, or the file starts with a zlib stream. |
-| `pe_dll` | Magic `MZ` - a Windows PE/DLL image, not a VXP (`Gravity Defied (x86).vxp`). |
+| `pe_dll` | Magic `MZ` - a Windows PE/DLL image, not a VXP (`GravityDefied (1.0.0).vxp`). |
 | `unknown` | Nothing recognisable; `container_note` explains why. |
 
 `VM_CE_INFO_RO_RW_ZIP` is deliberately not used here: it is set on plain
@@ -126,7 +126,7 @@ uncompressed ELFs too. See [vxp_icons.md](../vxp_icons.md).
 `Icon:` reports presence, format and size by delegating to
 [`vxpicon`](vxpicon.md), so both front ends agree on which packages have a
 usable icon. `-` in summary mode means "no icon found" (`Mrecp.vxp` and
-`Show Picture.vxp` carry stub icons; this matches the table in
+`Show_picture.vxp` carry stub icons; this matches the table in
 [vxp_icons.md](../vxp_icons.md)).
 
 ### Other summary fields

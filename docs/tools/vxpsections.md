@@ -27,7 +27,7 @@ python tools/vxpsections.py <file.vxp> [--disasm] [--section NAME] [--offset N] 
 ## Example
 
 ```text
-python tools/vxpsections.py "Opera Mini 6.1.vxp" --disasm --max-insns 8
+python tools/vxpsections.py "Opera Mini (6.1).vxp" --disasm --max-insns 8
 ```
 
 Output (abridged):

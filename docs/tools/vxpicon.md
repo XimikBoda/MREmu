@@ -23,7 +23,7 @@ python tools/vxpicon.py <file.vxp> [-o OUTPUT]
 ## Example
 
 ```text
-python tools/vxpicon.py "Opera Mini 6.1.vxp" -o opera.icon.png
+python tools/vxpicon.py "Opera Mini (6.1).vxp" -o opera.icon.png
 ```
 
 Output:
@@ -39,5 +39,5 @@ Extracted 1776 bytes -> opera.icon.png (.gif)
   payload, ignoring the variant tag.
 - The declared payload size bounds the scan so a stub icon cannot borrow an image
   from a following resource.
-- Packages without a usable VRE blob (e.g. `GravityDefied.vxp`) fall back to the
+- Packages without a usable VRE blob (e.g. `GravityDefied (1.0.0).vxp`) fall back to the
   `.vm_res` resource directory, ranked by name (`AppLogo.img`, `*applogo*`, etc.).

@@ -10,7 +10,7 @@ it quit. Changing the answer to `0` fixes the boot.
 
 ## What happened
 
-- Both `Opera mini 4.4.vxp` and `Opera Mini 4.4 leatest en.vxp` failed the same way.
+- Both `Opera Mini (4.4).vxp` and `Opera Mini (4.4.0).vxp` failed the same way.
 - `vm_exit_app` was call number 901 of 902 (the second VXP: 908).
 - The app never reached the UI.
 
@@ -79,9 +79,9 @@ Two related, pre-existing hardening edits shipped alongside it:
 
 | Check | Result |
 |---|---|
-| `Opera mini 4.4.vxp` | boots to the EULA welcome page; `vm_exit_app` calls **0** (was 1 at call 901); ~9.5-10.3k VM calls, 36+ `vm_graphic_flush_layer` |
-| `Opera Mini 4.4 leatest en.vxp` | same; screenshot byte-identical |
-| `Opera Mini 6.1.vxp` | unchanged - renders Top Sites (it never calls this API) |
+| `Opera Mini (4.4).vxp` | boots to the EULA welcome page; `vm_exit_app` calls **0** (was 1 at call 901); ~9.5-10.3k VM calls, 36+ `vm_graphic_flush_layer` |
+| `Opera Mini (4.4.0).vxp` | same; screenshot byte-identical |
+| `Opera Mini (6.1).vxp` | unchanged - renders Top Sites (it never calls this API) |
 | `test_mcp.py` / `test_mcp_window.py` | ALL CHECKS PASSED |
 | 19-app library sweep | no new failures; the two faults (`Messenger`, `Spider Man`) are pre-existing |
 | `Spider Man` (the only other caller of `vm_get_res_header`) | faulted at the same PC with both `0` and `8` - a pre-existing fault, not a regression |

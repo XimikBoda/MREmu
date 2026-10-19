@@ -78,9 +78,9 @@ the algorithm.
 |---|---|---|
 | Icon extracted | 16 | up from 5 in the native list |
 | Stub, no image | 2 | `Mrecp.vxp`, `Show_picture.vxp` |
-| Not a VXP container | 1 | `GravityDefied.vc.vxp` is a Windows DLL (`MZ`) |
+| Not a VXP container | 1 | `GravityDefied (1.0.0).vc.vxp` is a Windows DLL (`MZ`) |
 
-`GravityDefied.vxp` is the case that needs the `.vm_res` fallback: its `Applogo.img` is a
+`GravityDefied (1.0.0).vxp` is the case that needs the `.vm_res` fallback: its `Applogo.img` is a
 stub but it ships a real `logo.png`. Formats handled: GIF (8), PNG (8).
 
 ## Android list details

@@ -26,14 +26,14 @@ python tools/vxpdiff.py <a.vxp> <b.vxp> [--json]
 ## Example
 
 ```text
-python tools/vxpdiff.py "Opera Mini 4.4.vxp" "Opera Mini 6.1.vxp"
+python tools/vxpdiff.py "Opera Mini (4.4).vxp" "Opera Mini (6.1).vxp"
 ```
 
 Output (abridged):
 
 ```text
-A: Opera Mini 4.4.vxp
-B: Opera Mini 6.1.vxp
+A: Opera Mini (4.4).vxp
+B: Opera Mini (6.1).vxp
 Size: 637265 -> 2041317 (delta 1404052)
 Summary changes:
   app_name_source: 'VM_CE_INFO_NAME (0x04)' -> 'VM_CE_INFO_NAME_LIST (0x19) lang 1'

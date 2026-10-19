@@ -2,7 +2,7 @@
 
 ## The short version
 
-`The Amazing Spider-Man (Demo).vxp` (internal name `Spiderman4`) crashed almost immediately on boot at VM call 360 with:
+`Spiderman4.vxp` (internal name `Spiderman4`) crashed almost immediately on boot at VM call 360 with:
 `[Spiderman4] [error] uc_emu_start returned 6 (Invalid memory read (UC_ERR_READ_UNMAPPED)) at PC=0x1580`.
 
 The root cause was that `vm_resource_get_data` in [`MREmu/MREngine/Resources.cpp`](../../MREmu/MREngine/Resources.cpp) treated the caller-provided `offset` as an absolute file offset rather than taking `local_offsets` into account. In compressed ADS packages, `vm_res_offset` is non-zero and resource offsets read from the `mre-2.0` index table are relative to the start of the resource block. As a result, `vm_resource_get_data` copied raw compressed zlib code bytes into the sprite/data buffer instead of genuine resource payloads. The game's sprite parser subsequently computed invalid negative offsets and faulted.

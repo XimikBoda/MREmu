@@ -1,0 +1,16 @@
+Notes with facebook messenger
+App opens
+Login screen renders properly with text and images
+nothing else working
+login, exit, email, password not working
+not recieving keyboard input
+exit not working because not recieving keyboard input
+
+repeated warning:
+[Messenger] [warning] vm_get_sym_entry(vm_editor_get_active_editor) -> 00000000
+==========================REG=================================
+ R0=0x0007927C  R1=0x00000000    R2=0x00000000   R3=0x00000065  N:0
+ R4=0x0006ECA4  R5=0x0005F3F0    R6=0x00000000   R7=0x00000000  Z:0
+ R8=0x00000000  R9=0x0006C75C   R10=0x00000000  R11=0x00000000  C:1
+R12=0x00A20167  SP=0x00A20000    LR=0x00061E68   PC=0x00A2021C  V:0     Thumb:1
+==============================================================

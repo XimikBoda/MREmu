@@ -24,7 +24,7 @@ python tools/vxpresources.py <file.vxp> [--list] [--extract NAME] [--extract-all
 ## Example
 
 ```text
-python tools/vxpresources.py "Opera Mini 6.1.vxp"
+python tools/vxpresources.py "Opera Mini (6.1).vxp"
 ```
 
 Output:
@@ -39,7 +39,7 @@ Idx  Name                             Offset       Size  Type
 Extract all resources:
 
 ```text
-python tools/vxpresources.py "Opera Mini 6.1.vxp" --extract-all -o out/res
+python tools/vxpresources.py "Opera Mini (6.1).vxp" --extract-all -o out/res
 ```
 
 ## Notes

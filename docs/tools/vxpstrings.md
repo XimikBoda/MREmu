@@ -25,7 +25,7 @@ python tools/vxpstrings.py <file.vxp> [--min N] [--encoding {ascii,ucs2,all}] [-
 ## Example
 
 ```text
-python tools/vxpstrings.py "Opera Mini 6.1.vxp" --vm-res --encoding ucs2 --limit 5
+python tools/vxpstrings.py "Opera Mini (6.1).vxp" --vm-res --encoding ucs2 --limit 5
 ```
 
 Output:

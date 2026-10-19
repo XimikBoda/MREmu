@@ -236,13 +236,19 @@ def plan(folder):
         m = meta.get(keep, {})
         declared = m.get("app", "")
         skipped = ""
-        if is_mojibake(declared):
-            # Renaming to this would replace a readable English filename with
-            # unreadable Latin-1 soup. Keep the filename instead.
-            skipped = declared
+        # The original filename wins. Packages routinely declare an app_name
+        # that is just their own filename flattened - "Adam n Eve.vxp" arrives
+        # as "adameve", "Call Of Duty.vxp" as "callduty" - and renaming to
+        # that is strictly worse than what was already on disk. The metadata
+        # is only used when the filename is unusable, and as a hint when two
+        # surviving names collide.
+        if stem:
             base = stem
+        elif is_mojibake(declared):
+            skipped = declared
+            base = ""
         else:
-            base = declared or stem
+            base = declared
         entries.append({"hash": h, "keep": keep, "stem": stem, "meta": m,
                         "base": sanitize(base), "size": sizes[keep],
                         "skipped": skipped})
@@ -339,6 +345,19 @@ def main():
 
     qdir = os.path.join(args.dir, QUARANTINE)
     os.makedirs(qdir, exist_ok=True)
+
+    # Always record the mapping before touching anything. Renaming is
+    # otherwise irreversible: the original filename is not recoverable from
+    # the package, only from this file.
+    manifest = os.path.join(args.dir, "vxpclean-manifest.txt")
+    with open(manifest, "w", encoding="utf-8") as fh:
+        fh.write("# old name -> new name (and which copy won each hash group)\n")
+        for old, keep in sorted(moved):
+            fh.write("duplicate\t%s\t->\t%s\n" % (old, keep))
+        for e in sorted(entries, key=lambda x: x["final"].lower()):
+            fh.write("rename\t%s\t->\t%s\n" % (e["keep"], target(e)))
+    print("manifest: %s" % manifest)
+
     for old, _keep in sorted(moved):
         src = os.path.join(args.dir, old)
         dst = os.path.join(qdir, old)
