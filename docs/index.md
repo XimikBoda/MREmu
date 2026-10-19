@@ -51,6 +51,7 @@ For step-by-step compilation guides on supported host platforms, refer to the bu
 - Read [VXP & Binary Formats](vxp_format.md) to examine how VXP headers, tags, sections, and relocations are parsed.
 - Use the headless inspection mode described in [Desktop & Headless Tooling](desktop.md) (`--inspect --json out.json`) to quickly extract app tags and memory footprints.
 - Leverage the [MCP Server](mcp.md) to automate reverse engineering pipelines and capture dynamic API traces.
+- Use the Python helper tools documented in [docs/tools/](tools/vxpinfo.md): `vxpinfo`, `vxpicon`, `vxpstrings`, `vxpsections`, `vxpresources`, and `vxpdiff`.
 
 ### For Android & Frontend Developers
 
