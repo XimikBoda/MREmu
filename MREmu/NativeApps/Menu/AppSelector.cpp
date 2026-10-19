@@ -141,12 +141,11 @@ namespace NativeApps::Menu::AppSelector {
 
 	// --- Tile chrome --------------------------------------------------------
 
-	// Drop shadow: a dark squircle offset down and slightly right. Kept faint -
-	// the icons sit almost flat on the wallpaper, and a strong shadow smears
-	// into the gutter and makes the rows look ragged.
-	static constexpr int kShadowOffsetX = -1;
-	static constexpr int kShadowOffsetY = 1;
-	static constexpr int kShadowAlpha = 55;
+	// There is deliberately no drop shadow under the tiles. A dark squircle
+	// offset down and right reads as a rim rather than as depth at this size:
+	// the tile's own antialiased edge blends against whatever is underneath it,
+	// so a dark shape under a light tile doubles the fringe instead of
+	// softening it, and the icons came out looking outlined in grey.
 
 	// The "Switch to List View" tile gets a pale plate instead of app artwork,
 	// so that it does not read as another entry.
@@ -1423,9 +1422,6 @@ namespace NativeApps::Menu::AppSelector {
 	void draw_tile(int index, int x, int y) {
 		int size = tile;
 		int radius = std::max(kMinRadiusPx, size * kCornerRadiusPct / 100);
-
-		blend_rounded_rect(x + kShadowOffsetX, y + kShadowOffsetY, size, radius,
-			VM_COLOR_888_TO_565(0, 0, 0), kShadowAlpha);
 
 		if (index == m_i) {
 			blend_rounded_rect(x - kFocusRimPx, y - kFocusRimPx,

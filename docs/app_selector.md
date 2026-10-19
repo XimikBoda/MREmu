@@ -110,7 +110,6 @@ The ones worth reaching for:
 | `kFocusRimPx` | 2 | Thickness of the outline around the selected tile |
 | `kFocusAlpha` | 235 | How solid that outline is |
 | `kAccentR/G/B` | 126, 178, 242 | The outline's colour, shared with the title text |
-| `kShadowAlpha`, `kShadowOffsetX/Y` | 55, −1, +1 | The drop shadow under each tile |
 | `kMaxCellPx` | 64 | Ceiling on the cell pitch, so tiles stay tile-sized |
 | `kGridDim`, `kListDim` | 64, 70 | How far each layout pushes the wallpaper back |
 | `kPressR/G/B` | 232, 236, 243 | The block behind a held softkey |
@@ -122,6 +121,15 @@ the tile is sized from the **larger** of the two gaps and the smaller is
 absorbed by the centring. They are separate constants because row and column
 spacing are separate design decisions, but giving them different values has no
 effect until the cell pitch itself is made rectangular.
+
+### No drop shadow
+
+The tiles deliberately have nothing under them. A dark squircle offset down and
+right reads as a **rim** rather than as depth at this size: the tile's own edge is
+antialiased, so a partially covered pixel already blends toward whatever is
+underneath, and putting a dark shape under a light tile doubles that fringe
+instead of softening it. The icons came out looking outlined in grey. The
+selection ring is the only outline on a tile, and it is there to mean something.
 
 Changing any of this was verified to be pixel-identical at the defaults — see
 [Checking it](#checking-it).
