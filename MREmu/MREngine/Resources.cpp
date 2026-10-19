@@ -151,12 +151,14 @@ VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
 	if (data == 0)
 		return -1;
 
-	if(offset + size >= resources.file_context->size())
+	if (resources.local_offsets)
+		offset += resources.vm_res_offset;
+
+	if (offset + size > resources.file_context->size() || offset + size < offset)
 		return -1;
 
 	memcpy(data, resources.file_context->data() + offset, size);
 	return 0;
-	
 }
 
 VMUINT vm_get_resource_offset(char* res_name) {
