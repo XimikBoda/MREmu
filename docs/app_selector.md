@@ -31,6 +31,42 @@ Because that index has no `vxp` behind it, anything reading `vxps[m_i]` has to
 check `is_switch_item(m_i)` first — it is a control, not an app, so it has no
 icon, no details sheet and is not remembered as the last selection.
 
+## Loading
+
+`scan()` is synchronous and never yields — it walks the directory, reads every
+`.vxp` in full, runs the icon extractor over each one and decodes the list-sized
+icon. Nothing in that gives the host a chance to present a frame, so until it
+finishes the window still shows whatever was last flushed, which on a cold start
+is nothing at all. A slow folder is therefore indistinguishable from a hang.
+
+So `scan()` presents a **"Loading..."** centred on both axes, over the same
+wallpaper the layout will use.
+
+The frame does not need an event to be drawn: the app runs on `AppManager`'s
+loop thread while the window is presented from the main one, and
+`update_screen()` is unthrottled, so the presenting thread picks it up on its
+next pass. The flush's own ~33 ms sleep is what gives it the window to do that
+in.
+
+**But nothing waits for that pass to happen.** On a scan fast enough to finish
+inside the presenting loop's own cadence, the next flush overwrites the frame
+unseen — which is the right outcome, since there was no wait worth explaining,
+but it does mean the frame is only visible when the scan genuinely *is* slow.
+
+That is also why **`--mcp-window` cannot show it at all**: the launch is queued
+at `MREmu.cpp` before `run_mcp_window` creates the window, so the entire load
+happens with nothing presenting. Verify this one in the normal window.
+
+**It is not shown unconditionally.** Over a warm folder `scan()` measures about
+15 ms — nineteen packages, 6.9 MB, page cache warm — and there a loading frame is
+just a flicker that explains nothing. It appears when the *previous* scan was
+slow, above `kLoadingThresholdMs`, which is what the case it exists for looks
+like: a cold cache, a slow device, a large folder. The first scan of a session
+always shows it, since `last_scan_ms` starts at -1 and a cold start is precisely
+the moment the screen would otherwise be blank. Changing directory clears the
+measurement too, because a different folder is a different cost and the old one
+predicts nothing.
+
 ## Remembering the layout
 
 The emulator exposes no settings store to VXP apps, and `DragAndDrop`'s

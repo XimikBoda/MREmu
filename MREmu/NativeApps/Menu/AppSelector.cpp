@@ -18,6 +18,8 @@
 #include <vmtimer.h>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+#include <thread>
 
 VMWSTR vm_ucs2_string(VMSTR s);
 extern AppManager* g_appManager;
@@ -617,7 +619,78 @@ namespace NativeApps::Menu::AppSelector {
 		marquee_timer_id = vm_create_timer(35, timer_cb);
 	}
 
+	// Milliseconds scan() has to take before "Loading..." is worth the flash it
+	// costs. Below this the frame is presented and replaced inside a blink, which
+	// reads as a glitch rather than as progress.
+	static constexpr int kLoadingThresholdMs = 120;
+
+	// How long the previous scan() took, or -1 before there has been one.
+	//
+	// This is what makes the loading frame adaptive. scan() over a warm folder is
+	// fast enough to finish in 0ms - sixteen packages, a warm page cache - and on
+	// that folder an unconditional frame is just a flicker that explains nothing.
+	// A cold cache, a slow device or a large folder is the case the frame exists
+	// for, and those are exactly the ones where the *previous* scan was slow too,
+	// so the last measurement predicts the next.
+	//
+	// -1 means nothing has been measured yet, which is the cold start: that one
+	// always shows, because it is the case where the screen would otherwise sit on
+	// whatever was last presented and nothing at all.
+	int last_scan_ms = -1;
+
+	// Records how long the scan it is constructed in took.
+	struct ScanTimer {
+		std::chrono::steady_clock::time_point start;
+		explicit ScanTimer(std::chrono::steady_clock::time_point s) : start(s) {}
+		~ScanTimer() {
+			last_scan_ms = (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now() - start).count();
+		}
+	};
+
+	// "Loading..." centred on both axes, presented while scan() reads a folder.
+	//
+	// scan() is synchronous and never yields: it walks the directory, reads every
+	// .vxp in full, runs the icon extractor over each one and decodes the
+	// list-sized icon. None of that gives the host a chance to present anything,
+	// so until it finishes the window is still showing whatever was last flushed -
+	// on a cold start, nothing at all. A slow folder is therefore indistinguishable
+	// from a hang.
+	//
+	// The flush at the end is what makes it eligible to appear at all. The app runs
+	// on AppManager's loop thread while the window is presented from the main one,
+	// so the frame does not need an event to be drawn - the presenting thread picks
+	// it up on its next pass over update_screen(), which is unthrottled.
+	//
+	// "Eligible" is the honest word. Nothing waits for that pass to happen, so on
+	// a scan fast enough to finish inside the presenting loop's own cadence the
+	// next flush overwrites it unseen. That is the right outcome - there was no
+	// wait worth explaining - but it does mean the frame is only ever visible when
+	// the scan genuinely is slow.
+	void draw_loading() {
+		const std::vector<uint16_t>& bg =
+			view == View::Grid ? wallpaper : wallpaper_list;
+		if (bg.size() == (size_t)w * h)
+			memcpy(layer_buf, bg.data(), (size_t)w * h * 2);
+		else
+			vm_graphic_fill_rect(layer_buf, 0, 0, w, h, 0x0000, 0x0000);
+
+		static const std::u16string text = u"Loading...";
+		int tw = vm_graphic_get_string_width((VMWSTR)text.c_str());
+		vm_graphic_textout(layer_buf, (w - tw) / 2, (h - c_h) / 2,
+			(VMWSTR)text.c_str(), 100, 0xFFFF);
+
+		vm_graphic_flush_layer(&layer_h, 1);
+	}
+
 	void scan() {
+		// Not unconditional - see show_loading_again.
+		if (last_scan_ms < 0 || last_scan_ms >= kLoadingThresholdMs)
+			draw_loading();
+
+		auto scan_start = std::chrono::steady_clock::now();
+		ScanTimer timer(scan_start);
+
 		for (auto& v : vxps) {
 			if (v.img)
 				vm_graphic_release_canvas_FIX(v.img);
@@ -858,6 +931,11 @@ namespace NativeApps::Menu::AppSelector {
 		current_dir = dir;
 		m_i = 0;
 		set_scroll_pos(0);
+		// A different folder is a different cost, so the last measurement says
+		// nothing about this scan. Clearing it makes scan() show the loading
+		// frame rather than guess from a folder with a different number of
+		// packages in it.
+		last_scan_ms = -1;
 		scan();
 		reset_marquee();
 		trigger_scrollbar();
