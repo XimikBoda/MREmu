@@ -9,9 +9,9 @@ not edit by hand; run the script instead.
 | APIs declared by the SDK | 893 |
 | Resolved by `vm_get_sym_entry` | 281 |
 | **Unimplemented** (guest gets NULL) | **628** |
-| Registered but doing nothing | 32 |
+| Registered but doing nothing | 29 |
 | Registered but partial (hand-maintained) | 13 |
-| Implemented | 233 |
+| Implemented | 236 |
 
 ## What a missing API does to an app
 
@@ -450,7 +450,7 @@ and proceeds as though the call worked.
 
 | API | Kind | Returns | Implementation | Note |
 | --- | --- | --- | --- | --- |
-| `vm_appmgr_is_installed` | fixed answer | `0` | `MREmu/MREngine/System.cpp:187` | Always false, so an app probing for a sibling MRE app concludes nothing is installed. |
+| `vm_appmgr_is_installed` | fixed answer | `0` | `MREmu/MREngine/System.cpp:186` | Always false, so an app probing for a sibling MRE app concludes nothing is installed. |
 | `vm_audio_resume_bg_play` | no behaviour | `nothing` | `MREmu/MREngine/Audio.cpp:254` | Empty body. Counterpart to the suspend stub. |
 | `vm_audio_suspend_bg_play` | no behaviour | `nothing` | `MREmu/MREngine/Audio.cpp:256` | Empty body. Background audio state is not tracked, so an app cannot be suspended this way. |
 | `vm_font_set_font_size` | fixed answer | `VM_GDI_SUCCEED` | `MREmu/MREngine/Textout.cpp:230` | Reports success and does nothing - there is only one bitmap face. |
@@ -458,7 +458,7 @@ and proceeds as though the call worked.
 | `vm_get_cache_free_space` | fixed answer | `16 * 1024 * 1024` | `MREmu/Bridge.cpp:43` | Fixed 16 MiB. |
 | `vm_get_language` | fixed answer | `ENGLISH` | `MREmu/MREngine/CharSet.cpp:79` | Always English. Fine for the shipping apps. |
 | `vm_get_operator` | fixed answer | `UNKOWN_OPERATOR` | `MREmu/MREngine/SIM.cpp:17` | Returns a fixed unknown-operator string. |
-| `vm_get_sys_scene` | fixed answer | `0` | `MREmu/MREngine/System.cpp:81` | Always 0; there is no scene stack. |
+| `vm_get_sys_scene` | fixed answer | `0` | `MREmu/MREngine/System.cpp:80` | Always 0; there is no scene stack. |
 | `vm_graphic_get_bits_per_pixel` | fixed answer | `2` | `MREmu/MREngine/Graphic.cpp:395` | 16bpp, which matches the real canvas. |
 | `vm_graphic_get_character_height` | fixed answer | `16` | `MREmu/MREngine/Textout.cpp:75` | Fixed 16px cell for the unifont face. |
 | `vm_graphic_is_r2l_state` | fixed answer | `0` | `MREmu/MREngine/Graphic.cpp:962` | Always false; no right-to-left layout. |
@@ -476,11 +476,8 @@ and proceeds as though the call worked.
 | `vm_sim_max_card_count` | fixed answer | `1` | `MREmu/MREngine/SIM.cpp:59` | One fake SIM. |
 | `vm_srv_sensor_is_available` | fixed answer | `0` | `MREmu/MREngine/Sensor.cpp:3` | Reports no sensors. |
 | `vm_start_app_with_para` | no behaviour | `nothing` | `MREmu/MREngine/ProgramManager.cpp:35` | Empty body, unlike `vm_start_app`, which really launches. An app cannot pass a start parameter to the next app. |
-| `vm_switch_power_saving_mode` | fixed answer | `0` | `MREmu/MREngine/System.cpp:183` | Always returns 0 and changes no state; power saving is not modelled. |
+| `vm_switch_power_saving_mode` | fixed answer | `0` | `MREmu/MREngine/System.cpp:182` | Always returns 0 and changes no state; power saving is not modelled. |
 | `vm_sys_file_get_space` | fixed answer | `128 * 1024 * 1024` | `MREmu/MREngine/IO.cpp:816` | Fixed 128 MiB. |
-| `vm_vibrator_off` | no behaviour | `nothing` | `MREmu/MREngine/System.cpp:214` |  |
-| `vm_vibrator_on` | no behaviour | `nothing` | `MREmu/MREngine/System.cpp:210` |  |
-| `vm_vibrator_once` | no behaviour | `nothing` | `MREmu/MREngine/System.cpp:206` |  |
 | `vm_wifi_is_connected` | fixed answer | `1` | `MREmu/MREngine/Sock.cpp:309` | Claims a connection; the socket layer is real regardless. |
 
 Two kinds, and they are not equally serious. **No behaviour** is an
@@ -502,9 +499,6 @@ The unambiguous stubs - empty bodies, no behaviour at all:
 - `vm_input_set_vk_default_enlarge` (MREmu/Bridge.cpp:1739) - Empty bridge lambda.
 - `vm_set_app_desired_input_mode` (MREmu/Bridge.cpp:1731) - Empty bridge lambda.
 - `vm_start_app_with_para` (MREmu/MREngine/ProgramManager.cpp:35) - does nothing and reports nothing
-- `vm_vibrator_off` (MREmu/MREngine/System.cpp:214) - does nothing and reports nothing
-- `vm_vibrator_on` (MREmu/MREngine/System.cpp:210) - does nothing and reports nothing
-- `vm_vibrator_once` (MREmu/MREngine/System.cpp:206) - does nothing and reports nothing
 
 ## Registered but partial
 
@@ -515,9 +509,9 @@ not a proof.
 
 | API | Implementation | What is missing |
 | --- | --- | --- |
-| `vm_open_wap_url` | `MREmu/MREngine/System.cpp:196` | Logs the request and returns 0 - which is `VM_OPEN_WAP_URL_SUCCESS`. It reports the browser opened the URL when nothing was opened at all. |
-| `vm_get_sys_property` | `MREmu/MREngine/System.cpp:162` | Handles 2 of the 9 `MRE_SYS_*` keys (`MRE_SYS_EQUIPMENT_ID`, `MRE_SYS_HOST_MAX_MEM`). The rest, including `MRE_SYS_SUBSCRIBER_ID`, yield an empty string and a written length of 0, which is a valid answer rather than an error. |
-| `vm_appmgr_get_installed_list` | `MREmu/MREngine/System.cpp:191` | Reports 0, which the SDK defines as success, with the count zeroed - so an app is told 'no apps installed' rather than 'query failed'. |
+| `vm_open_wap_url` | `MREmu/MREngine/System.cpp:195` | Logs the request and returns 0 - which is `VM_OPEN_WAP_URL_SUCCESS`. It reports the browser opened the URL when nothing was opened at all. |
+| `vm_get_sys_property` | `MREmu/MREngine/System.cpp:161` | Handles 2 of the 9 `MRE_SYS_*` keys (`MRE_SYS_EQUIPMENT_ID`, `MRE_SYS_HOST_MAX_MEM`). The rest, including `MRE_SYS_SUBSCRIBER_ID`, yield an empty string and a written length of 0, which is a valid answer rather than an error. |
+| `vm_appmgr_get_installed_list` | `MREmu/MREngine/System.cpp:190` | Reports 0, which the SDK defines as success, with the count zeroed - so an app is told 'no apps installed' rather than 'query failed'. |
 | `vm_file_set_attributes` | `MREmu/MREngine/IO.cpp:471` | Resolves the path and then ignores it, always reporting failure. Read attributes work; writes do not. |
 | `vm_post_msg` | `MREmu/MREngine/ProgramManager.cpp:24` | Always returns 1. The SDK defines 1 as queued and 0 as queue-full, so the queue can never be reported full. |
 | `vm_start_app_with_para` | `MREmu/MREngine/ProgramManager.cpp:35` | Empty body, unlike `vm_start_app`, which really launches. An app cannot pass a start parameter to the next app. |
