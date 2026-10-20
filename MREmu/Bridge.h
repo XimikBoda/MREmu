@@ -29,7 +29,7 @@ namespace Bridge {
 			int n = sizeof...(args);
 
 			if constexpr (from_hook) Cpu::push_cpu();
-			auto raw_ret = Bridge::run_cpu(FUNC_TO_UINT32(func), n, prepare_emu_arg(args)...);
+			auto raw_ret = Bridge::run_cpu(ADDRESS_TO_EMU((void*)func), n, prepare_emu_arg(args)...);
 			if constexpr (from_hook) Cpu::pop_cpu();
 
 			if constexpr (std::is_void_v<RetType>)

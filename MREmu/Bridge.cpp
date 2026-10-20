@@ -146,7 +146,7 @@ namespace Bridge {
 			vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
 		}},
 		{FUNCN(vm_reg_sysevt_callback), [](uc_engine* uc) {
-			vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))read_arg(uc, 0));
+			vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))ADDRESS_FROM_EMU(read_arg(uc, 0)));
 		}},
 		{FUNCN(vm_get_mre_total_mem_size), [](uc_engine* uc) {
 			write_ret(uc, vm_get_mre_total_mem_size());
@@ -207,7 +207,7 @@ namespace Bridge {
 			write_ret(uc, vm_pmng_get_current_handle());
 		}},
 		{FUNCN(vm_reg_msg_proc), [](uc_engine* uc) {
-			vm_reg_msg_proc((VM_MESSAGE_PROC)read_arg(uc, 0));
+			vm_reg_msg_proc((VM_MESSAGE_PROC)ADDRESS_FROM_EMU(read_arg(uc, 0)));
 		}},
 		{FUNCN(vm_post_msg), [](uc_engine* uc) {
 			write_ret(uc,
@@ -242,14 +242,14 @@ namespace Bridge {
 		// Timer
 		{FUNCN(vm_create_timer), [](uc_engine* uc) {
 			write_ret(uc, vm_create_timer(read_arg(uc, 0),
-				(VM_TIMERPROC_T)read_arg(uc, 1)));
+				(VM_TIMERPROC_T)ADDRESS_FROM_EMU(read_arg(uc, 1))));
 		}},
 		{FUNCN(vm_delete_timer), [](uc_engine* uc) {
 			write_ret(uc, vm_delete_timer(read_arg(uc, 0)));
 		}},
 		{FUNCN(vm_create_timer_ex), [](uc_engine* uc) {
 			write_ret(uc, vm_create_timer_ex(read_arg(uc, 0),
-				(VM_TIMERPROC_T)read_arg(uc, 1)));
+				(VM_TIMERPROC_T)ADDRESS_FROM_EMU(read_arg(uc, 1))));
 		}},
 		{FUNCN(vm_delete_timer_ex), [](uc_engine* uc) {
 			write_ret(uc, vm_delete_timer_ex(read_arg(uc, 0)));
@@ -260,11 +260,11 @@ namespace Bridge {
 		// IO
 		{FUNCN(vm_reg_keyboard_callback), [](uc_engine* uc) {
 			vm_reg_keyboard_callback(
-				(vm_key_handler_t)read_arg(uc, 0));
+				(vm_key_handler_t)ADDRESS_FROM_EMU(read_arg(uc, 0)));
 		}},
 		{FUNCN(vm_reg_pen_callback), [](uc_engine* uc) {
 			vm_reg_pen_callback(
-				(vm_pen_handler_t)read_arg(uc, 0));
+				(vm_pen_handler_t)ADDRESS_FROM_EMU(read_arg(uc, 0)));
 		}},
 		{FUNCN(vm_file_open), [](uc_engine* uc) {
 			write_ret(uc, vm_file_open(
@@ -1077,7 +1077,7 @@ namespace Bridge {
 		}},
 		{FUNCN(vm_reg_res_provider), [](uc_engine* uc) {
 			vm_reg_res_provider(
-				(res_provider_t)read_arg(uc, 0)
+				(res_provider_t)ADDRESS_FROM_EMU(read_arg(uc, 0))
 			);
 		}},
 
@@ -1225,25 +1225,25 @@ namespace Bridge {
 					read_arg(uc, 2),
 					read_arg(uc, 3),
 					read_arg(uc, 4),
-					(void(*)(VMINT))read_arg(uc, 5)
+					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 5))
 				));
 		}},
 		{FUNCN(vm_audio_pause), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_audio_pause(
-					(void(*)(VMINT))read_arg(uc, 0)
+					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 0))
 				));
 		}},
 		{FUNCN(vm_audio_resume), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_audio_resume(
-					(void(*)(VMINT))read_arg(uc, 0)
+					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 0))
 				));
 		}},
 		{FUNCN(vm_audio_stop), [](uc_engine* uc) {
 			write_ret(uc,
 				vm_audio_stop(
-					(void(*)(VMINT))read_arg(uc, 0)
+					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 0))
 				));
 		}},
 		{FUNCN(vm_set_volume), [](uc_engine* uc) {
@@ -1258,7 +1258,7 @@ namespace Bridge {
 				vm_midi_play(
 					read_arg(uc, 0),
 					read_arg(uc, 1),
-					(void(*)(VMINT, VMINT))read_arg(uc, 2)
+					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 2))
 				));
 		}},
 		{FUNCN(vm_midi_play_ex), [](uc_engine* uc) {
@@ -1268,7 +1268,7 @@ namespace Bridge {
 					read_arg(uc, 1),
 					read_arg(uc, 2),
 					read_arg(uc, 3),
-					(void(*)(VMINT, VMINT))read_arg(uc, 4)
+					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 4))
 				));
 		}},
 		{FUNCN(vm_midi_play_by_bytes), [](uc_engine* uc) {
@@ -1277,7 +1277,7 @@ namespace Bridge {
 					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					read_arg(uc, 1),
 					read_arg(uc, 2),
-					(void(*)(VMINT, VMINT))read_arg(uc, 3)
+					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 3))
 				));
 		}},
 		{FUNCN(vm_midi_play_by_bytes_ex), [](uc_engine* uc) {
@@ -1288,7 +1288,7 @@ namespace Bridge {
 					read_arg(uc, 2),
 					read_arg(uc, 3),
 					read_arg(uc, 4),
-					(void(*)(VMINT, VMINT))read_arg(uc, 5)
+					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 5))
 				));
 		}},
 		{FUNCN(vm_midi_pause), [](uc_engine* uc) {
@@ -1323,7 +1323,7 @@ namespace Bridge {
 				vm_bitstream_audio_open(
 					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					(vm_bitstream_audio_cfg_struct*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(vm_bitstream_audio_result_callback)read_arg(uc, 2)
+					(vm_bitstream_audio_result_callback)ADDRESS_FROM_EMU(read_arg(uc, 2))
 				));
 		}},
 		{FUNCN(vm_bitstream_audio_open_pcm), [](uc_engine* uc) {
@@ -1331,7 +1331,7 @@ namespace Bridge {
 				vm_bitstream_audio_open_pcm(
 					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					(vm_bitstream_pcm_audio_cfg_struct*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(vm_bitstream_audio_result_callback)read_arg(uc, 2)
+					(vm_bitstream_audio_result_callback)ADDRESS_FROM_EMU(read_arg(uc, 2))
 				));
 		}},
 		{FUNCN(vm_bitstream_audio_finished), [](uc_engine* uc) {
@@ -1433,7 +1433,7 @@ namespace Bridge {
 					read_arg(uc, 0),
 					(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 					(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					(VMINT(*)(vm_soc_dns_result*))read_arg(uc, 3)
+					(VMINT(*)(vm_soc_dns_result*))ADDRESS_FROM_EMU(read_arg(uc, 3))
 				));
 		}},
 		{FUNCN(vm_tcp_connect), [](uc_engine* uc) {
@@ -1442,7 +1442,7 @@ namespace Bridge {
 					(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					read_arg(uc, 1),
 					read_arg(uc, 2),
-					(void (*)(VMINT, VMINT))read_arg(uc, 3)
+					(void (*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 3))
 				));
 		}},
 		{FUNCN(vm_tcp_close), [](uc_engine* uc) {
@@ -1469,7 +1469,7 @@ namespace Bridge {
 				vm_udp_create(
 					read_arg(uc, 0),
 					read_arg(uc, 1),
-					(void (*)(VMINT, VMINT))read_arg(uc, 2),
+					(void (*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 2)),
 					read_arg(uc, 3)
 				));
 		}},
