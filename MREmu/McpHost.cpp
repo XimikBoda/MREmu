@@ -482,6 +482,7 @@ static void drain_step_budget() {
 
 void tick(bool running) {
 	if (!g_ctl) return;
+	if (g_keyboard) g_keyboard->update();
 
 	// Drain any fault the emulator raised. run_cpu() reports uc_emu_start failures
 	// through trigger_hard_reset_with_error, which in the GUI becomes a modal; with

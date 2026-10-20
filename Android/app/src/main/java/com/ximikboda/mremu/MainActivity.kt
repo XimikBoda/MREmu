@@ -1469,10 +1469,8 @@ private enum class OptionsPage(val title: String) {
      * other. A linear resonant actuator is crisp and resolves a 10-20 ms tick perfectly. An
      * eccentric rotating mass motor - the coin motor still fitted to a lot of budget Android
      * phones - needs roughly 15-30 ms just to spin the mass past the perceptible threshold,
-     * so a 40 ms one-shot arrives barely started and reads as almost nothing. Retriggered
-     * faster than that, which is exactly what the app selector's key auto-repeat does once it
-     * accelerates to 50 ms, the mass is cancelled mid spin-up over and over and the result
-     * is a stutter rather than a buzz.
+     * so a 40 ms one-shot arrives barely started and reads as almost nothing. With the key
+     * auto-repeat firing steadily at 120 ms, the mass has time to spin up and settle.
      *
      * No public API reports motor type. The predefined effects are the way out of that:
      * each OEM tunes them against the hardware in the handset, so asking for EFFECT_TICK

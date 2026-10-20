@@ -291,9 +291,11 @@ namespace NativeApps::Menu::AppSelector {
 	int blit_clip_top = 0;
 	int blit_clip_bottom = 0;
 
-	// Selectable items: every entry plus the trailing switch item.
-	int count() { return (int)vxps.size() + 1; }
-	bool is_switch_item(int i) { return i == (int)vxps.size(); }
+	bool is_root() { return current_dir == u"e:\\mre\\" || current_dir == u"e:\\mre"; }
+
+	// Selectable items: every entry plus the trailing switch item (root directory only).
+	int count() { return (int)vxps.size() + (is_root() ? 1 : 0); }
+	bool is_switch_item(int i) { return is_root() && i == (int)vxps.size(); }
 
 	// Row pitch and visible area, per layout. The scroll code talks only about
 	// these so it does not have to care which layout is up.
@@ -1924,16 +1926,14 @@ namespace NativeApps::Menu::AppSelector {
 
 		int old_m_i = m_i;
 
-		// Directional keys must act on auto-repeat as well as on release, or
-		// holding a D-pad key moves the selection exactly once and the repeat
-		// events the frontend now sends are thrown away.
+		// Directional keys act immediately on press (VM_KEY_EVENT_DOWN) and continue
+		// scrolling on auto-repeat (VM_KEY_EVENT_REPEAT).
 		//
-		// Everything else stays on release only. A held OK would otherwise
-		// launch an app over and over as the repeat accelerates, and the
-		// softkeys and the T9 number row are one-shot actions whose "pressed"
-		// highlight is drawn from the release handler anyway.
-		const bool release = (event == VM_KEY_EVENT_UP);
-		if (release || event == VM_KEY_EVENT_REPEAT) {
+		// Actions like launch (OK), softkeys, and T9 jumps activate on release (VM_KEY_EVENT_UP).
+		const bool is_dir_action = (event == VM_KEY_EVENT_DOWN || event == VM_KEY_EVENT_REPEAT);
+		const bool is_release_action = (event == VM_KEY_EVENT_UP);
+
+		if (is_dir_action) {
 			trigger_scrollbar();
 			switch (keycode) {
 			case VM_KEY_UP:
@@ -1951,26 +1951,23 @@ namespace NativeApps::Menu::AppSelector {
 					if (++m_i >= count())
 						m_i = 0;
 				}
-				// Left and right do nothing in the list, which is the behaviour
-				// this menu always had.
 				break;
+			}
+		}
+
+		if (is_release_action) {
+			switch (keycode) {
 			case VM_KEY_LEFT_SOFTKEY:
-				if (!release)
-					break;
 				// Reads as "Options" on the grid's softkey bar.
 				open_details_for_selection();
 				draw();
 				return;
 			case VM_KEY_RIGHT_SOFTKEY:
-				if (!release)
-					break;
 				// Reads as "Back" on the grid's softkey bar.
 				do_back();
 				draw();
 				return;
 			case VM_KEY_OK:
-				if (!release)
-					break;
 				// Reads as "Choose" on the grid's softkey bar.
 				activate(m_i);
 				draw();
@@ -1985,8 +1982,6 @@ namespace NativeApps::Menu::AppSelector {
 			case VM_KEY_NUM8:
 			case VM_KEY_NUM9:
 			case VM_KEY_NUM0:
-				if (!release)
-					break;
 				jump_by_letter(keycode);
 				break;
 			}

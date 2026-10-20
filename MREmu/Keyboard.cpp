@@ -15,20 +15,10 @@ KeyboardControl::pkey_t::pkey_t(int key_code, key_source source) {
 
 void KeyboardControl::update() {
 	for (int i = 0; i < pkey.size(); ++i) {
-		int threshold = pkey[i].repeat_started ? pkey[i].repeat_delay_ms : 500;
+		int threshold = pkey[i].repeat_started ? pkey_t::REPEAT_INTERVAL_MS : pkey_t::INITIAL_REPEAT_DELAY_MS;
 		if (pkey[i].tim.getElapsedTime().asMilliseconds() >= threshold) {
 			pkey[i].tim.restart();
-			if (!pkey[i].repeat_started) {
-				// First repeat after the initial 500 ms hold.
-				pkey[i].repeat_started = true;
-				pkey[i].repeat_delay_ms = 300;
-			}
-			else {
-				// Accelerate: shorten the delay for the next repeat.
-				pkey[i].repeat_delay_ms = std::max(
-					pkey_t::REPEAT_DELAY_MIN,
-					pkey[i].repeat_delay_ms - pkey_t::REPEAT_DELAY_STEP);
-			}
+			pkey[i].repeat_started = true;
 			add_keyboard_event(VM_KEY_EVENT_REPEAT, pkey[i].key_code);
 		}
 	}

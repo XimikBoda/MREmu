@@ -594,6 +594,7 @@ static void run_mcp_window(MREngine::Graphic& graphic, Keyboard& keyboard, Touch
 	sf::RenderWindow win(sf::VideoMode(graphic.width, graphic.height + 208),
 		"MREmu (MCP)");
 	win.setVerticalSyncEnabled(true);
+	win.setKeyRepeatEnabled(false);
 
 	// Touch and the keyboard widget both map window coordinates back onto the
 	// sprite, so they need the very sprite being drawn. Scale stays 1 here, which
@@ -849,9 +850,11 @@ int main(int argc, char** argv) {
 	ImGui::SFML::Init(win_debug);
 	win_debug.setVerticalSyncEnabled(true);
 	win_device.setVerticalSyncEnabled(true);
+	win_device.setKeyRepeatEnabled(false);
 #else
 	sf::RenderWindow win_device(sf::VideoMode::getDesktopMode(), "MREmu");
 	win_device.setVerticalSyncEnabled(true);
+	win_device.setKeyRepeatEnabled(false);
 
 	while (win_device.isOpen()) {
 		sf::Event event;
