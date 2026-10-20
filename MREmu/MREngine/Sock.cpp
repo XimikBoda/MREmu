@@ -3,8 +3,8 @@
 #include <cstring>
 //#include "../Cpu.h"
 #include "Sock.h"
+#include <asio.hpp>
 
-#include "../App.h"
 #include "../AppManager.h"
 
 MREngine::NetworkManager* g_networkManager = 0;

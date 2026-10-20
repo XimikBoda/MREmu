@@ -1,9 +1,10 @@
 #pragma once
 #include "ItemsMng.h"
-#include <SFML/Network/TcpSocket.hpp>
-#include <memory>
 #include <vmsys.h>
-#include <asio.hpp>
+#include <memory>
+#include <thread>
+#include <asio/ip/tcp.hpp>
+#include <asio/ip/udp.hpp>
 
 class App;
 

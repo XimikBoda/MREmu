@@ -2,6 +2,7 @@
 #include "../Bridge.h"
 #include "../Memory.h"
 #include <vmtimer.h>
+#include <SFML/System/Clock.hpp>
 
 #include "../App.h"
 

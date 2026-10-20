@@ -13,7 +13,6 @@
 #include "Cpu.h"
 #include "GDB.h"
 #include "Bridge.h"
-#include "App.h"
 #include "AppManager.h"
 #include "Log.h"
 
