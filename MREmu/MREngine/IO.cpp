@@ -10,8 +10,11 @@
 #include <regex>
 #include <codecvt>
 #include <filesystem>
+
+#ifdef DEBUG_WINDOW
 #include <imgui.h>
 #include <imgui-SFML.h>
+#endif
 
 using namespace std::string_literals;
 

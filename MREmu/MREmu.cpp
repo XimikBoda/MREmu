@@ -1,8 +1,10 @@
 #include <iostream>
 #include <thread>
 
+#ifdef DEBUG_WINDOW
 #include "imgui.h"
 #include "imgui-SFML.h"
+#endif
 
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
@@ -108,15 +110,8 @@ int main(int argc, char** argv) {
 	MREngine::Graphic graphic;
 	MREngine::NetworkManager nm;
 
-#ifndef ANDROID
-	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
-	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
-	ImGui::SFML::Init(win_debug);
-	win_debug.setFramerateLimit(60);
-	win_device.setFramerateLimit(60);
-	//win_debug.setVerticalSyncEnabled(true);
-#else
-	sf::RenderWindow win_device(sf::VideoMode::getDesktopMode(), "MREmu");
+#ifdef ANDROID
+	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu");
 	win_device.setFramerateLimit(60);
 
 	while (win_device.isOpen()) {
@@ -138,6 +133,16 @@ int main(int argc, char** argv) {
 
 		win_device.display();
 	}
+#else // Not ANDROID
+
+#ifdef DEBUG_WINDOW
+	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
+	win_debug.setFramerateLimit(60);
+	ImGui::SFML::Init(win_debug);
+#endif
+
+	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
+	win_device.setFramerateLimit(60);
 #endif
 
 	MREngine::IO::init();
@@ -166,11 +171,11 @@ int main(int argc, char** argv) {
 	sf::Event event;
 
 	while (win_device.isOpen()
-#ifndef ANDROID
+#ifdef DEBUG_WINDOW
         && win_debug.isOpen()
 #endif
     ) {
-#ifndef ANDROID
+#ifdef DEBUG_WINDOW
 		while (win_debug.pollEvent(event)) {
 			ImGui::SFML::ProcessEvent(event);
 			switch (event.type) {
@@ -186,7 +191,7 @@ int main(int argc, char** argv) {
 #endif
 		device.process_events();
 		
-#ifndef ANDROID
+#ifdef DEBUG_WINDOW
 		ImGui::SFML::Update(win_debug, deltaClock.restart());
 
 		if (show_error) {
@@ -206,7 +211,7 @@ int main(int argc, char** argv) {
 
 		device.draw();
 
-#ifndef ANDROID
+#ifdef DEBUG_WINDOW
 		if (ImGui::Begin("Fps")) {
 			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
 		}
@@ -250,7 +255,7 @@ int main(int argc, char** argv) {
 
 	appManager.stop();
 
-#ifndef ANDROID
+#ifdef DEBUG_WINDOW
 	ImGui::SFML::Shutdown();
 #endif
 	return 0;

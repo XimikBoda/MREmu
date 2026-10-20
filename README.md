@@ -12,7 +12,9 @@ For platform-specific dependencies and build instructions, see:
 ## Credits for Dependencies
 - [QEMU](https://github.com/qemu/qemu)
 - [Unicorn](https://github.com/unicorn-engine/unicorn)
+- [unicorn.js](https://github.com/AlexAltea/unicorn.js)
 - [SFML](https://github.com/SFML/SFML)
+- [SFML (Emscripten port)](https://github.com/Zombieschannel/SFML)
 - [Dear ImGui](https://github.com/ocornut/imgui)
 - [ImGui-SFML](https://github.com/SFML/imgui-sfml)
 - [Capstone](https://github.com/capstone-engine/capstone)

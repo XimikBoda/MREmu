@@ -1,12 +1,15 @@
 #include "Graphic.h"
 #include "Canvas.h"
 #include "../Memory.h"
-#include <imgui.h>
-#include <imgui-SFML.h>
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 #include <vmpromng.h>
 #include <format>
+
+#ifdef DEBUG_WINDOW
+#include <imgui.h>
+#include <imgui-SFML.h>
+#endif
 
 MREngine::Graphic* graphic = 0; // Do I really need this?
 
@@ -169,6 +172,7 @@ void MREngine::Graphic::update_screen() {
 	}
 }
 
+#ifdef DEBUG_WINDOW
 void MREngine::Graphic::imgui_screen() {
 	if (ImGui::Begin("Screen")) {
 		ImGui::Image(screen_tex);
@@ -177,6 +181,7 @@ void MREngine::Graphic::imgui_screen() {
 	}
 	ImGui::End();
 }
+#endif
 
 std::string get_screenshots_path();
 
@@ -282,6 +287,7 @@ void* MREngine::AppGraphic::get_layer_buf(int handle) {
 	return layers[handle].buf;
 }
 
+#ifdef DEBUG_WINDOW
 void MREngine::AppGraphic::imgui_layers() {
 	if (ImGui::Begin("Layers")) {
 		for (int i = 0; i < layers.size(); ++i) {
@@ -296,6 +302,7 @@ void MREngine::AppGraphic::imgui_layers() {
 	}
 	ImGui::End();
 }
+#endif
 
 //MRE API
 

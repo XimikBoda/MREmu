@@ -4,8 +4,10 @@
 #include <vector>
 #include <SFML/Graphics.hpp>
 
-#include "imgui.h"
-#include "imgui-SFML.h"
+#ifdef DEBUG_WINDOW
+#include <imgui.h>
+#include <imgui-SFML.h>
+#endif
 
 Keyboard::Keyboard(KeyboardControl& keyboardControl) : kc(keyboardControl) {}
 
@@ -100,6 +102,7 @@ bool Keyboard::event(sf::Event& event) {
 	return false;
 }
 
+#ifdef DEBUG_WINDOW
 void Keyboard::imgui_keyboard() {
 	ImVec2 v = { 60,20 };
 	ImGui::Begin("KeyBoard");
@@ -125,6 +128,7 @@ void Keyboard::imgui_keyboard() {
 	}
 	ImGui::End();
 }
+#endif
 
 void Keyboard::draw(sf::RenderTarget* rt) {
 	for (int i = 0; i < kc.pkey.size(); ++i)

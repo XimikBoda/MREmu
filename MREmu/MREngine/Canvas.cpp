@@ -2,11 +2,14 @@
 #include "Image.h"
 #include "Canvas.h"
 #include "../Memory.h"
-#include <imgui.h>
-#include <imgui-SFML.h>
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 #include <vmpromng.h>
+
+#ifdef DEBUG_WINDOW
+#include <imgui.h>
+#include <imgui-SFML.h>
+#endif
 
 static unsigned char clamp(unsigned int x) {
 	return x > 255 ? 255 : x;
@@ -78,6 +81,7 @@ void canvas_to_texture(std::pair<void*, sf::Texture>& p) {
 	p.second.loadFromImage(im);
 }
 
+#ifdef DEBUG_WINDOW
 void MREngine::AppGraphic::imgui_canvases() {
 	std::lock_guard lock(canvases_list_mutex);
 	const char* formats[4] = { "RGB565", "RGB", "RGBA", "PARGB" };
@@ -106,6 +110,7 @@ void MREngine::AppGraphic::imgui_canvases() {
 	}
 	ImGui::End();
 }
+#endif
 
 MREngine::canvas_signature* find_canvas_signature(VMUINT8* buf) {
 	if (!buf)

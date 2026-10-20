@@ -62,6 +62,8 @@ void Device::draw() {
 	win.draw(screen_sp);
 }
 
+#ifdef DEBUG_WINDOW
 void Device::imgui() {
 	keyboard.imgui_keyboard();
 }
+#endif
