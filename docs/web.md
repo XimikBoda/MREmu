@@ -1,8 +1,8 @@
 # Web (Emscripten) Build
 
-MREmu also compiles to WebAssembly, which runs the emulator and the whole VXP
-catalog inside a browser tab. This page covers building it, running it, and the
-parts that behave differently from the desktop build.
+MREmu also compiles to WebAssembly, which runs the emulator in a browser tab
+and launches `.vxp` files uploaded through the page. This page covers building
+it, running it, and the parts that behave differently from the desktop build.
 
 ## Building
 
@@ -35,13 +35,20 @@ cmake -S <repo> -B build/em -G Ninja -DCMAKE_BUILD_TYPE=Release -DEMSCRIPTEN=1 ^
   generator the Emscripten setup expects.
 
 The target emits a complete `index.html` / `index.js` / `index.wasm` /
-`index.data` / `index.worker.js` bundle into `build\em` (`MREmu/CMakeLists.txt`
-sets the output name and shell page; the root `CMakeLists.txt` skips the desktop
-`bin\` output directory for Emscripten). A post-build step also copies
+`index.worker.js` bundle into `build\em` (`MREmu/CMakeLists.txt` sets the output
+name and shell page; the root `CMakeLists.txt` skips the desktop `bin\` output
+directory for Emscripten). A post-build step also copies
 [`web/mremu-web.js`](../web/mremu-web.js) and
 [`web/coi-serviceworker.js`](../web/coi-serviceworker.js) next to the page and
 creates `.nojekyll`. `launch.bat 8 1` then copies all of it to `bin\Release`
 (or `bin\Debug`).
+
+There is deliberately **no `.data` preload**. `bin\Release\fs` is the desktop
+app's local filesystem (including whatever `.vxp` files were dropped into
+`fs/e/mre`), so embedding it would publish that snapshot and add tens of
+megabytes to the bundle. The web page is bring-your-own-apps: uploads are
+mounted into `/fs/e/mre` at runtime instead. If a build ever adds a preload,
+Emscripten will emit `index.data` again; the launcher copies it when present.
 
 The page itself is [`web/shell.html`](../web/shell.html), passed to emcc with
 `--shell-file`. It hosts the canvas, the apps panel, and the load overlay. The
@@ -73,9 +80,8 @@ python tools/web_serve.py --dir bin/Release --port 8123
 
 The served page needs `Cross-Origin-Opener-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: require-corp`; any static server that adds that
-pair works. The `.data` preload carries `bin/Release/fs` (the VXP catalog and
-`mremu_view.cfg`), so whatever is in `fs/e/mre` at configure time is what the web
-build can launch - about 43 MB with the full catalog.
+pair works. No VXP catalog is bundled, so a fresh origin starts with an empty
+emulator menu; add apps from the uploads panel.
 
 ### Static host (GitHub Pages, plain `http.server`)
 
@@ -109,7 +115,8 @@ network request.
 ## Apps panel and uploads
 
 The apps button (top-right of the page, once the runtime has started) opens the
-options panel. It offers:
+options panel. The web build ships no apps, so the panel and the emulator menu
+both start empty; this panel is how apps get into the web build. It offers:
 
 - **Add .vxp files** - a multi-file picker; only `.vxp` files are accepted.
   Dropping `.vxp` files anywhere on the page opens the panel and imports them
@@ -132,8 +139,8 @@ They also appear in the emulator's app list without extra steps:
   therefore tiles on the very first frame, with no rescan flash.
 - While the emulator is already running, an upload is written to the same
   directory immediately and `mremu_web_apps_changed()` tells the native menu to
-  rescan. New tiles appear in the grid (sorted with the rest of the catalog)
-  and launch exactly like preloaded ones.
+  rescan. New tiles appear in the grid (sorted with the rest of the apps)
+  and launch exactly like any other app.
 - Removing an upload deletes it from IndexedDB and from the emulator's
   filesystem in the same step.
 
@@ -161,7 +168,7 @@ while the document is unfocused.
   wasm sandbox.
 - **Slower.** `-pthread` plus `ASYNCIFY` keeps the guest's blocking calls working,
   at a cost; expect fewer steps per second than the native build.
-- **Saves are per-tab.** The preloaded catalog is a read-only Emscripten MEMFS
+- **Saves are per-tab.** The emulator runs on an in-memory Emscripten MEMFS
   tree; writes made by guest apps (save games and similar) last only for the
   lifetime of the tab. Uploaded `.vxp` files are the exception - they persist in
   IndexedDB as described above.
@@ -186,10 +193,11 @@ Useful when changing the shell or the loader:
 | :--- | :--- |
 | `SharedArrayBuffer is not defined` | Page served without COOP/COEP, or opened via `file://`. Use `launch.bat 8 3`, or a secure (HTTPS/localhost) static host with `coi-serviceworker.js` beside `index.html`. |
 | Page reloads once on first visit | Expected: the service worker takes control, then the page reloads to receive the COOP/COEP headers. |
+| MRE menu says "No files in MRE folder" | Expected on a new web origin: the bundle contains no VXP catalog. Add `.vxp` files from the apps panel; they persist for that origin. |
 | Page reports it is not cross-origin isolated | Service worker not registered: not a secure context (`http://` LAN address), `coi-serviceworker.js` missing, or storage blocked in a private window. |
 | Uploaded app is gone after a reload | Site data was cleared, storage is blocked, or the origin evicted it. The panel summary left the app count at zero after reload. |
 | A new upload does not appear in the menu | The menu rescan flag is consumed by the menu's own timer; make sure the emulator is running (not paused on a fatal overlay) and reopen the panel to confirm the app is listed. |
 | `emcmake`/`emcc` not found | `emsdk_env.bat` only edits `PATH` when it thinks the parent shell is `cmd.exe`; started from Git Bash it writes `emsdk_set_env.sh` instead. `:web_env` in `launch.bat` sets the toolchain paths explicitly. |
 | Configure fails downloading `CPM.cmake` | The CMake install has no CA bundle (`SSL certificate verification failed: certificate signer not trusted`). `launch.bat` passes `-DCMAKE_TLS_VERIFY=OFF` so the bootstrap can complete; the file is still checked against its pinned SHA256. Do not redirect `CPM_SOURCE_CACHE`: CPM's include guard then silently skips defining `CPMAddPackage`. |
 | Build step prints nothing and stops | Something in the batch called `exit` (see `emcmake` above); use plain `cmake --build .`. |
-| Blank page, no console errors | The canvas needs a click for audio/focus; check the network tab for `index.data` (43 MB) still downloading. |
+| Blank page, no console errors | The canvas needs a click for audio/focus; check the network tab for a failed `index.wasm` / `index.worker.js`, and the console for a wasm compile error. |

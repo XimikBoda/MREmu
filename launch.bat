@@ -695,6 +695,9 @@ if not exist "%WEB_OUT%\index.html" (
   exit /b 1
 )
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
+rem The web build intentionally has no .data preload. Remove a stale catalog
+rem left by an older snapshot so it cannot be served with the new bundle.
+if not exist "%WEB_OUT%\index.data" if exist "%OUT_DIR%\index.data" del /q "%OUT_DIR%\index.data"
 for %%F in (index.html index.js index.wasm index.data index.worker.js mremu-web.js coi-serviceworker.js .nojekyll) do (
   if exist "%WEB_OUT%\%%F" (
     copy /y "%WEB_OUT%\%%F" "%OUT_DIR%\%%F" >nul

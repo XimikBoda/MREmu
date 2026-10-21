@@ -44,8 +44,9 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
 endif()
 
 if (EMSCRIPTEN)
-  # Emit a self-contained index.html/index.js/index.wasm/index.data bundle,
-  # which is the entry point launch.bat copies and tools/web_serve.py serves.
+  # Emit a self-contained index.html/index.js/index.wasm bundle, which is the
+  # entry point launch.bat copies and tools/web_serve.py serves. Emscripten adds
+  # index.data only if the build ever preloads files; the web build does not.
   # Emscripten would otherwise name it MREmu.js and emit no page at all.
   # The binary dir on purpose: without an explicit output directory CMake puts
   # the bundle in build\em\MREmu, but the launcher, the copy step and

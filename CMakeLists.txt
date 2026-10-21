@@ -58,7 +58,11 @@ if(EMSCRIPTEN)
         "-sMODULARIZE=1"
         "-sEXPORT_NAME=MREmuModule"
         "-sEXPORTED_RUNTIME_METHODS=FS"
-        "--preload-file" "${PROJECT_SOURCE_DIR}/bin/Release/fs@/fs"
+        # No --preload-file here on purpose. bin/Release/fs is the desktop's
+        # local filesystem, including whatever .vxp files were dropped into
+        # fs/e/mre; embedding it would publish that snapshot and grow the
+        # bundle by tens of megabytes. The page mounts its IndexedDB uploads
+        # into /fs/e/mre at runtime instead (web/mremu-web.js).
         "-sWASM=1"
     )
     

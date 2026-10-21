@@ -12,7 +12,7 @@
  *     options panel, and tell the running menu to rescan.
  *
  * Uploads live in IndexedDB, not localStorage: a single VXP is a few hundred
- * kilobytes and a catalog runs to tens of megabytes, well past localStorage's
+ * kilobytes and a library runs to tens of megabytes, well past localStorage's
  * ~5 MB ceiling.
  */
 (function () {
@@ -521,9 +521,9 @@
         }
       },
       onRuntimeInitialized: function () {
-        // Frame 0 of main(): the preloaded catalog is in the filesystem and
-        // the app list has not been built yet, so uploads appear in the very
-        // first scan instead of needing a rescan.
+        // Frame 0 of main(): the uploads are in the filesystem and the app
+        // list has not been built yet, so they appear in the very first scan
+        // instead of needing a rescan.
         writeAllUploads();
         els.overlay.classList.add('hidden');
         els.canvas.focus();

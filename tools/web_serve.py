@@ -20,8 +20,8 @@ import os
 import sys
 
 # Python's mimetypes does not know these on every platform; without them the
-# browser refuses to stream-compile the module and the .data preload is fetched
-# as text.
+# browser refuses to stream-compile the module. .data is kept for builds that
+# add a preload and emit index.data.
 EXTRA_TYPES = {
     ".wasm": "application/wasm",
     ".data": "application/octet-stream",

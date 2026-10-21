@@ -1852,7 +1852,11 @@ namespace NativeApps::Menu::AppSelector {
 		if (vxps.empty()) {
 			int y0 = (view == View::Grid ? grid_y0() : 0) + 2;
 			vm_graphic_textout(layer_buf, 0, y0, vm_ucs2_string((VMSTR)"No files in MRE folder."), 100, 0xFFFF);
+#if defined(__EMSCRIPTEN__)
+			vm_graphic_textout(layer_buf, 0, y0 + c_h + 2, vm_ucs2_string((VMSTR)"Add them in the apps panel."), 100, 0xFFFF);
+#else
 			vm_graphic_textout(layer_buf, 0, y0 + c_h + 2, vm_ucs2_string((VMSTR)"Put them in fs/e/mre."), 100, 0xFFFF);
+#endif
 			vm_graphic_textout(layer_buf, 0, y0 + c_h * 2 + 2, vm_ucs2_string((VMSTR)"Or drag them here to import..."), 100, 0xFFFF);
 		}
 
