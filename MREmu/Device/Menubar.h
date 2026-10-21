@@ -29,7 +29,7 @@ public:
 
 	Menubar(KeyboardControl& kc);
 
-	int getHeight();
+	int getHeight() const;
 
 	void draw(sf::RenderTarget* rt);
 

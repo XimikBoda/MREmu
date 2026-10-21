@@ -1,27 +1,25 @@
 #include "Device.h"
 
-Device::Device(sf::RenderWindow& win_device, MREngine::Graphic& graphic_) 
-	: win(win_device), graphic(graphic_), keyboard(keyboardControl), menubar(keyboardControl)
+Device::Device(sf::RenderWindow& win_device, MREngine::Graphic& graphic_,
+	KeyboardControl& keyboardControl)
+	: kc(keyboardControl), keyboard(keyboardControl), menubar(keyboardControl),
+	  win(win_device), graphic(graphic_)
 {
 	update_size();
 }
 
-void Device::process_events() {
-	sf::Event event;
-	while (win.pollEvent(event)) {
-		keyboard.event(event);
-		menubar.event(event);
-		touch.sf_event(event);
-		switch (event.type) {
-		case sf::Event::Closed:
-			win.close();
-			break;
-		case sf::Event::Resized:
-			win.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
-			update_size();
-			break;
-		}
-	}
+void Device::update() {
+	kc.update();
+}
+
+void Device::event(sf::Event& event) {
+	keyboard.event(event);
+	menubar.event(event);
+	touch.sf_event(event);
+}
+
+int Device::menubar_height() const {
+	return show_menubar ? menubar.getHeight() : 0;
 }
 
 void Device::update_size() {
@@ -31,39 +29,28 @@ void Device::update_size() {
 	keyboard.screen = &screen_sp;
 	menubar.screen = &screen_sp;
 
-	int menubar_height = menubar.getHeight();
-
-	float scale_x = win.getSize().x / (float)graphic.width;
-	float scale_y = win.getSize().y / (float)(graphic.height + menubar_height);
-
-	float scale = scale_x;
-
-	if (scale_y < scale_x) {
-		if(win.getSize().x > graphic.width * scale_y * 2)
-			scale_y = win.getSize().y / (float)graphic.height, menubar_height = 0;
-		scale = scale_y;
-	}
-
-	if (scale < 0)
-		scale = 0;
+	// The menubar strip sits above the emulated screen, so the screen is
+	// offset down by its height rather than by nothing.
+	int menubar_height = this->menubar_height();
 
 	screen_sp.setScale(scale, scale);
-	screen_sp.setPosition((win.getSize().x - graphic.width * scale) / 2, menubar_height * scale);
+	screen_sp.setPosition(0.f, (float)(menubar_height * scale));
 
-	keyboard.update_resize(win.getSize().x, win.getSize().y, menubar.getHeight() * scale);
+	keyboard.update_resize(win.getSize().x, win.getSize().y, menubar_height * scale);
 	menubar.update_resize(win.getSize().x, win.getSize().y);
 }
 
 void Device::draw() {
+	if (show_menubar)
+		menubar.draw(&win);
 	keyboard.draw(&win);
-	menubar.draw(&win);
 
 	screen_sp.setTexture(graphic.screen_tex, true);
 	win.draw(screen_sp);
 }
 
-#ifdef DEBUG_WINDOW
 void Device::imgui() {
+#ifdef DEBUG_WINDOW
 	keyboard.imgui_keyboard();
-}
 #endif
+}

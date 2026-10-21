@@ -23,11 +23,14 @@ namespace MREngine {
 		void update_screen();
 
 		void imgui_screen();
+		void reset();
 
 		void screenshot(std::u8string name);
 
 		~Graphic();
 	};
+
+	extern Graphic* graphic;
 
 	struct layer {
 		void* buf = 0;

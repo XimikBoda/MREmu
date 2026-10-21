@@ -17,3 +17,9 @@ std::u16string utf8_to_utf16(std::u8string src);
 void utf8_to_ucs2(std::u8string src, VMWSTR dest, int size);
 
 std::string utf8_to_ascii(std::u8string src);
+
+// A u8string and a string carry the same bytes; char8_t is just a distinct
+// character type so that UTF-8 cannot be passed where a plain byte string
+// is expected. This is the cast between the two, for the places that still
+// deal in std::string.
+std::string u8_to_utf8(std::u8string src);

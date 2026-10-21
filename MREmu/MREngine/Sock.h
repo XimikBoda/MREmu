@@ -17,6 +17,19 @@ typedef struct
     VMUINT8	addr[VM_MAX_SOCK_ADDR_LEN];
 } vm_sockaddr_struct;
 
+typedef struct
+{
+    VMINT       apn_info_id;
+    VMINT       proxy_port;
+    VMCHAR      operator_id[8];
+    VMCHAR      operator_name[64];
+    VMCHAR      proxy_ip[16];
+    VMCHAR      apn_proxy[32];
+    VMCHAR      apn_no_proxy[32];
+    VMCHAR      user_name[16];
+    VMCHAR      pass_word[16];
+} vm_apn_info_ext;
+
 namespace MREngine {
     class TcpSock : public std::enable_shared_from_this<TcpSock> {
         asio::ip::tcp::socket socket;
@@ -149,6 +162,8 @@ extern "C" {
     VMINT vm_udp_sendto(VMINT hdl, const void* buf, VMINT32 len, const vm_sockaddr_struct* addr);
     VMINT vm_udp_recvfrom(VMINT hdl, void* buf, VMINT32 len, vm_sockaddr_struct* addr);
     VMINT vm_udp_close(VMINT hdl);
+    VMINT vm_get_default_apn_info(vm_apn_info_ext* apn_info);
+    VMINT vm_get_apn_info(vm_apn_info_ext* current_apn_info);
 }
 
 struct sock_event { //tcp and udp

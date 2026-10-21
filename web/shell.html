@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0d0d0f">
+    <title>MREmu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          crossorigin>
+    <style>
+      :root {
+        --bg: #0d0d0f;
+        --surface: #161619;
+        --surface-hover: #1e1e23;
+        --surface-active: #25252b;
+        --line: #2b2b32;
+        --line-strong: #3a3a43;
+        --fg: #f0f0f3;
+        --muted: #a6a6b0;
+        --accent: #f2b544;
+        --accent-hover: #ffc95e;
+        --accent-active: #d9a02f;
+        --on-accent: #17130a;
+        --radius: 8px;
+        --radius-sm: 4px;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font: 400 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+        overflow: hidden;
+      }
+      button, select, input {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 0 16px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        font-weight: 500;
+        text-align: center;
+        cursor: pointer;
+        transition: background-color 160ms ease-out, border-color 160ms ease-out;
+      }
+      @media (hover: hover) {
+        button:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+      }
+      button:active { background: var(--surface-active); }
+      button:focus-visible, select:focus-visible, input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--on-accent);
+        font-weight: 600;
+      }
+      @media (hover: hover) {
+        button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+      }
+      button.primary:active { background: var(--accent-active); border-color: var(--accent-active); }
+      select {
+        min-height: 40px;
+        padding: 0 12px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        cursor: pointer;
+      }
+      input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      #stage {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      #stage.dropping {
+        outline: 2px dashed var(--accent);
+        outline-offset: -8px;
+      }
+      /* The canvas must have no border or padding, or mouse coordinates drift
+         from the pixels SFML thinks it is drawing to. */
+      canvas#canvas {
+        display: block;
+        border: 0 none;
+        padding: 0;
+        background: #000;
+        image-rendering: pixelated;
+        outline: none;
+      }
+
+      /* Loading screen ----------------------------------------------------- */
+      #overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: space-between;
+        padding: 32px;
+        background: var(--bg);
+        transition: opacity 200ms ease-out;
+      }
+      #overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .wordmark {
+        margin: 0;
+        font-size: clamp(56px, min(20vw, 30vh), 280px);
+        line-height: 0.85;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        color: var(--fg);
+      }
+      .overlay-sub {
+        max-width: 40ch;
+        margin: 16px 0 0;
+        font-size: 16px;
+        color: var(--muted);
+      }
+      .overlay-status {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        width: 100%;
+        max-width: 560px;
+      }
+      #bar {
+        width: 100%;
+        height: 4px;
+        background: var(--line);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      #bar > div {
+        height: 100%;
+        width: 0%;
+        background: var(--accent);
+        transition: width 200ms ease-out;
+      }
+      #status { font-size: 15px; color: var(--fg); }
+      #hint {
+        max-width: 60ch;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      /* Options panel ------------------------------------------------------ */
+      #panel-open {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        z-index: 20;
+        width: 44px;
+        min-height: 44px;
+        padding: 0;
+        background: var(--surface);
+      }
+      #panel-open svg { width: 20px; height: 20px; }
+      #panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        width: min(400px, 100vw);
+        padding: 24px;
+        overflow-y: auto;
+        background: var(--surface);
+        border-left: 1px solid var(--line);
+      }
+      #panel header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      #panel h2 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.3;
+        font-weight: 600;
+      }
+      #panel-close {
+        width: 40px;
+        min-height: 40px;
+        padding: 0;
+      }
+      #panel-close svg { width: 18px; height: 18px; }
+      .group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .button-row {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        gap: 8px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .field-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      .control-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .control-row select, .control-row button { width: 100%; }
+      .check {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 40px;
+      }
+      .hintline {
+        max-width: 60ch;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      #uploads-wrap {
+        max-height: 40vh;
+        overflow-y: auto;
+      }
+      #uploads-table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      #uploads-table th, #uploads-table td {
+        padding: 8px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: middle;
+      }
+      #uploads-table th {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      #uploads-table .size {
+        width: 72px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      #uploads-table .action { width: 88px; text-align: right; }
+      .upload-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .upload-remove {
+        min-height: 32px;
+        padding: 0 8px;
+        font-size: 14px;
+      }
+      /* Visible to the accessibility tree and still activatable by the Add
+         button, but out of the flow and out of the tab order. */
+      #file-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .panel-footer { margin-top: auto; }
+      .panel-footer button { width: 100%; }
+      #toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        z-index: 40;
+        max-width: 80vw;
+        padding: 12px 16px;
+        background: #202026;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        font-size: 14px;
+        opacity: 0;
+        transform: translate(-50%, 8px);
+        pointer-events: none;
+        transition: opacity 180ms ease-out, transform 180ms ease-out;
+      }
+      #toast.visible { opacity: 1; transform: translate(-50%, 0); }
+      @media (max-width: 640px) {
+        #panel { width: 100vw; border-left: 0; }
+        #overlay { padding: 24px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    </div>
+
+    <button id="panel-open" type="button" hidden aria-controls="panel"
+            aria-expanded="false" aria-label="Apps and options"
+            title="Apps and options">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <line x1="21" y1="4" x2="14" y2="4"/>
+        <line x1="10" y1="4" x2="3" y2="4"/>
+        <line x1="21" y1="12" x2="12" y2="12"/>
+        <line x1="8" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="20" x2="16" y2="20"/>
+        <line x1="12" y1="20" x2="3" y2="20"/>
+        <line x1="14" y1="2" x2="14" y2="6"/>
+        <line x1="8" y1="10" x2="8" y2="14"/>
+        <line x1="16" y1="18" x2="16" y2="22"/>
+      </svg>
+    </button>
+
+    <aside id="panel" hidden aria-label="Apps and options">
+      <header>
+        <h2>Apps and options</h2>
+        <button id="panel-close" type="button" aria-label="Close panel" title="Close panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M18 6 6 18"/>
+            <path d="m6 6 12 12"/>
+          </svg>
+        </button>
+      </header>
+
+      <section class="group">
+        <div class="button-row">
+          <button id="add-files" type="button" class="primary">Add .vxp files</button>
+          <button id="uploads-clear" type="button" hidden>Remove all</button>
+        </div>
+        <input id="file-input" type="file" accept=".vxp,application/octet-stream"
+               multiple tabindex="-1">
+        <div id="uploads-summary" class="hintline"></div>
+        <div id="uploads-wrap">
+          <table id="uploads-table" aria-label="Uploaded apps" hidden>
+            <thead>
+              <tr>
+                <th scope="col">App</th>
+                <th scope="col" class="size">Size</th>
+                <th scope="col" class="action">Action</th>
+              </tr>
+            </thead>
+            <tbody id="uploads"></tbody>
+          </table>
+        </div>
+        <p class="hintline">
+          Uploads are stored in this browser and are mounted again on every load.
+          Drop .vxp files anywhere on the page to import them.
+        </p>
+      </section>
+
+      <section class="group">
+        <div class="field">
+          <label class="field-label" for="scale">Display</label>
+          <div class="control-row">
+            <select id="scale">
+              <option value="fit">Fit</option>
+              <option value="1">1&times;</option>
+              <option value="2">2&times;</option>
+              <option value="3">3&times;</option>
+              <option value="4">4&times;</option>
+            </select>
+            <button id="fullscreen" type="button">Fullscreen</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">Audio</span>
+          <label class="check"><input id="muted" type="checkbox"> Mute</label>
+        </div>
+      </section>
+
+      <div class="panel-footer">
+        <button id="reload" type="button">Reload page</button>
+      </div>
+    </aside>
+
+    <div id="overlay">
+      <div>
+        <p class="wordmark">MREmu</p>
+        <p class="overlay-sub">MRE app emulator for the browser</p>
+      </div>
+      <div class="overlay-status">
+        <div id="bar" aria-hidden="true"><div></div></div>
+        <div id="status" role="status" aria-live="polite">Loading&hellip;</div>
+        <div id="hint">Click the screen once to enable keyboard and sound.</div>
+      </div>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      // Frames and audio both want a user gesture; hand the first click to the
+      // canvas so the emulated phone actually receives key events.
+      var canvas = document.getElementById('canvas');
+      canvas.addEventListener(
+        'webglcontextlost',
+        function (e) {
+          alert('WebGL context lost. Reload the page to continue.');
+          e.preventDefault();
+        },
+        false
+      );
+      document.getElementById('stage').addEventListener('click', function () {
+        canvas.focus();
+      });
+
+      window.onerror = function () {
+        var overlay = document.getElementById('overlay');
+        var status = document.getElementById('status');
+        var bar = document.querySelector('#bar > div');
+        if (overlay) overlay.classList.remove('hidden');
+        if (status) status.textContent = 'Failed to start. See the browser console.';
+        if (bar) bar.style.width = '0%';
+      };
+    </script>
+    <script src="coi-serviceworker.js"></script>
+    <script src="mremu-web.js"></script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

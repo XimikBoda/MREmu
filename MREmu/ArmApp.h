@@ -28,6 +28,11 @@ public:
 	uint32_t rw_size = 0;
 	uint32_t zi_size = 0;
 
+	// Buffer offset the ER_RO (code) section was actually copied to by
+	// preparation(). Exposed so headless inspection can compare it against
+	// entry_point and prove where execution actually begins.
+	uint32_t code_load_offset = 0;
+
 	static bool check_format(fs::path path, bool local);
 
 	bool preparation() override;

@@ -20,6 +20,7 @@ add_library (MREngine
 						"CharSet.cpp" "CharSet.h"
 						"Textout.cpp" 
 						"STDLib.cpp" 
+						"SystemTextBox.cpp" "SystemTextBox.h"
 						"ItemsMng.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)

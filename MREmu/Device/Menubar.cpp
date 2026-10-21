@@ -12,7 +12,7 @@ Menubar::Menubar(KeyboardControl& keyboardControl) : kc(keyboardControl){
 	screen_corner = ScreenCorner().getRadius();
 }
 
-int Menubar::getHeight() {
+int Menubar::getHeight() const {
 	return base_size;
 }
 

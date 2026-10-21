@@ -17,7 +17,12 @@ endif()
 
 option(CAPSTONE "Endble capstone" OFF)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+# Emscripten output stays beside build.ninja (index.html/js/wasm/data): launch.bat
+# copies it to bin\<config> to be served, and a Debug web build must not stomp
+# the desktop binaries that live in bin\Release.
+if(NOT EMSCRIPTEN)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+endif()
 
 # Enable optimizations by default
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -46,6 +51,13 @@ if(EMSCRIPTEN)
         "-sGL_EXPLICIT_UNIFORM_LOCATION=1"
         "-sGL_EXPLICIT_UNIFORM_BINDING=1"
         "-sFORCE_FILESYSTEM=1"
+        # Modularized: the page has to read its uploaded .vxp files from
+        # IndexedDB before instantiating the runtime, and needs a handle on
+        # Module.FS afterwards to add or remove them. FS is not exported by
+        # default any more.
+        "-sMODULARIZE=1"
+        "-sEXPORT_NAME=MREmuModule"
+        "-sEXPORTED_RUNTIME_METHODS=FS"
         "--preload-file" "${PROJECT_SOURCE_DIR}/bin/Release/fs@/fs"
         "-sWASM=1"
     )
@@ -70,13 +82,23 @@ if(EMSCRIPTEN)
 endif()
 
 add_definitions(-DLIBICONV_PLUG)
-set(BUILD_SHARED_LIBS FALSE) 
-
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
 if (MSVC)
-    add_compile_options(/wd4828)
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:LIBCMTD")
+  add_compile_options(/wd4828)
+  set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:LIBCMTD")
+endif()
+
+set(BUILD_SHARED_LIBS FALSE) 
+
+# Use ccache when available to speed up C++ rebuilds (Android + desktop).
+if(NOT MSVC)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
+    message(STATUS "ccache found: ${CCACHE_PROGRAM}")
+  endif()
 endif()
 
 include_directories("include")

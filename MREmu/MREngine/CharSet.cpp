@@ -215,6 +215,10 @@ std::u16string utf8_to_utf16(std::u8string src) {
 	return std::u16string(buf.data(), written_bytes / sizeof(char16_t));
 }
 
+std::string u8_to_utf8(std::u8string src) {
+	return std::string((const char*)src.data(), src.size());
+}
+
 std::string utf8_to_ascii(std::u8string src) {
 	iconv_t ch = iconv_open("ASCII//TRANSLIT", "UTF-8");
 	if (ch == (iconv_t)-1 || src.empty()) return "";

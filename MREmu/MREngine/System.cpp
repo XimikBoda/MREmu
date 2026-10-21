@@ -9,8 +9,7 @@
 #include <cstring>
 #include <filesystem>
 #include <SFML/System/Clock.hpp>
-
-#include <cstring>
+#include "../jni/Vibration.h"
 
 namespace fs = std::filesystem;
 
@@ -32,13 +31,30 @@ VMINT vm_get_time(vm_time_t* time) {
 	time->hour = pTInfo->tm_hour;
 	time->min = pTInfo->tm_min;
 	time->sec = pTInfo->tm_sec;
+
+	const char* env_year = getenv("MREMU_YEAR");
+	if (env_year && *env_year) {
+		int y = std::atoi(env_year);
+		if (y > 1990 && y < 2050)
+			time->year = y;
+	}
 	return 0;
 }
 
 VMINT vm_get_curr_utc(VMUINT* utc) {
 	if (utc == 0)
 		return -1;
-	*utc = std::time(nullptr);
+	std::time_t t = std::time(nullptr);
+	const char* env_year = getenv("MREMU_YEAR");
+	if (env_year && *env_year) {
+		int y = std::atoi(env_year);
+		if (y > 1990 && y < 2050) {
+			std::tm* pTInfo = std::localtime(&t);
+			pTInfo->tm_year = y - 1900;
+			t = std::mktime(pTInfo);
+		}
+	}
+	*utc = (VMUINT)t;
 	return 0;
 }
 
@@ -107,6 +123,20 @@ void vm_free(void* ptr) {
 	Memory::app_free(ptr);
 }
 
+VMINT vm_global_get_max_alloc_size(void) {
+	Memory::MemoryManager& mm = get_current_app_memory();
+	return (VMINT)mm.get_free_memory_size();
+}
+
+void* vm_global_malloc(unsigned int size) {
+	return vm_malloc(size);
+}
+
+void vm_global_free(void* ptr) {
+	if (ptr)
+		vm_free(ptr);
+}
+
 void vm_reg_sysevt_callback(void (*f)(VMINT message, VMINT param)) {
 	MREngine::SystemCallbacks& sc = get_current_app_system_callbacks();
 	sc.sysevt = f;
@@ -166,4 +196,30 @@ VMINT vm_open_wap_url(VMWSTR url) {
 	auto u8str = ucs2_to_utf8(url);
 	spdlog::info("vm_open_wap_url(\"{}\")", (const char*)u8str.c_str());
 	return 0;
+}
+
+VMUINT vm_get_mre_version(void) {
+	return 0x030000;
+}
+
+void vm_vibrator_once(void) {
+	spdlog::debug("vm_vibrator_once called");
+	// A one-shot tick, not an alert. The API takes no duration argument, so this
+	// value is entirely the emulator's choice, and 1000ms was wrong for the way
+	// guests actually use it: the app selector fires one of these per selection
+	// change, and with auto-repeat firing at 120ms a 1s buzz would run
+	// continuously while scrolling and keep going long after release. 40ms reads
+	// as a discrete tick instead, and still leaves vm_vibrator_on/off to carry the
+	// sustained case.
+	mremu_vibrate(sf::milliseconds(40));
+}
+
+void vm_vibrator_on(void) {
+	spdlog::debug("vm_vibrator_on called");
+	mremu_vibrate(sf::milliseconds(5000));
+}
+
+void vm_vibrator_off(void) {
+	spdlog::debug("vm_vibrator_off called");
+	mremu_vibrate_stop();
 }

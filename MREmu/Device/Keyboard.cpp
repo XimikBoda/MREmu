@@ -46,9 +46,18 @@ const std::map<sf::Keyboard::Key, int> key_to_key =
 	{sf::Keyboard::Down,		VM_KEY_DOWN},
 	{sf::Keyboard::Left,		VM_KEY_LEFT},
 	{sf::Keyboard::Right,		VM_KEY_RIGHT},
+	// WASD as an alternative to the arrow keys, for a physical keyboard.
+	{sf::Keyboard::W,			VM_KEY_UP},
+	{sf::Keyboard::S,			VM_KEY_DOWN},
+	{sf::Keyboard::A,			VM_KEY_LEFT},
+	{sf::Keyboard::D,			VM_KEY_RIGHT},
 	{sf::Keyboard::Slash,		VM_KEY_LEFT_SOFTKEY},
 	{sf::Keyboard::RShift,		VM_KEY_RIGHT_SOFTKEY},
+	{sf::Keyboard::Q,			VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::E,			VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::F1,			VM_KEY_LEFT_SOFTKEY},
 	{sf::Keyboard::Enter,		VM_KEY_OK},
+	{sf::Keyboard::Space,		VM_KEY_OK},
 	{sf::Keyboard::BackSpace,	VM_KEY_CLEAR},
 	{sf::Keyboard::Escape,		VM_KEY_BACK},
 	{sf::Keyboard::Numpad7,		VM_KEY_NUM1},
@@ -63,6 +72,16 @@ const std::map<sf::Keyboard::Key, int> key_to_key =
 	{sf::Keyboard::Divide,		VM_KEY_STAR},
 	{sf::Keyboard::Numpad0,		VM_KEY_NUM0},
 	{sf::Keyboard::Multiply,	VM_KEY_POUND},
+	{sf::Keyboard::Num1,		VM_KEY_NUM1},
+	{sf::Keyboard::Num2,		VM_KEY_NUM2},
+	{sf::Keyboard::Num3,		VM_KEY_NUM3},
+	{sf::Keyboard::Num4,		VM_KEY_NUM4},
+	{sf::Keyboard::Num5,		VM_KEY_NUM5},
+	{sf::Keyboard::Num6,		VM_KEY_NUM6},
+	{sf::Keyboard::Num7,		VM_KEY_NUM7},
+	{sf::Keyboard::Num8,		VM_KEY_NUM8},
+	{sf::Keyboard::Num9,		VM_KEY_NUM9},
+	{sf::Keyboard::Num0,		VM_KEY_NUM0},
 	{sf::Keyboard::Add,			VM_KEY_VOL_UP},
 	{sf::Keyboard::Subtract,	VM_KEY_VOL_DOWN},
 
@@ -294,6 +313,10 @@ const char16_t* keys_marks_right[3][3] = {
 	{u"\u232B", u"\u2B07", u"\u21A9"},
 };
 
+void Keyboard::update() {
+	kc.update();
+}
+
 void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 	int screen_x = screen->getPosition().x;
 	int screen_y = screen->getPosition().y;
@@ -313,6 +336,10 @@ void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 		left = { (screen_x - size.x) / 2, y, size.x, size.y };
 		right = { screen_x + screen_w, y, size.x, size.y };
 	}
+
+	// Lowest row the keypad reaches. Anything under it in the window is free
+	// space, which is where the Options button goes.
+	m_bottom = std::max(left.top + left.height, right.top + right.height);
 
 	{
 		int w = left.width, h = left.height;

@@ -1,14 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.ximikboda.mremu"
-    android:versionCode="1"
-    android:versionName="1.0">
+    android:versionCode="2"
+    android:versionName="1.0.1">
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!--
+        No <queries> element on purpose. Package visibility filtering on Android 11+
+        applies to resolveActivity() / queryIntentActivities(), but not to startActivity(),
+        so declaring folder intents here would only be needed by a resolveActivity() guard
+        - and that guard is exactly what openFolder() avoids. Filtering resolveActivity()
+        makes it return null for file managers that startActivity() launches fine, which
+        would show a bogus "no app can open that folder" error.
+    -->
 
     <application
         android:allowBackup="false"
@@ -43,6 +52,26 @@
                 <data android:pathPattern=".*\\.vxp" />
             </intent-filter>
         </activity>
+        <!--
+            Placeholder destination for the VXP Browser entry in the library's header
+            menu. Not exported and not launchable from the launcher; it exists so the
+            menu opens a real screen rather than a no-op.
+        -->
+        <activity
+            android:name=".VxpBrowserActivity"
+            android:exported="false"
+            android:label="@string/vxp_browser"
+            android:theme="@style/Theme.Android" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

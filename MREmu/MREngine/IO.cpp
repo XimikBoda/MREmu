@@ -37,6 +37,7 @@ void MREngine::IO::init()
 	fs::create_directories(base_path / fs::path("fs/e").make_preferred(), ec);
 	fs::create_directories(base_path / fs::path("fs/c").make_preferred(), ec);
 	fs::create_directories(base_path / fs::path("fs/d").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("fs/e/mre").make_preferred(), ec);
 	fs::create_directories(base_path / fs::path("screenshots").make_preferred(), ec);
 }
 
@@ -50,8 +51,8 @@ bool validate_path(fs::path path) {
 	return std::regex_match(path.string(), pr);
 }
 
-fs::path UCS2_to_path(const VMWSTR wstr) {
-	auto u8str = ucs2_to_utf8(wstr);
+fs::path UCS2_to_path(const VMWCHAR* wstr) {
+	auto u8str = ucs2_to_utf8((VMWSTR)wstr);
 #ifndef WIN32
 	std::replace(u8str.begin(), u8str.end(), '\\', '/');
 #endif
@@ -97,7 +98,7 @@ fs::path path_from_emu(fs::path path) { // TODO rewrite this
 	return res;
 }
 
-fs::path path_from_emu(const VMWSTR str) {
+fs::path path_from_emu(const VMWCHAR* str) {
 	return path_from_emu(UCS2_to_path(str));
 }
 
@@ -175,6 +176,7 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	MREngine::AppIO& io = get_current_app_io();
 
 	fs::path path = path_from_emu(filename);
+	spdlog::info("vm_file_open: {} -> {}, mode={}", UCS2_to_path(filename).string(), path.string(), mode);
 
 	std::string fmode;
 	std::string fmode2;
@@ -199,8 +201,9 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 	}
 
 	std::error_code ec;
-	if (mode != MODE_READ) 
-		fs::create_directories(path.parent_path(), ec); // This is right way?
+	if (mode != MODE_READ) {
+		fs::create_directories(path.parent_path(), ec);
+	}
 
 #ifdef _WIN32
 	std::wstring wfmode(fmode.begin(), fmode.end());
@@ -221,10 +224,13 @@ VMFILE vm_file_open(const VMWSTR filename, VMUINT mode, VMUINT binary) {
 		return -2;
 	}
 
-	return io.files.push(f);
+	return (VMFILE)io.files.push(f);
 }
 
 void vm_file_close(VMFILE handle) {
+	if (handle <= 0)
+		return;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (io.files.is_active(handle)) {
@@ -237,6 +243,9 @@ void vm_file_close(VMFILE handle) {
 }
 
 VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
+	if (handle <= 0 || !data || !nread)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle] || !data || !nread)
@@ -251,6 +260,9 @@ VMINT vm_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
 }
 
 VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
+	if (handle <= 0 || !data || !written)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle] || !data || !written)
@@ -269,6 +281,9 @@ VMINT vm_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
 }
 
 VMINT vm_file_commit(VMFILE handle) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -282,6 +297,9 @@ VMINT vm_file_commit(VMFILE handle) {
 }
 
 VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -304,6 +322,9 @@ VMINT vm_file_seek(VMFILE handle, VMINT offset, VMINT base) {
 }
 
 VMINT vm_file_tell(VMFILE handle) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -318,6 +339,9 @@ VMINT vm_file_tell(VMFILE handle) {
 }
 
 VMINT vm_file_is_eof(VMFILE handle) {
+	if (handle <= 0)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle])
@@ -327,6 +351,9 @@ VMINT vm_file_is_eof(VMFILE handle) {
 }
 
 VMINT vm_file_getfilesize(VMFILE handle, VMUINT* file_size) {
+	if (handle <= 0 || !file_size)
+		return -1;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	if (!io.files.is_active(handle) || !io.files[handle] || !file_size)
@@ -390,6 +417,63 @@ VMINT vm_file_mkdir(const VMWSTR dirname) {
 		return -1;
 }
 
+VMINT vm_file_rmdir(const VMWSTR dirname) {
+	fs::path path = path_from_emu(dirname);
+	std::error_code ec;
+	fs::remove_all(path, ec);
+	if (!ec)
+		return 0;
+	else
+		return -1;
+}
+
+const VMWCHAR* vm_get_default_folder_path(vm_fmgr_default_folder_enum type) {
+	static const VMWCHAR p_ebooks[] = { 'e', ':', '\\', 'e', 'b', 'o', 'o', 'k', 's', '\\', 0 };
+	static const VMWCHAR p_images[] = { 'e', ':', '\\', 'i', 'm', 'a', 'g', 'e', 's', '\\', 0 };
+	static const VMWCHAR p_audio[]  = { 'e', ':', '\\', 'a', 'u', 'd', 'i', 'o', '\\', 0 };
+	static const VMWCHAR p_video[]  = { 'e', ':', '\\', 'v', 'i', 'd', 'e', 'o', '\\', 0 };
+	static const VMWCHAR p_swflash[]= { 'e', ':', '\\', 's', 'w', 'f', 'l', 'a', 's', 'h', '\\', 0 };
+	static const VMWCHAR p_langln[] = { 'e', ':', '\\', 'l', 'a', 'n', 'g', 'l', 'n', '\\', 0 };
+	static const VMWCHAR p_temp[]   = { 'e', ':', '\\', 't', 'e', 'm', 'p', '\\', 0 };
+	static const VMWCHAR p_themes[] = { 'e', ':', '\\', 't', 'h', 'e', 'm', 'e', 's', '\\', 0 };
+	static const VMWCHAR p_barcode[]= { 'e', ':', '\\', 'b', 'a', 'r', 'c', 'o', 'd', 'e', '\\', 0 };
+	static const VMWCHAR p_mmsbox[] = { 'e', ':', '\\', 'm', 'm', 's', 'b', 'o', 'x', '\\', 0 };
+	static const VMWCHAR p_root[]   = { 'e', ':', '\\', 0 };
+
+	const VMWCHAR* res = p_root;
+	switch (type) {
+	case VM_FMGR_DEFAULT_FOLDER_EBOOKS:  res = p_ebooks; break;
+	case VM_FMGR_DEFAULT_FOLDER_IMAGES:  res = p_images; break;
+	case VM_FMGR_DEFAULT_FOLDER_AUDIO:   res = p_audio; break;
+	case VM_FMGR_DEFAULT_FOLDER_VIDEO:   res = p_video; break;
+	case VM_FMGR_DEFAULT_FOLDER_SWFLASH: res = p_swflash; break;
+	case VM_FMGR_DEFAULT_FOLDER_LANGLN:  res = p_langln; break;
+	case VM_FMGR_DEFAULT_FOLDER_TEMP:    res = p_temp; break;
+	case VM_FMGR_DEFAULT_FOLDER_THEMES:  res = p_themes; break;
+	case VM_FMGR_DEFAULT_FOLDER_BARCODE: res = p_barcode; break;
+	case VM_FMGR_DEFAULT_FOLDER_MMSBOX:  res = p_mmsbox; break;
+	case VM_FMGR_DEFAULT_FOLDER_ROOT:    res = p_root; break;
+	default:                             res = p_root; break;
+	}
+
+	fs::path host_path = path_from_emu(res);
+	std::error_code ec;
+	fs::create_directories(host_path, ec);
+
+	static VMWCHAR* guest_buf = nullptr;
+	if (!guest_buf) {
+		guest_buf = (VMWCHAR*)Memory::shared_malloc(256);
+	}
+	int len = 0;
+	while (res[len]) {
+		guest_buf[len] = res[len];
+		len++;
+	}
+	guest_buf[len] = 0;
+
+	return guest_buf;
+}
+
 VMINT vm_file_set_attributes(const VMWSTR filename, VMBYTE attributes) {
 	fs::path path = path_from_emu(filename);
 	return 0; //todo
@@ -449,6 +533,9 @@ VMINT vm_find_next(VMINT handle, struct vm_fileinfo_t* info) {
 	return 0;
 }
 void vm_find_close(VMINT handle) {
+	if (handle <= 0)
+		return;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	io.find.remove(handle);
@@ -512,6 +599,9 @@ VMINT vm_find_next_ext(VMINT handle, vm_fileinfo_ext* direntry) {
 }
 
 void vm_find_close_ext(VMINT handle) {
+	if (handle <= 0)
+		return;
+
 	MREngine::AppIO& io = get_current_app_io();
 
 	io.find_ext.remove(handle);
@@ -555,11 +645,182 @@ VMINT vm_get_system_driver(void) {
 }
 
 VMUINT vm_get_disk_free_space(VMWSTR drv_name) {
+	if (drv_name) {
+		const unsigned char* p = (const unsigned char*)drv_name;
+		char drive = 0;
+		if (p[0] != 0 && p[1] != 0) {
+			// ASCII string (e.g. "c", "c:", "c:\\")
+			const char* cp = (const char*)drv_name;
+			while (*cp) {
+				if ((*cp >= 'a' && *cp <= 'z') || (*cp >= 'A' && *cp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*cp);
+					break;
+				}
+				cp++;
+			}
+		} else {
+			// UCS-2 string (e.g. L"c", L"c:", L"c:\\")
+			const VMWCHAR* wp = (const VMWCHAR*)drv_name;
+			while (*wp) {
+				if ((*wp >= 'a' && *wp <= 'z') || (*wp >= 'A' && *wp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*wp);
+					break;
+				}
+				wp++;
+			}
+		}
+	}
 	return 256 * 1024 * 1024;
 }
 
 VMINT vm_get_disk_info(const VMCHAR* drv_name, vm_fs_disk_info* fs_disk, vm_fs_di_enum e_di) {
-	return -1;
+	if (!fs_disk)
+		return -1;
+	memset(fs_disk, 0, sizeof(vm_fs_disk_info));
+
+	char drive = 'C';
+	if (drv_name) {
+		const unsigned char* p = (const unsigned char*)drv_name;
+		if (p[0] != 0 && p[1] != 0) {
+			// ASCII string
+			const char* cp = (const char*)drv_name;
+			while (*cp) {
+				if ((*cp >= 'a' && *cp <= 'z') || (*cp >= 'A' && *cp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*cp);
+					break;
+				}
+				cp++;
+			}
+		} else {
+			// UCS-2 string
+			const VMWCHAR* wp = (const VMWCHAR*)drv_name;
+			while (*wp) {
+				if ((*wp >= 'a' && *wp <= 'z') || (*wp >= 'A' && *wp <= 'Z')) {
+					drive = (char)toupper((unsigned char)*wp);
+					break;
+				}
+				wp++;
+			}
+		}
+	}
+
+	fs_disk->DriveLetter = drive;
+	fs_disk->WriteProtect = 0;
+	fs_disk->FATType = 32;
+	fs_disk->FATCount = 2;
+	fs_disk->BytesPerSector = 512;
+	fs_disk->SectorsPerCluster = 8;
+	fs_disk->TotalClusters = 65536;
+	fs_disk->FreeClusters = 65536;
+	fs_disk->LargestFreeChain = 65536;
+	fs_disk->FreeChains = 1;
+	strcpy(fs_disk->Label, "MRE");
+	return 0;
+}
+
+static fs::path get_sys_file_path() {
+	std::string stem;
+	fs::path rp = get_current_app_real_path();
+	if (!rp.empty())
+		stem = rp.stem().string();
+	if (stem.empty())
+		stem = get_current_app_name();
+	if (stem.empty()) {
+		fs::path p = get_current_app_path();
+		stem = p.stem().string();
+	}
+	if (stem.empty())
+		stem = "app";
+
+	// Sanitize stem: remove characters not allowed in file names
+	for (char& c : stem) {
+		if (c == '\\' || c == '/' || c == ':' || c == '*' || c == '?' ||
+			c == '"' || c == '<' || c == '>' || c == '|' || c == '@') {
+			c = '_';
+		}
+	}
+
+	fs::path sys_dir = (base_path / "fs" / "c").make_preferred();
+	std::error_code ec;
+	fs::create_directories(sys_dir, ec);
+
+	return (sys_dir / ("@" + stem + ".sys")).make_preferred();
+}
+
+VMFILE vm_sys_file_open(VMUINT mode, VMUINT binary) {
+	MREngine::AppIO& io = get_current_app_io();
+	fs::path path = get_sys_file_path();
+
+	std::string fmode;
+	switch (mode) {
+	case MODE_READ:
+		fmode = "rb";
+		break;
+	case MODE_WRITE:
+		fmode = "r+b";
+		break;
+	case MODE_CREATE_ALWAYS_WRITE:
+		fmode = "w+b";
+		break;
+	case MODE_APPEND:
+		fmode = "a+b";
+		break;
+	default:
+		return -1;
+	}
+
+	std::error_code ec;
+	if (mode != MODE_READ) {
+		fs::create_directories(path.parent_path(), ec);
+	}
+
+#ifdef _WIN32
+	std::wstring wfmode(fmode.begin(), fmode.end());
+	FILE* f = _wfopen(path.wstring().c_str(), wfmode.c_str());
+	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
+		f = _wfopen(path.wstring().c_str(), L"w+b");
+#else
+	FILE* f = fopen(path.string().c_str(), fmode.c_str());
+	if (!f && (mode == MODE_WRITE || mode == MODE_APPEND))
+		f = fopen(path.string().c_str(), "w+b");
+#endif
+
+	if (!f) {
+		spdlog::warn("vm_sys_file_open({}, {}) = -1", path.string(), mode);
+		return -1;
+	}
+
+	return (VMFILE)io.files.push(f);
+}
+
+VMINT vm_sys_file_seek(VMFILE handle, VMINT offset, VMINT base) {
+	return vm_file_seek(handle, offset, base);
+}
+
+VMINT vm_sys_file_read(VMFILE handle, void* data, VMUINT length, VMUINT* nread) {
+	return vm_file_read(handle, data, length, nread);
+}
+
+VMINT vm_sys_file_write(VMFILE handle, void* data, VMUINT length, VMUINT* written) {
+	return vm_file_write(handle, data, length, written);
+}
+
+void vm_sys_file_close(VMFILE h) {
+	vm_file_close(h);
+}
+
+VMINT vm_sys_file_delete(void) {
+	fs::path path = get_sys_file_path();
+	std::error_code ec;
+	if (fs::exists(path, ec)) {
+		if (!fs::remove(path, ec))
+			return -1;
+	}
+	return 0;
+}
+
+VMINT vm_sys_file_get_space(void) {
+	return 128 * 1024 * 1024;
 }
 
 VMINT vm_is_support_keyborad(void) {
@@ -574,7 +835,9 @@ VMINT vm_is_support_pen_touch(void) {
 VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
 	if (filename[0] == '@') {
 		fs::path vpath = UCS2_to_path((VMWSTR)filename);
-		uint32_t adr;
+		// Initialise before sscanf: on a malformed "@:\<name>.rom" the parse fails
+		// and an uninitialised adr would be turned into a wild host pointer.
+		uint32_t adr = 0;
 		sscanf(vpath.stem().string().c_str(), "%d", &adr);
 		return vm_get_vm_tag_from_rom((VMUINT8*)ADDRESS_FROM_EMU(adr), tag_num, buf, buf_size);
 	}
@@ -654,4 +917,48 @@ VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size
 	*buf_size = tag_size;
 
 	return GET_TAG_TRUE;
+}
+fs::path get_current_app_real_path() {
+	return get_current_app_path();
+}
+
+std::string get_current_app_name() {
+	fs::path p = get_current_app_path();
+	return p.stem().string();
+}
+
+#pragma pack(push, 1)
+struct multi_tag_emu {
+	VMINT tag_id[10];
+	VMINT tag_len[10];
+	uint32_t tag_content[10];
+};
+#pragma pack(pop)
+
+VMINT vm_get_multi_tags(short* filename, struct multi_tag_t* tag_req) {
+	if (!tag_req) return GET_TAG_ERROR;
+	multi_tag_emu* req = (multi_tag_emu*)tag_req;
+	VMINT result = GET_TAG_TRUE;
+
+	for (int i = 0; i < 10; i++) {
+		if (req->tag_id[i] == 0)
+			continue;
+		void* buf = (void*)ADDRESS_FROM_EMU(req->tag_content[i]);
+		int buf_size = req->tag_len[i];
+		VMINT ret = vm_get_vm_tag(filename, req->tag_id[i], buf, &buf_size);
+		if (ret == GET_TAG_TRUE) {
+			req->tag_len[i] = buf_size;
+		} else {
+			if (result == GET_TAG_TRUE)
+				result = ret;
+		}
+	}
+	return result;
+}
+
+static VMUINT8 g_kbd_mode = 0;
+
+VMINT vm_kbd_set_mode(VMUINT8 mode) {
+	g_kbd_mode = mode;
+	return 0; // VM_KBD_MODE_ERR_SUCCESS
 }

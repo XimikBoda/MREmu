@@ -39,6 +39,21 @@ public:
 		int8_t key_status = VM_KEY_EVENT_DOWN;
 		key_source source = Unknow;
 
+		// Auto-repeat bookkeeping. The first repeat fires after
+		// INITIAL_REPEAT_DELAY_MS; each subsequent repeat fires sooner, so a held
+		// key accelerates.
+		//
+		// The floor is REPEAT_DELAY_MIN rather than something lower on purpose. The
+		// app selector fires a vibration tick on every selection change, and a
+		// rotating-mass motor needs that long to spin up and settle between
+		// pulses. Repeating faster than that cancels the mass mid spin-up and the
+		// buzz comes out as a stutter instead of a tick.
+		bool repeat_started = false;
+		int repeat_delay_ms = 300;   // delay between repeats, after the initial hold
+		static constexpr int INITIAL_REPEAT_DELAY_MS = 500;
+		static constexpr int REPEAT_DELAY_MIN = 120;
+		static constexpr int REPEAT_DELAY_STEP = 50;
+
 		pkey_t() = default;
 		pkey_t(int key_code, key_source source);
 	};

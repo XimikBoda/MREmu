@@ -1,10 +1,11 @@
 #include "../AppManager.h"
+#include "../MREngine/Graphic.h"
 #include "KeyboardControl.h"
 #include <vmio.h>
 #include <vector>
+#include <algorithm>
 
 App* get_active_app();
-extern MREngine::Graphic* graphic;
 
 KeyboardControl::pkey_t::pkey_t(int key_code, key_source source) {
 	this->key_code = key_code;
@@ -12,12 +13,26 @@ KeyboardControl::pkey_t::pkey_t(int key_code, key_source source) {
 }
 
 void KeyboardControl::update() {
-	for (int i = 0; i < pkey.size(); ++i)
-		if (pkey[i].tim.getElapsedTime().asMilliseconds() >= 500) {
+	for (int i = 0; i < pkey.size(); ++i) {
+		int threshold = pkey[i].repeat_started
+			? pkey[i].repeat_delay_ms
+			: pkey_t::INITIAL_REPEAT_DELAY_MS;
+		if (pkey[i].tim.getElapsedTime().asMilliseconds() >= threshold) {
 			pkey[i].tim.restart();
-			if (pkey[i].key_status < VM_KEY_EVENT_REPEAT)
-				pkey[i].key_status++;
+			if (!pkey[i].repeat_started) {
+				// First repeat, after the initial hold.
+				pkey[i].repeat_started = true;
+				pkey[i].repeat_delay_ms = 300;
+			}
+			else {
+				// Accelerate: shorten the delay for the next repeat.
+				pkey[i].repeat_delay_ms = std::max(
+					pkey_t::REPEAT_DELAY_MIN,
+					pkey[i].repeat_delay_ms - pkey_t::REPEAT_DELAY_STEP);
+			}
+			add_keyboard_event(VM_KEY_EVENT_REPEAT, pkey[i].key_code);
 		}
+	}
 }
 
 int KeyboardControl::find_key(int key_code) {
@@ -41,7 +56,7 @@ void KeyboardControl::press_key(int key_code, key_source source) {
 		if (key_code == MREMU_KEY_PRINTSCREEN){ //TODO
 			auto app = get_active_app();
 			if (app) {
-				graphic->screenshot(app->app_name);
+				MREngine::graphic->screenshot(app->app_name);
 			}
 
 		}

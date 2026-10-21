@@ -1,0 +1,143 @@
+filename,app_name,developer,version,ram_kb,resolution,file_size_bytes,is_ads,is_zipped,is_gameloft,gameloft_evidence
+Adam n Eve 240x320.vxp,adameve,MTK,1.0.0,800,240x320,268386,True,True,False,
+Asphalt.vxp,Asphalt,GameLoft,0,1200,any,284373,True,True,True,dev_name='GameLoft'; string: 'T.lang..H..0...gameloft_logo.bsprite..H......bg_al'
+Assassin's Creed Unity.vxp,Assassin's Creed Unity,ORIGINDATA LTD,0.1.0,3000,240x320,838109,True,False,False,
+AssassinCreed3.vxp,AssassinCreed3,Gameloft,0.3.0,1500,any,269460,True,True,True,dev_name='Gameloft'; string: 's....http://dl.gameloft.com/install.php..%s?d=%s.9'
+Asteroids (Multi-Screen).vxp,Asteroids,VHIT.info,1.0.0,500,any,34584,False,False,False,
+Asteroids 320x480.vxp,Asteroids,VHIT.info,1.0.0,500,320x480,27556,False,False,False,
+Bali Puzzle.vxp,Bali Puzzle,Gmobi,0.1.0,600,any,370745,True,True,False,
+Banana War 240x320.vxp,Banana War,sharejoy,0.1.0,600,any,140600,True,True,False,
+Beauty Mora.vxp,Beauty Mora,GMobi,0.1.0,800,any,1174922,True,True,False,
+Bike Adventure 176x220.vxp,BIKE_ADVENTURE,MMT,1.0.0,700,176x220,120971,True,True,False,
+Bike Adventure 240x320.vxp,BIKE_ADVENTURE,MMT,1.0.0,800,240x320,159037,True,True,False,
+Bikini Beach Bowling.vxp,Bikini Beach Bowling,Indiagames,1.0.0,1000,240x320,126777,True,True,False,
+Block Breaker 3 Unlimited TS 240x320.vxp,BlockBreaker3,MTK,0,800,any,234504,True,True,False,
+Block Breaker 3.vxp,BlockBreaker3,Gameloft,0,800,any,251846,True,True,True,dev_name='Gameloft'; string: 's....http://dl.gameloft.com/install.php..%s?d=%s.9'
+BlowingSkirt.vxp,BlowingSkirt,sharejoy,2.0.1,800,any,623473,True,True,False,
+Boulder Dash 240x320.vxp,Boulder Dash,MTK,0,800,240x320,385142,True,True,False,
+Brain Challenge 3 240x320.vxp,BrainChallenge3,Gameloft,0,1500,any,224472,True,True,True,dev_name='Gameloft'; string: 'https://secure.gameloft.com/partners/android/vk.ph'
+Brain Challenge 3 320x480.vxp,BrainChallenge3,Gameloft,3.0.1,1500,any,329968,True,True,True,dev_name='Gameloft'; string: 'https://secure.gameloft.com/partners/android/vk.ph'
+Brain challenge 3.vxp,BrainChallenge3,Gameloft,0,1500,any,414466,True,False,True,dev_name='Gameloft'
+BrainChallenge3 (Brain Chalange 3).vxp,BrainChallenge3,Gameloft,3.0.1,1500,any,329968,True,True,True,dev_name='Gameloft'; string: 'https://secure.gameloft.com/partners/android/vk.ph'
+Bubble Frenzy.vxp,Bubble Frenzy,Baltoro Games,2.0.1,1500,any,663439,True,True,True,string: '_3.gif.2<..W...gameloft.gif..O...6..survival_bar_b'
+Bubble Hunter 240x320.vxp,Bubble hunter,wanxiang,0.1.0,600,240x320,85726,True,True,False,
+BubbleBash2.vxp,BubbleBash2,Gameloft,3.0.1,1500,any,296171,True,True,True,dev_name='Gameloft'; string: 'https://secure.gameloft.com/partners/android/vk.ph'
+Building.vxp,Building,Gmobi,0.1.0,600,any,409958,True,True,False,
+CHENNAI EXPRESS 240x320.vxp,Chennai Express,Indiagames,1.0.0,1000,240x320,104941,True,True,False,
+CROSSFIRE 240x320.vxp,crossfire,MTK,0,800,240x320,347004,True,True,False,
+Calculator.vxp,Calculator,LongInfinity,111,1024,any,132033,False,False,False,
+Call Of Duty 240x320.vxp,callduty,MTK,0,800,240x320,359905,True,True,False,
+Car Puzzle.vxp,Car Puzzle,Gmobi,3.0.1,800,any,488072,True,True,False,
+Car Race 240x320.vxp,Car Race,MTK,0,800,any,116627,True,True,False,
+Chopper Fury.vxp,Chopper Fury,ORIGINDATA LTD,1.0.1,800,any,460553,True,False,False,
+Classi_qv_en.vxp,Classi_qv_en,GMobi,2.2.0,800,240x320,241228,True,True,False,
+Cricket 2016.vxp,Cricket 2016,Gameloft,0.1.0,1500,any,495259,True,True,True,dev_name='Gameloft'; string: '_3.gif.;!..?...gameloft_logo.gif.z-......font.gif.'
+Cricket Pro Tour.vxp,Cricket Pro Tour,ORIGINDATA LTD,0.1.0,1000,240x320,503797,True,False,False,
+Cricket.vxp,cricket,sharejoy,1.3.0,600,240x320,172753,True,True,False,
+Crocodile Eat Eat 240x320.vxp,CrocodileEat,MTK,0,800,240x320,295510,True,True,False,
+DangerDash.vxp,DangerDash,Gameloft,1.0.1,2500,any,600603,True,True,True,dev_name='Gameloft'; string: 'guages.6I../...gameloft_logo.png.eI......AppLogo.i'
+Demo.vxp,Demo,MTK,0,800,240x320,379040,True,True,False,
+DiamondTwister2.vxp,DiamondTwister2,Gameloft,0.3.0,800,any,338975,True,True,True,dev_name='Gameloft'; string: 'sprite..6...<..gameloft.bsprite.~s...-..Character1'
+Doodle Jump.vxp,Doodle Jump,Lima Sky,7.0.1,1500,any,287183,True,False,False,
+Dragon Fire 240x320.vxp,Fly,wanxiang,5.0.1,600,240x320,116301,True,True,False,
+Dragon Hunter 240x320.vxp,DNF,MTK,0,800,240x320,310800,True,True,False,
+EgyptCode.vxp,EgyptCode,Mtone Wireless,5.0.1,600,240x320,153299,True,True,False,
+Facebook.vxp,Facebook,MediaTek Inc.,9.16.1,570,any,227657,True,False,False,
+Fishing Captain.vxp,Fishing Captain,ORIGINDATA LTD,1.0.1,800,any,361297,True,False,False,
+Fishing Master 240x320.vxp,Fishing Master,MTK,0,700,240x320,145461,True,True,False,
+Flyman 240x320.vxp,FlyMan,ISVN,0.1.0,800,240x320,179482,True,True,False,
+Football Baby Puzzle.vxp,Football Baby Puzzle,General Mobile,2.0.1,500,any,324587,True,True,False,
+FrogTerminator.vxp,FrogTerminator,MTK,0,800,240x320,273548,True,True,False,
+FruitLink.vxp,FruitLink,sharejoy,1.0.0,600,any,184890,True,True,False,
+Fun Park CN 240x320.vxp,çÍ·×ÀÖÔ°,·ÖÀÖ,0.1.0,600,any,254843,,,False,
+Funbox.vxp,Funbox,General Mobile,3.5.1,500,any,90621,True,True,False,
+Funny Bubble 240x320.vxp,funny bubble,MTK,0,800,240x320,149504,True,True,False,
+G-FLY CN 240x320.vxp,°®ÇéÁéÊý,G-FLY,0.1.0,700,any,596386,,,False,
+GPT.vxp,GPT,gvl610,1.0.0,3072,any,149189,False,False,False,
+GTRacing2.vxp,GTRacing2,Gameloft,0.1.0,1500,any,468995,True,True,True,dev_name='Gameloft'; string: 'ANG_DE.S...{...gameloft.png.........splash.bsprite'
+GalaxyFight.vxp,GalaxyFight,MTK,1.0.0,800,240x320,334923,True,True,False,
+GameBox 6 in 1 (6 In 1 Gamebox full version).vxp,GameBox 6 in 1,ORIGINDATA LTD,3.0.1,800,any,361065,True,False,False,
+Gamebox 6 In 1 240x320.vxp,GameBox 6 in 1,sharejoy,0.1.0,800,any,242987,True,True,False,
+Gameloft Live.vxp,Shop,Gameloft,0,800,any,223127,True,True,True,dev_name='Gameloft'; string: 'ng.png.x{..w...gameloft_logo.png..|......loading.g'
+GamesAndApps.vxp,GamesAndApps,Gameloft,8.0.1,1500,any,303262,True,True,True,dev_name='Gameloft'; string: '....http://iap.gameloft.com/partners/nokia-mrestor'
+Gangnam Puzzle 240x320.vxp,GangnamPuzzle,Gmobi,0.1.0,600,any,394698,True,True,False,
+GangstarRio.vxp,GangstarRio,Gameloft,0.1.0,1500,any,546789,True,True,True,dev_name='Gameloft'; string: 'n.........Logo_Gameloft.bsprite.R.......menu_strip'
+Girl Tetris CN 240x320.vxp,ÃÀÉÙÅ®ìÅ²Ê·½¿é,ÀÖ¶à,2.0.1,600,240x320,292996,,,False,
+GirlSlot.vxp,GirlSlot,Mtone Wireless,6.0.1,600,240x320,276624,True,True,False,
+GoKartmania 2.vxp,GoKartmania 2,Baltoro Games,0.1.0,1500,any,504833,True,True,True,string: '80.gif.L.......gameloft.gif.U.......profiles_1....'
+GoldenMiner.vxp,GoldenMiner,Mtone Wireless,0.1.0,600,240x320,190380,True,True,False,
+Goolie.vxp,Goolie,Indiagames,0,1000,240x320,59546,True,True,False,
+Gravity Defied (x86).vxp,GravityDefied,Ximik_Boda,1.0.0,900,any,924220,False,False,False,
+Gravity Defied.vxp,GravityDefied,Ximik_Boda,1.0.0,900,any,354772,False,False,False,
+HOUSE OF WAR 240x320.vxp,house of war,General Mobile,7.1.3,600,240x320,200499,True,True,False,
+Hamering Mole 240x320.vxp,Hammering Moles,sharejoy,1.0.1,600,any,160024,True,True,False,
+Happy Egg 240x320.vxp,HappyEgg,Mtone Wireless,0.1.0,600,240x320,100191,True,True,False,
+Happy Farm CN 240x320.vxp,¿ªÐÄÅ©³¡,ÕÆÐÇÎÞÏÞ,0.1.0,800,240x320,383221,,,False,
+HappyWar.vxp,HappyWar,Mtone Wireless,5.0.1,600,240x320,126315,True,True,False,
+Hero Hoops 240x320.vxp,herohoops,MTK,0,800,240x320,220014,True,True,False,
+Humayun Rashid - Doreamon and nobita adventures.vxp,,,,,,291820,,,False,
+HungryBird 240x320.vxp,HungreeBirds,Indiagames,0,1000,240x320,70828,True,True,False,
+Ice Hot People 240x320.vxp,ice hot people,MTK,0,800,240x320,122064,True,True,False,
+Island Adventure 240x320.vxp,Island Adventure,MTK,1.0.0,800,240x320,220578,True,True,False,
+Jewel Match 240x320.vxp,Jewel Match,sharejoy,1.0.1,700,any,230387,True,True,False,
+KING COMBAT III 240x320.vxp,KingCombat,Mtone Wireless,0.1.0,800,240x320,349665,True,True,False,
+KidsAbc 240x320.vxp,KIDS ABC,MTK,0,600,240x320,259433,True,True,False,
+Kung Fu Rabbit 240x320.vxp,kung fu rabbit,MTK,1.0.0,800,240x320,194146,True,True,False,
+Little Big City Mobile Freemium.vxp,LittleBigCity,Gameloft,0,3000,any,1019188,True,False,True,dev_name='Gameloft'; string: '7%d_......%c:\@GameLoftDB\........%c:\@GameLoftDB\'
+Little Big City demo.vxp,LittleBigCity,Gameloft,3.0.1,1500,any,270186,True,True,True,dev_name='Gameloft'; string: 'sprite..M..G...gameloft_logo.bsprite..a......TUTOR'
+Lock D Block TETRIS 240x320.vxp,Lock 'D' Block,MMT,0.1.0,550,240x320,85936,True,True,False,
+MODERN COMBAT 2 240x320.vxp,ModernCombat2,Gameloft,0,800,any,344283,True,False,True,dev_name='Gameloft'; string: '40_EN.gif......gameloft_logo.bsprite..softkey.bspr'
+MONSTER MATCH 240x320.vxp,MonsterMatch,Gmobi,0.1.0,600,any,231224,True,True,False,
+Messenger.vxp,Messenger,MediaTek Inc.,2.0.1,800,128x160,409416,True,True,True,string: '7...http://iap.gameloft.com/mre/updates/?platform_'
+Metal Slug.vxp,Metal Slug,MTK,0,800,240x320,255631,True,True,False,
+MidnightPool3.vxp,MidnightPool3,Gameloft,0.3.0,800,any,331163,True,True,True,dev_name='Gameloft'; string: '..>..:...table_gameloft.bsprite.LV......view3d_cue'
+MonkeyTravels_qv_en.vxp,MonkeyTravels_qv_en,GMobi,1.0.1,800,any,308493,True,True,False,
+Moto Race 320x480.vxp,Moto,Mtone Wireless,0.1.0,1500,320x480,420718,True,True,False,
+Mrecp.vxp,Mrecp,RDZDX,1.0.0,1500,any,232915,False,False,False,
+N.O.V.A.3 240x320.vxp,NOVA3,Gameloft,0.1.0,1500,any,461406,True,True,True,dev_name='Gameloft'; string: 'my.mid.........gameloft_logo.bsprite.g.......menu_'
+Niblp.vxp,Niblp,RDZDX,1.0.0,512,any,15537,False,False,False,
+Opera Mini (4.4).vxp,Opera Mini,Opera Software,0,1500,any,834141,True,False,False,
+Opera Mini (4.4.0).vxp,Opera Mini,Opera Software,4.4.0,1500,any,637265,True,False,False,
+Opera Mini (6.1).vxp,Opera Mini,Opera,0,4500,any,2041317,True,False,False,
+Parkour 240x320.vxp,Parkour,Mtone Wireless,5.0.1,600,240x320,118439,True,True,False,
+PeanutVXP (1.0.0).vxp,PeanutVXP,gtrxAC,1.0.0,2500,any,121896,False,False,False,
+PeanutVXP (115 KB).vxp,PeanutVXP,gtrxAC,1.0.0,1200,any,117964,False,False,False,
+PeanutVXP.vxp,PeanutVXP,gtrxAC,1.0.0,512,any,117964,False,False,False,
+Princess wall.vxp,Princess wall,wanxiang,10.0.1,600,any,89572,True,True,False,
+Real Football 2012 240x320.vxp,RF2012,Gameloft,0,1500,any,340085,True,True,True,dev_name='Gameloft'; string: 's....http://dl.gameloft.com/install.php..%s?d=%s.9'
+Return Home.vxp,Return Home,MTK,0,800,240x320,293913,True,True,False,
+Runaway Car 240x320.vxp,Runaway Car,MTK,0,800,240x320,281743,True,True,False,
+SMASHnWIN.vxp,SMASHnWIN,MMT,0.1.0,800,240x320,118473,True,True,False,
+Sexygirl Puzzle.vxp,Sexygirl Puzzle,Gmobi,3.0.1,600,any,422863,True,True,False,
+Shop (Gameloft store live).vxp,Shop,Gameloft,0,800,any,232011,True,True,True,dev_name='Gameloft'; string: 'ng.png.....w...gameloft_logo.png.........loading.g'
+Show_picture.vxp,Show_picture,RDZDX,1.0.0,500,any,43666,False,False,False,
+Skateboard.vxp,Skateboard,Gameloft,0.1.0,1000,any,190345,True,True,True,"dev_name='Gameloft'; string: 'ng.bmp.ga......gameloft_logo.gif._t...""..MENU.LANG'"
+Slice Fruit.vxp,Slice Fruit,MTK,0,800,240x320,317991,True,True,False,
+Soccer Puzzle.vxp,Soccer Puzzle,Gmobi,3.0.1,800,any,438069,True,True,False,
+StarZuma.vxp,StarZuma,MTK,0,800,240x320,596847,True,True,False,
+Starwars 240x320.vxp,OperaMini,Vogins,0.1.0,800,any,179489,,,False,
+SubwaySurfers.vxp,SubwaySurfers,Gameloft,1.0.1,3000,any,833227,True,True,True,dev_name='Gameloft'; string: 'us.str.........gameloft_logo.bsprite......q..loadi'
+Super Gem Twist.vxp,Super Gem Twist,ORIGINDATA LTD,1.0.1,1200,any,348437,True,False,False,
+Super Mario.vxp,Super Mario,MTK,0,800,240x320,245649,True,True,False,
+Superman 240x320.vxp,OperaMini,Vogins,0.1.0,800,any,119571,,,False,
+Sushi Shuffle.vxp,Sushi Shuffle,GLU,0.1.0,550,240x320,172335,True,True,False,
+Tap Tap Tap.vxp,Tap Tap Tap,M Bounce Limited,0.1.0,600,240x320,149135,True,True,False,
+Tear Dress TS.vxp,TearDress,Mtone Wireless,5.0.1,600,240x320,369475,True,True,False,
+Teddy Flashing Card Cn.vxp,·­·­ÀÖ,ÎÖÇÚ,0.1.0,700,any,81463,,,False,
+Textep.vxp,Textep,RDZDX,1.0.0,512,any,17888,False,False,False,
+The Amazing Spider-Man (Demo).vxp,Spiderman4,Gameloft,1.0.0,1200,any,328202,True,True,True,dev_name='Gameloft'; string: 's....http://dl.gameloft.com/install.php..%s?d=%s.9'
+The Assembly Cn.vxp,¿¹ÈÕ¼¯½áºÅ,ÒÆÓé,1.0.1,600,240x320,194246,,,False,
+The Avengers (1.0.0).vxp,The Avengers,Gameloft,1.0.0,2000,any,408186,True,False,True,dev_name='Gameloft'; string: '........  2012 GAMELOFT............8@-..U...@...P.'
+The Avengers (3.0.0).vxp,The Avengers,Gameloft,3.0.0,1500,any,339964,True,True,True,dev_name='Gameloft'; string: '...<....  2014 GAMELOFT........;....A-..U.......p.'
+The Yulgang Tianxian Recorded 240x320.vxp,ÈÈÑª½­ºþÌìÐþÂ¼,ºÆÌìÍ¶×Ê,4.0.1,800,any,169160,,,False,
+Three Kingdoms Magestic 240x320.vxp,Èý¹úÖ¾ÈºÓ¢»á,öèÓÎ,0.1.0,800,any,602965,,,False,
+Toribash.vxp,Toribash,MTK,1.0.0,800,any,314720,True,True,False,
+Warcraft Link-up.vxp,Warcraft Link-up,wangxiang,2.0.1,700,240x320,90274,True,True,False,
+Whereischeese.vxp,Whereischeese,MTK,0,800,any,166104,True,True,False,
+World War II.vxp,World War II,MTK,0,1000,any,446014,True,True,False,
+Zapper Racing.vxp,Zapper Racing,MTK,0,500,240x320,102659,True,True,False,
+Zombieinfection.vxp,Zombieinfection,MTK,0,800,240x320,169972,True,True,False,
+ZombiesvsPlant.vxp,ZombiesvsPlant,MTK,0,800,240x320,150302,True,True,False,
+click_to_game.vxp,click_to_game,MTK,0,800,any,75355,True,True,False,
+qvm.tank.qv.vxp,qvm.tank.qv,GMobi,4.0.1,800,240x320,358250,True,True,False,
+tranForm.vxp,tranForm,MTK,0,800,240x320,286218,True,True,False,

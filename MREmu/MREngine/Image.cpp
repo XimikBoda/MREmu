@@ -351,21 +351,21 @@ struct frame_prop* vm_graphic_get_img_property_FIX(VMINT_CANVAS hcanvas, VMUINT8
 
 	static struct frame_prop* info = (frame_prop*)Memory::shared_malloc(sizeof(frame_prop));
 
-	MREngine::canvas_signature* cs = (MREngine::canvas_signature*)(hcanvas);
-	if (memcmp(cs->magic, CANVAS_MAGIC, 9))
+	MREngine::canvas_signature* cs = find_canvas_signature((VMUINT8*)hcanvas);
+	if (!cs)
 		return 0;
-	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs + 1);
-
-	//TODO frame index
+	MREngine::canvas_frame_property* cfp_dst = get_canvas_frame_by_ind(cs, frame_index);
+	if (!cfp_dst)
+		return 0;
 
 	info->flag = cfp_dst->flag;
 	info->left = cfp_dst->left;
 	info->top = cfp_dst->top;
 	info->width = cfp_dst->width;
 	info->height = cfp_dst->height;
-	info->delay_time = cfp_dst->delay * 10; //todo check this
+	info->delay_time = cfp_dst->delay;
 	info->trans_color_index = cfp_dst->trans_color_index;
-	info->trans_color = cfp_dst->trans_color;
+	info->trans_color = (VMUINT16)cfp_dst->trans_color;
 	info->offset = cfp_dst->offset;
 
 	return info;

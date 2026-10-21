@@ -10,7 +10,7 @@
 #include <SFML/Graphics/Texture.hpp>
 #include <SFML/Graphics/Image.hpp>
 
-extern MREngine::Graphic* graphic;
+using MREngine::graphic;
 
 static bool is_skip_symbol(VMWCHAR c) {
 	return c < 0x20 || c == 0x7F;
@@ -19,6 +19,7 @@ static bool is_skip_symbol(VMWCHAR c) {
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 	sf::Image im;
 	int w = vm_graphic_get_string_width((VMWSTR)str.c_str());
+	if (w <= 0) w = 1;
 	im.create(w, 16, sf::Color::Transparent);
 
 	sf::Color* buf32_dst = (sf::Color*)im.getPixelsPtr();
@@ -32,16 +33,19 @@ sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 			continue;
 
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)str[i]];
+		if (data_offset == 0)
+			continue;
 
 		int ch_d = unifont_15_1_04_bin[data_offset];
 		int ch_w = ch_d & 0xF;
 		bool sho = ch_w >= 8;
+		int char_w = sho ? 16 : 8;
 
 		if (x_off >= w)
 			break;
 
-		int st_x = x_off;
-		int end_x = std::min<int>(w, x_off + ch_w + 1);
+		int st_x = std::max(0, x_off);
+		int end_x = std::min<int>(w, x_off + char_w);
 
 		for (int sy = st_y; sy < end_y; ++sy) {
 			int tex_ty = sy;
@@ -60,7 +64,7 @@ sf::Texture u16text_to_texture(std::u16string str, sf::Color c) {
 			}
 		}
 
-		x_off += ch_w + 1;
+		x_off += char_w;
 	}
 
 	sf::Texture tex;
@@ -80,12 +84,13 @@ VMINT vm_graphic_get_character_width(VMWCHAR c) {
 
 	int ch_d = unifont_15_1_04_bin[data_offset];
 	int ch_w = ch_d & 0xF;
-	return ch_w + 1;
+	return (ch_w >= 8) ? 16 : 8;
 }
 
 VMINT vm_graphic_get_string_width(VMWSTR str) {
 	if (!str)
 		return 0;
+
 	int w = 0;
 	for (int i = 0; str[i]; ++i) {
 		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)str[i]];
@@ -96,9 +101,9 @@ VMINT vm_graphic_get_string_width(VMWSTR str) {
 		int ch_d = unifont_15_1_04_bin[data_offset];
 		int ch_w = ch_d & 0xF;
 
-		w += ch_w + 1;
+		w += (ch_w >= 8) ? 16 : 8;
 	}
-	return w+1;
+	return w;
 }
 
 VMINT vm_graphic_get_string_height(VMWSTR str) {
@@ -143,8 +148,13 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	if (disp_buf == 0 || !s)
 		return;
 
-	MREngine::canvas_signature* cs_dst = (MREngine::canvas_signature*)(disp_buf - VM_CANVAS_DATA_OFFSET);
-	if (memcmp(cs_dst->magic, CANVAS_MAGIC, 9))
+	// Accept both buffer conventions. A layer hands out its pixel pointer, but
+	// vm_graphic_get_canvas_buffer hands out the canvas base, and an app drawing
+	// into a canvas it created passes that base straight in. Assuming only the
+	// pixel form made every text draw into an app canvas fail the magic check and
+	// silently draw nothing.
+	MREngine::canvas_signature* cs_dst = find_canvas_signature(disp_buf);
+	if (!cs_dst)
 		return;
 	MREngine::canvas_frame_property* cfp_dst = (MREngine::canvas_frame_property*)(cs_dst + 1);
 	unsigned short* buf16_dst = (unsigned short*)(cfp_dst + 1);
@@ -179,17 +189,18 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 		int ch_d = unifont_15_1_04_bin[data_offset];
 		int ch_w = ch_d & 0xF;
 		bool sho = ch_w >= 8;
+		int char_w = sho ? 16 : 8;
 
 		if (x_off >= right)
 			break;
 
-		if (x_off + ch_w < left) {
-			x_off += ch_w + 1;
+		if (x_off + char_w < left) {
+			x_off += char_w;
 			continue;
 		}
 
 		int st_x = std::max(left, x_off);
-		int end_x = std::min<int>(right, x_off + ch_w + 1);
+		int end_x = std::min<int>(right, x_off + char_w);
 
 		for (int sy = st_y; sy < end_y; ++sy) {
 			int tex_ty = sy - y;
@@ -208,7 +219,7 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 			}
 		}
 
-		x_off += ch_w + 1;
+		x_off += char_w;
 	}
 }
 
@@ -337,6 +348,154 @@ VMINT vm_graphic_get_highest_char_height_of_all_language(void);
 
 VMINT vm_graphic_get_char_height_alllang(VMINT size);
 
+VMINT vm_graphic_get_char_baseline_alllang(VMINT size);
+
+void raw_textout_to_buf(uint16_t* buf, int screen_w, int screen_h, int x, int y,
+	const std::u16string& str, uint16_t color, int clip_y1, int clip_y2) {
+	if (!buf || str.empty()) return;
+
+	int x_off = x;
+	for (size_t i = 0; i < str.length(); ++i) {
+		char16_t c = str[i];
+		if (is_skip_symbol(c)) continue;
+
+		int data_offset = ((unsigned int*)unifont_15_1_04_bin)[(unsigned short)c];
+		if (data_offset == 0) continue;
+
+		int ch_d = unifont_15_1_04_bin[data_offset];
+		int ch_w = ch_d & 0xF;
+		bool sho = ch_w >= 8;
+		int char_w = sho ? 16 : 8;
+
+		if (x_off + char_w > 0 && x_off < screen_w) {
+			for (int tex_ty = 0; tex_ty < 16; ++tex_ty) {
+				int py = y + tex_ty;
+				if (py < clip_y1 || py >= clip_y2 || py < 0 || py >= screen_h)
+					continue;
+
+				unsigned short line = 0;
+				if (sho)
+					line = (unifont_15_1_04_bin[data_offset + 2 + tex_ty * 2] << 8) |
+					       unifont_15_1_04_bin[data_offset + 2 + tex_ty * 2 + 1];
+				else
+					line = unifont_15_1_04_bin[data_offset + 2 + tex_ty] << 8;
+
+				for (int im_x = 0; im_x < char_w; ++im_x) {
+					int px = x_off + im_x;
+					if (px < 0 || px >= screen_w) continue;
+
+					if ((line >> (15 - im_x)) & 1) {
+						buf[py * screen_w + px] = color;
+					}
+				}
+			}
+		}
+		x_off += char_w;
+	}
+}
+
 VMINT vm_graphic_get_char_baseline_alllang(VMINT size) {
 	return vm_graphic_get_character_height();
 }
+
+VMINT vm_graphic_get_character_height_ex(VMUWCHAR c) {
+	return vm_graphic_get_character_height();
+}
+
+VMINT vm_graphic_get_highest_char_height_of_all_language(void) {
+	return vm_graphic_get_character_height();
+}
+
+VMINT vm_graphic_get_char_height_alllang(VMINT size) {
+	return vm_graphic_get_character_height();
+}
+
+VMUINT vm_graphic_get_char_num_in_width_ex(VMWCHAR* string, VMUINT width, VMINT checklinebreak, VMUINT gap) {
+	if (!string)
+		return 0;
+
+	VMUINT current_width = 0;
+	VMUINT count = 0;
+
+	for (int i = 0; string[i]; ++i) {
+		VMWCHAR c = string[i];
+		if (checklinebreak && (c == '\r' || c == '\n')) {
+			break;
+		}
+
+		int char_w = vm_graphic_get_character_width(c);
+		VMUINT next_width = current_width + char_w + (count > 0 ? gap : 0);
+		if (next_width > width) {
+			break;
+		}
+
+		current_width = next_width;
+		count++;
+	}
+
+	return count;
+}
+
+VMUINT vm_get_string_width_height_ex(
+	VMWCHAR* string,
+	VMINT gap,
+	VMINT n,
+	VMINT *pWidth,
+	VMINT *pHeight,
+	VMINT max_width,
+	VMUINT8 checkLineBreak,
+	VMUINT8 checkCompleteWord)
+{
+	if (pWidth) *pWidth = 0;
+	if (pHeight) *pHeight = vm_graphic_get_character_height();
+	if (!string) return 0;
+
+	int total_chars = 0;
+	while (string[total_chars] && (n < 0 || total_chars < n)) {
+		total_chars++;
+	}
+
+	int fit_chars = 0;
+	int fit_width = 0;
+
+	int last_word_boundary_chars = -1;
+	int last_word_boundary_width = 0;
+
+	int current_width = 0;
+	int count = 0;
+
+	for (int i = 0; i < total_chars; ++i) {
+		VMWCHAR c = string[i];
+		if (checkLineBreak && (c == '\r' || c == '\n')) {
+			break;
+		}
+
+		int char_w = vm_graphic_get_character_width(c);
+		int next_width = current_width + char_w + (count > 0 ? gap : 0);
+
+		if (max_width > 0 && next_width > max_width) {
+			if (checkCompleteWord && last_word_boundary_chars > 0) {
+				fit_chars = last_word_boundary_chars;
+				fit_width = last_word_boundary_width;
+			} else {
+				fit_chars = count;
+				fit_width = current_width;
+			}
+			if (pWidth) *pWidth = fit_width;
+			return fit_chars;
+		}
+
+		current_width = next_width;
+		count++;
+
+		if (checkCompleteWord && (c == ' ' || c == '\t')) {
+			last_word_boundary_chars = count;
+			last_word_boundary_width = current_width;
+		}
+	}
+
+	fit_chars = count;
+	fit_width = current_width;
+	if (pWidth) *pWidth = fit_width;
+	return fit_chars;
+}

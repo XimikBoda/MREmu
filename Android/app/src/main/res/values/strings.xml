@@ -2,4 +2,61 @@
 <resources>
     <string name="app_name">MREmu</string>
     <string name="title_activity_main">MainActivity</string>
+
+    <string name="about_title">About MREmu</string>
+    <string name="about_message">MREmu - MediaTek MRE / VRE emulator</string>
+    <string name="about_repo">Source repository</string>
+    <string name="about_repo_url">github.com/theonlyasdk/MREmu</string>
+
+    <string name="open_fs_folder">Open fs folder</string>
+    <string name="section_emulator">Emulator</string>
+    <string name="section_files">Files</string>
+    <string name="section_app">App</string>
+    <string name="section_storage">Storage</string>
+    <string name="section_apps">Apps</string>
+
+    <string name="hard_reset_title">Reset emulator state?</string>
+    <string name="hard_reset_message">This stops the running app, clears its memory and restarts the emulator back to the launcher.</string>
+    <string name="hard_reset_confirm">Reset</string>
+
+    <string name="clear_data_title">Clear user data?</string>
+    <string name="clear_data_message">This erases saved data, settings and caches from fs/c and fs/d. VXP files in fs/e/mre are kept.</string>
+    <string name="clear_data_confirm">Clear</string>
+
+    <string name="no_app_to_open_folder">No app on this device can open that folder</string>
+    <string name="cannot_create_folder">Could not create %1$s</string>
+
+    <string name="section_vxp_library">VXP Library</string>
+    <string name="vxp_library_title">VXP Library</string>
+    <string name="vxp_library_subtitle">Manage and launch installed VXP applications</string>
+    <string name="vxp_search_hint">Search apps...</string>
+    <string name="vxp_sort_name">Name</string>
+    <string name="vxp_sort_date">Date</string>
+    <string name="vxp_sort_size">Size</string>
+    <string name="vxp_empty_title">No VXP files found</string>
+    <string name="vxp_empty_desc">Place .vxp files into fs/e/mre or open them from a file manager.</string>
+    <string name="vxp_delete_confirm_title">Delete VXP file?</string>
+    <string name="vxp_delete_confirm_desc">Are you sure you want to permanently delete \"%1$s\"?</string>
+    <string name="vxp_rename_title">Rename VXP</string>
+    <string name="vxp_rename_hint">New filename</string>
+    <string name="vxp_action_launch">Launch</string>
+    <string name="vxp_action_rename">Rename</string>
+    <string name="vxp_action_share">Share</string>
+    <string name="vxp_action_delete">Delete</string>
+    <string name="vxp_action_reveal">Open containing folder</string>
+    <string name="vxp_filter_all">All</string>
+    <string name="vxp_filter_recents">Recents</string>
+    <string name="vxp_browser">VXP Browser</string>
+    <string name="vxp_import">Import VXP…</string>
+    <string name="import_failed">Could not open that file</string>
+    <string name="vxp_browser_placeholder">VXP Browser</string>
+    <string name="vxp_browser_placeholder_desc">Coming soon</string>
+
+    <string name="cancel">Cancel</string>
+    <string name="rename">Rename</string>
+    <string name="delete">Delete</string>
+    <string name="ok">OK</string>
+    <string name="copy">Copy</string>
+    <string name="copied_to_clipboard">Copied to clipboard</string>
+    <string name="error_title">Emulator error</string>
 </resources>

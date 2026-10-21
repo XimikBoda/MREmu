@@ -199,6 +199,15 @@ void AppManager::add_system_event(int phandle, int message, int param)
 	events_cv.notify_one(); // TODO: here too
 }
 
+
+void AppManager::add_input_event(uint32_t callback, int state, uint32_t text_emu_addr)
+{
+	if (g_appManager) {
+		g_appManager->input_events_queue.push(g_appManager->events_mutex, { callback, state, text_emu_addr });
+		g_appManager->events_cv.notify_one();
+	}
+}
+
 void AppManager::process_system_event(system_event_el se)
 {
 	current_work_app_id = find_app_id_by_phandle(se.phandle);
@@ -208,6 +217,21 @@ void AppManager::process_system_event(system_event_el se)
 	App& cur_app = *apps[current_work_app_id];
 	if (cur_app.system_callbacks.sysevt)
 		cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
+}
+
+
+void AppManager::process_input_event(input_event_el ie)
+{
+	current_work_app_id = active_app_id;
+
+	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
+		return;
+
+	App& cur_app = *apps[current_work_app_id];
+	if (ie.callback) {
+		cur_app.run((void(*)(VMINT, uint32_t))ie.callback, ie.state, ie.text_emu_addr);
+		add_system_event(cur_app.system_callbacks.ph_app_id, VM_MSG_PAINT, 0);
+	}
 }
 
 void AppManager::add_sock_event(sock_event se)
@@ -269,7 +293,8 @@ bool AppManager::is_all_events_empty() {
 	return launch_queue.empty() &&
 		keyboard_events_queue.empty() && pen_events_queue.empty() &&
 		message_events_queue.empty() && system_events_queue.empty() &&
-		sock_events_queue.empty() && dns_events_queue.empty();
+		sock_events_queue.empty() && dns_events_queue.empty() &&
+		input_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -296,10 +321,17 @@ void AppManager::loop() {
 
 		std::unique_lock lock(events_mutex);
 		if(wait_time_ms > 0)
-			event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
+			event = events_cv.wait_for(lock, wait_time, [this] {
+				return !is_all_events_empty() || !running
+					|| wake_flag.load(std::memory_order_relaxed);
+			});
+
+		// Consumed: clear it before processing so the next sleep can block again.
+		wake_flag.store(false, std::memory_order_relaxed);
 
 		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
 		run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
+	run_queue(input_events_queue, lock, [this](input_event_el data) { process_input_event(data); });
 		run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
 		run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
 		run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
@@ -332,6 +364,23 @@ void AppManager::stop() {
 	running = false;
 	events_cv.notify_one();
 	loop_thread.join();
+}
+
+void AppManager::reset()
+{
+	std::lock_guard lock(events_mutex);
+	launch_queue.clear();
+	keyboard_events_queue.clear();
+	pen_events_queue.clear();
+	message_events_queue.clear();
+	system_events_queue.clear();
+	sock_events_queue.clear();
+	dns_events_queue.clear();
+	input_events_queue.clear();
+
+	apps.clear();
+	active_app_id = -1;
+	current_work_app_id = -1;
 }
 
 App* AppManager::get_active_app()
@@ -409,8 +458,15 @@ MreTags* get_tags_by_mem_adr(size_t offset_mem) {
 		return 0;
 
 	auto &apps = g_appManager->apps;
+	// Only apps that actually parsed a VXP tag table qualify. Native apps (the
+	// built-in menu) leave offset_mem at its default of 0, and the first VXP app
+	// loaded also gets emulated address 0 for its image, because that is where the
+	// shared memory pool starts. Without this guard a lookup for offset 0 returns
+	// the native app's empty table, so vm_get_vm_tag() answers NOT_FOUND for a tag
+	// the running app really does have. Test the tag table rather than is_native():
+	// DLLApp is a real VXP app but does not override is_native().
 	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->offset_mem == offset_mem)
+		if (!apps[i]->tags.raw_tags.empty() && apps[i]->offset_mem == offset_mem)
 			return &apps[i]->tags;
 
 	return 0;
@@ -438,4 +494,9 @@ void add_system_event(int phandle, int message, int param)
 {
 	if (g_appManager)
 		g_appManager->add_system_event(phandle, message, param);
+}
+
+void add_input_event(uint32_t callback, int state, uint32_t text_emu_addr) {
+	if (g_appManager)
+		g_appManager->add_input_event(callback, state, text_emu_addr);
 }

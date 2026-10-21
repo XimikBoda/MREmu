@@ -131,10 +131,23 @@ MreTags::mstring MreTags::read_mstring(int id) {
 	if (it != raw_tags.end()) {
 		uint8_t* data = it->second.data();
 		size_t size = it->second.size();
-		while (offset < size) {
-			uint32_t id = *(uint32_t*)(data + offset);
+		// Every record is (id:u32, byte_size:u32, payload). offset MUST advance or
+		// this re-reads the first record forever, growing res until bad_alloc --
+		// which is what a real VXP hits when it has a name-list tag but no
+		// single-name tag, because get_app_name() falls through to here.
+		while (offset + 8 <= size) {
+			uint32_t rid = *(uint32_t*)(data + offset);
 			uint32_t str_size = *(uint32_t*)(data + offset + 4);
-			res.push_back({ id, raw_to_u8(data + offset + 8, str_size)});
+			offset += 8;
+
+			// Clamp to what is actually left so a malformed tag cannot read past
+			// the payload.
+			if (str_size > size - offset)
+				str_size = (uint32_t)(size - offset);
+
+			res.push_back({ (int)rid, raw_to_u8(data + offset, str_size) });
+
+			offset += str_size;
 		}
 	}
 
