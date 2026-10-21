@@ -11,11 +11,14 @@ endif()
 
 if(NOT EMSCRIPTEN AND NOT ANDROID)
     option(DEBUG_WINDOW "Turn on additional debugging windows" ON)
+    option(BUILTIN_GDB "Turn on additional build-in GDB" OFF)
+    option(CAPSTONE "Endble capstone" OFF)
 else()
     set(DEBUG_WINDOW FALSE)
+    set(BUILTIN_GDB FALSE)
+    set(CAPSTONE FALSE)
 endif()
 
-option(CAPSTONE "Endble capstone" OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 

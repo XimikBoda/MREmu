@@ -1,5 +1,7 @@
 #include "GDB.h"
 
+#ifdef BUILTIN_GDB
+
 #include <SFML/Network.hpp>
 #include <unicorn/unicorn.h>
 #include "AppManager.h"
@@ -595,3 +597,5 @@ namespace GDB {
 		return packet_len != 0;
 	}
 }
+
+#endif

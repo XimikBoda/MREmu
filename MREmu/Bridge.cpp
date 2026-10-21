@@ -1645,7 +1645,10 @@ namespace Bridge {
 		//write_reg(uc, UC_ARM_REG_LR, (uint64_t)stack_p);
 		write_reg(uc, UC_ARM_REG_LR, (uint64_t)idle_p);
 
-		if (!GDB::gdb_mode) {
+#ifdef GDB
+		if (!GDB::gdb_mode)
+#endif
+		{
 			uc_err err = uc_emu_start(uc, adr, (uint64_t)idle_p & ~1, 0, 0);
 			if (err) {
 				spdlog::error("uc_emu_start returned {} ({})", (int)err, uc_strerror(err));
@@ -1655,6 +1658,7 @@ namespace Bridge {
 				}
 			}
 		}
+#ifdef GDB
 		else
 		{
 			write_reg(uc, UC_ARM_REG_PC, (uint64_t)adr & ~1LL);
@@ -1690,6 +1694,7 @@ namespace Bridge {
 				}
 			}
 		}
+#endif
 		return read_reg(uc, UC_ARM_REG_R0);
 	}
 }

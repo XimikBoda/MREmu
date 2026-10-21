@@ -7,6 +7,7 @@
 #include <vmgraph.h>
 #include <vmpromng.h>
 #include <format>
+#include <cstring>
 
 #ifdef DEBUG_WINDOW
 #include <imgui.h>

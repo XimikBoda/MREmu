@@ -76,8 +76,10 @@ int main(int argc, char** argv) {
 	{
 		parser.set_optional<std::string>("", "", "", "Path to vxp");
 		parser.set_optional<bool>("l", "path_is_local", false, "Set to run from local filesystem");
+#ifdef BUILTIN_GDB
 		parser.set_optional<bool>("g", "gdb", false, "Set to run gdb server");
 		parser.set_optional<int>("p", "gdb_port", 1234, "Port for gdb server");
+#endif
 	}
 	parser.run_and_exit_if_error();
 	app_path = parser.get<std::string>("");
@@ -85,9 +87,6 @@ int main(int argc, char** argv) {
 
 	if (app_path.size())
 		spdlog::info("Vxp path from args: {} {}", app_path, path_is_local ? "(local path)" : "");
-
-	GDB::gdb_mode = parser.get<bool>("g");
-	GDB::gdb_port = parser.get<int>("p");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
 #else
@@ -98,8 +97,13 @@ int main(int argc, char** argv) {
 
     AppManager appManager;
 
+#ifdef BUILTIN_GDB
+	GDB::gdb_mode = parser.get<bool>("g");
+	GDB::gdb_port = parser.get<int>("p");
+
 	if(GDB::gdb_mode)
 		GDB::wait();
+#endif
 
 	Memory::init(32 * 1024 * 1024);
 	Cpu::init();
@@ -150,8 +154,10 @@ int main(int argc, char** argv) {
 
 	MREngine::IO::init();
 
+#ifdef BUILTIN_GDB
 	if (GDB::gdb_mode)
 		GDB::cpu_state = GDB::Stop;
+#endif
 
 	appManager.start();
 

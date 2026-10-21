@@ -250,7 +250,9 @@ static void run_queue(Queue<T>& q, std::unique_lock<std::mutex>& lock, F f) {
 
 void AppManager::loop() {
 	while (running) {
+#ifdef BUILTIN_GDB
 		GDB::update(); //TODO
+#endif
 		bool event = false;
 
 		auto wait_time_ms = get_time_for_nearest_timer().asMicroseconds();

@@ -6,6 +6,7 @@
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 #include <vmpromng.h>
+#include <cstring>
 
 #ifdef DEBUG_WINDOW
 #include <imgui.h>

@@ -35,7 +35,6 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
 endif()
 
 target_link_libraries(MREmu sfml-graphics)
-target_link_libraries(MREmu sfml-network)
 target_link_libraries(MREmu sfml-audio)
 target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu ADLMIDI_static)
@@ -47,13 +46,18 @@ target_link_libraries(MREmu MREngine)
 target_link_libraries(MREmu NativeApps)
 target_link_libraries(MREmu Device)
 
+if(BUILTIN_GDB)
+    target_link_libraries(MREmu sfml-network)
+    target_compile_definitions(MREmu PRIVATE BUILTIN_GDB)
+endif()
+
 if(DEBUG_WINDOW)
     target_link_libraries(MREmu imgui)
     target_compile_definitions(MREmu PRIVATE DEBUG_WINDOW)
 endif()
 
 if(CAPSTONE)
-	target_link_libraries(MREmu capstone)
+    target_link_libraries(MREmu capstone)
     target_compile_definitions(MREmu PRIVATE CAPSTONE)
 endif()
 
