@@ -461,8 +461,7 @@ static void handle_command(const Mcp::Command& c) {
 	if (c.kind == "touch") {
 		int x = 0, y = 0;
 		if (sscanf(c.a.c_str(), "%d,%d", &x, &y) == 2) {
-			void add_pen_event(int event, int x, int y);
-			add_pen_event(c.n, x, y);
+			g_app_manager->add_pen_event(c.n, x, y);
 		}
 		return;
 	}

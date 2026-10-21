@@ -8,6 +8,9 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+// Emscripten provides POSIX fileno/dup/fdopen/close.
+#elif defined(__EMSCRIPTEN__)
+#include <unistd.h>
 #endif
 
 // A small hand-rolled JSON layer. The project already vendors spdlog/fmt but not a
@@ -298,7 +301,7 @@ std::ostream* claim_stdout_for_protocol() {
 	return &proto;
 #else
 	fflush(stdout);
-	if (FILE* f = _fdopen(_dup(_fileno(stdout)), "w")) {
+	if (FILE* f = fdopen(dup(fileno(stdout)), "w")) {
 		static FileBuf buf(f);
 		static std::ostream proto(&buf);
 		return &proto;

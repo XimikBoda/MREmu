@@ -847,10 +847,12 @@ int main(int argc, char** argv) {
 		return serve_rc.load();
 	}
 
+#ifdef DEBUG_WINDOW
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
-	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	ImGui::SFML::Init(win_debug);
 	win_debug.setVerticalSyncEnabled(true);
+#endif
+	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu Device");
 	win_device.setVerticalSyncEnabled(true);
 	win_device.setKeyRepeatEnabled(false);
 #else
@@ -880,7 +882,11 @@ int main(int argc, char** argv) {
 #endif
 
 #ifndef ANDROID
-	DragAndDrop::init(win_device, &win_debug);
+		#ifdef DEBUG_WINDOW
+		DragAndDrop::init(win_device, &win_debug);
+		#else
+		DragAndDrop::init(win_device, nullptr);
+		#endif
 #else
 	DragAndDrop::init(win_device, nullptr);
 #endif
@@ -1009,7 +1015,9 @@ int main(int argc, char** argv) {
 	DragAndDrop::restore_window_state();
 
 #ifndef ANDROID
-	win_debug.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)win_debug.getSize().x, (float)win_debug.getSize().y)));
+		#ifdef DEBUG_WINDOW
+		win_debug.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)win_debug.getSize().x, (float)win_debug.getSize().y)));
+		#endif
 #endif
 
 	update_screen_size(win_device.getSize().x, win_device.getSize().y);
@@ -1029,7 +1037,9 @@ int main(int argc, char** argv) {
 
 	while (win_device.isOpen()
 #ifndef ANDROID
+        #ifdef DEBUG_WINDOW
         && win_debug.isOpen()
+        #endif
 #endif
     ) {
 #ifdef ANDROID
@@ -1089,6 +1099,7 @@ int main(int argc, char** argv) {
 		}
 
 #ifndef ANDROID
+		#ifdef DEBUG_WINDOW
 		while (win_debug.pollEvent(event)) {
 			ImGui::SFML::ProcessEvent(event);
 			switch (event.type) {
@@ -1102,6 +1113,7 @@ int main(int argc, char** argv) {
 				break;
 			}
 		}
+		#endif
 #endif
 
 		while (win_device.pollEvent(event)) {
@@ -1150,7 +1162,9 @@ int main(int argc, char** argv) {
 				DragAndDrop::save_window_state();
 				win_device.close();
 #ifndef ANDROID
+				#ifdef DEBUG_WINDOW
 				win_debug.close();
+				#endif
 #endif
 				break;
 			case sf::Event::Resized:
@@ -1159,6 +1173,7 @@ int main(int argc, char** argv) {
 			}
 		}
 #ifndef ANDROID
+		#ifdef DEBUG_WINDOW
 		ImGui::SFML::Update(win_debug, deltaClock.restart());
 
 		if (show_error) {
@@ -1189,6 +1204,7 @@ int main(int argc, char** argv) {
 			}
 			ImGui::EndPopup();
 		}
+		#endif
 #endif
 
 		graphic.update_screen();
@@ -1196,6 +1212,7 @@ int main(int argc, char** argv) {
 		device.draw();
 
 #ifndef ANDROID
+		#ifdef DEBUG_WINDOW
 		if (ImGui::Begin("Fps")) {
 			ImGui::Text("%1.3f", 1.f / fps.restart().asSeconds());
 		}
@@ -1217,11 +1234,11 @@ int main(int argc, char** argv) {
 			float size = active_app->app_memory.get_memory_size();
 			float free_size = active_app->app_memory.get_free_memory_size();
 			float used_size = size - free_size;
-			ImGui::Text("All:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
+			ImGui::Text("All:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
 				size, size / 1024.f, size / 1024.f / 1024.f);
-			ImGui::Text("Free:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
+			ImGui::Text("Free:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
 				free_size, free_size / 1024.f, free_size / 1024.f / 1024.f);
-			ImGui::Text("Used:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
+			ImGui::Text("Used:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
 				used_size, used_size / 1024.f, used_size / 1024.f / 1024.f);
 			ImGui::Text("Used: %1.2f%%%", 100.f*used_size / size);
 		}
@@ -1275,6 +1292,7 @@ int main(int argc, char** argv) {
 			}
 			ImGui::End();
 		}
+		#endif
 #endif
 
 		device.update();
@@ -1282,15 +1300,19 @@ int main(int argc, char** argv) {
 		repaint_device();
 
 #ifndef ANDROID
+		#ifdef DEBUG_WINDOW
 		Cpu::imgui_REG();
 
 		device.imgui();
+		#endif
 #endif
 
 #ifndef ANDROID
+		#ifdef DEBUG_WINDOW
 		ImGui::SFML::Render(win_debug);
 		win_debug.display();
 		win_debug.clear();
+		#endif
 		DragAndDrop::ensure_device_on_top();
 #endif
 	}
@@ -1301,7 +1323,9 @@ int main(int argc, char** argv) {
 	work = false;
 
 #ifndef ANDROID
-	ImGui::SFML::Shutdown();
+		#ifdef DEBUG_WINDOW
+		ImGui::SFML::Shutdown();
+		#endif
 #endif
 	return 0;
 }

@@ -592,13 +592,12 @@ if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
 cd /d "%EM_BUILD%"
 emcmake cmake -S %ROOT% -B . -DCMAKE_BUILD_TYPE=Release -DEMSCRIPTEN=1 -G Ninja
 set "EM_CFG_RC=%errorlevel%"
-cd /d "%ROOT%"
 if not "%EM_CFG_RC%"=="0" (
   echo Emscripten configure failed.
   if defined once exit /b %EM_CFG_RC%
   goto web_menu
 )
-emcmake cmake --build . --config Release
+emcmake cmake --build .
 set "EM_BUILD_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_BUILD_RC%"=="0" (
@@ -623,13 +622,12 @@ if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
 cd /d "%EM_BUILD%"
 emcmake cmake -S %ROOT% -B . -DCMAKE_BUILD_TYPE=Debug -DEMSCRIPTEN=1 -G Ninja
 set "EM_CFG_RC=%errorlevel%"
-cd /d "%ROOT%"
 if not "%EM_CFG_RC%"=="0" (
   echo Emscripten configure failed.
   if defined once exit /b %EM_CFG_RC%
   goto web_menu
 )
-emcmake cmake --build . --config Debug
+emcmake cmake --build .
 set "EM_BUILD_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_BUILD_RC%"=="0" (
@@ -651,6 +649,14 @@ if exist "%EM_SDK%\emsdk_env.bat" (
 if errorlevel 1 (
   echo Failed to activate emsdk environment.
   exit /b 1
+)
+
+rem CPM.cmake is downloaded from GitHub at configure time. If SSL inspection
+rem blocks the download, pre-place CPM_0.40.2.cmake at
+rem   %ROOT%em\emsdk_cache\cpm\CPM_0.40.2.cmake
+rem and set CPM_SOURCE_CACHE=%ROOT%em\emsdk_cache to avoid the download.
+if not defined CPM_SOURCE_CACHE if exist "%ROOT%em\emsdk_cache\cpm\CPM_0.40.2.cmake" (
+  set "CPM_SOURCE_CACHE=%ROOT%em\emsdk_cache"
 )
 exit /b 0
 
