@@ -14,5 +14,3 @@ namespace MREngine {
 		VM_MESSAGE_PROC msg_proc = 0;
 	};
 }
-
-MREngine::SystemCallbacks& get_current_app_system_callbacks();

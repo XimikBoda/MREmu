@@ -2,6 +2,7 @@
 #include "Resources.h"
 #include "../Memory.h"
 #include "../Log.h"
+#include "../AppContext.h"
 #include <SFML/Audio.hpp>
 #include <vmmm.h>
 #include <vm4res.h>
@@ -87,7 +88,7 @@ MREngine::AppAudio::~AppAudio() {
 }
 
 VMINT vm_audio_play_bytes(void* audio_data, VMUINT len, VMUINT8 format, VMUINT start_time, VMUINT path, void (*f)(VMINT result)) {
-	auto& audio = get_current_app_audio();
+	auto& audio = AppContext::get_executing_app_audio();
 
 	auto& music = audio.music;
 
@@ -102,7 +103,7 @@ VMINT vm_audio_play_bytes(void* audio_data, VMUINT len, VMUINT8 format, VMUINT s
 }
 
 VMINT vm_audio_pause(void (*f)(VMINT result)) {
-	auto& audio = get_current_app_audio();
+	auto& audio = AppContext::get_executing_app_audio();
 
 	auto& music = audio.music;
 
@@ -112,7 +113,7 @@ VMINT vm_audio_pause(void (*f)(VMINT result)) {
 }
 
 VMINT vm_audio_resume(void (*f)(VMINT result)) {
-	auto& audio = get_current_app_audio();
+	auto& audio = AppContext::get_executing_app_audio();
 
 	auto& music = audio.music;
 
@@ -122,7 +123,7 @@ VMINT vm_audio_resume(void (*f)(VMINT result)) {
 }
 
 VMINT vm_audio_stop(void (*f)(VMINT result)) {
-	auto& audio = get_current_app_audio();
+	auto& audio = AppContext::get_executing_app_audio();
 
 	auto& music = audio.music;
 
@@ -155,8 +156,8 @@ VMINT vm_midi_play(VMINT resid, VMINT repeat, void (*f)(VMINT handle, VMINT even
 }
 
 VMINT vm_midi_play_ex(VMINT resid, VMUINT start_time, VMINT repeat, VMUINT path, void (*f)(VMINT handle, VMINT event)) {
-	MREngine::Resources& resources = get_current_app_resources();
-	auto& audio = get_current_app_audio();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
+	auto& audio = AppContext::get_executing_app_audio();
 
 	VMUINT8* buf = resources.call_res_provider(resid, audio.tmp_int_p);
 	int size = *audio.tmp_int_p;
@@ -174,7 +175,7 @@ VMINT vm_midi_play_by_bytes(VMUINT8* midibuf, VMINT len, VMINT repeat, void (*f)
 VMINT vm_midi_play_by_bytes_ex(VMUINT8* midibuf, VMINT len, VMUINT start_time,
 	VMINT repeat, VMUINT path, void (*f)(VMINT handle, VMINT event))
 {
-	auto& audio = get_current_app_audio();
+	auto& audio = AppContext::get_executing_app_audio();
 
 	std::shared_ptr<Midi> midi = std::make_shared<Midi>(midibuf, len);
 	if (midi->error)
@@ -206,7 +207,7 @@ VMINT vm_midi_play_by_bytes_ex(VMUINT8* midibuf, VMINT len, VMUINT start_time,
 }
 
 VMINT vm_midi_pause(VMINT handle) {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.midis.is_active(handle)) {
 		audio.midis[handle]->pause();
@@ -216,7 +217,7 @@ VMINT vm_midi_pause(VMINT handle) {
 }
 
 VMINT vm_midi_get_time(VMINT handle, VMUINT* current_time) {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.midis.is_active(handle) && !audio.midis[handle]->done) {
 		*current_time = audio.midis[handle]->getPlayingOffset().
@@ -231,7 +232,7 @@ VMINT vm_midi_get_time(VMINT handle, VMUINT* current_time) {
 }
 
 void vm_midi_stop(VMINT handle) {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.midis.is_active(handle)) {
 		audio.midis[handle]->stop();
@@ -240,7 +241,7 @@ void vm_midi_stop(VMINT handle) {
 	}
 }
 void vm_midi_stop_all(void) {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	for (int i = 0; i < audio.midis.size(); ++i)
 		if (audio.midis.is_active(i)) {

@@ -42,5 +42,3 @@ namespace MREngine {
 		uint8_t* call_res_provider(int resid, int* len);
 	};
 }
-
-MREngine::Resources& get_current_app_resources();

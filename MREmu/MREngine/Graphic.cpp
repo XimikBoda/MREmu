@@ -1,6 +1,7 @@
 #include "Graphic.h"
 #include "Canvas.h"
 #include "../Memory.h"
+#include "../AppContext.h"
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 #include <vmpromng.h>
@@ -324,11 +325,11 @@ VMINT vm_graphic_get_screen_height(void)
 
 
 VMINT vm_graphic_create_layer(VMINT x, VMINT y, VMINT width, VMINT height, VMINT trans_color) {
-	return get_current_app_graphic().create_layer(x, y, width, height, trans_color);
+	return AppContext::get_executing_app_graphic().create_layer(x, y, width, height, trans_color);
 }
 
 VM_GDI_HANDLE vm_graphic_create_layer_ex(VMINT x, VMINT y, VMINT width, VMINT height, VMINT trans_color, VMINT mode, VMUINT8* buf) {
-	return get_current_app_graphic().create_layer_ex(x, y, width, height, trans_color, mode, buf);
+	return AppContext::get_executing_app_graphic().create_layer_ex(x, y, width, height, trans_color, mode, buf);
 }
 
 VM_GDI_HANDLE vm_graphic_create_layer_cf(vm_graphic_color_famat cf, VMINT x, VMINT y, VMINT width, VMINT height, vm_graphic_color_argb* trans_color, VMINT mode, VMUINT8* buf, VMINT buf_size) {
@@ -339,11 +340,11 @@ VM_GDI_HANDLE vm_graphic_create_layer_cf(vm_graphic_color_famat cf, VMINT x, VMI
 }
 
 VMINT vm_graphic_delete_layer(VMINT handle) {
-	return get_current_app_graphic().delete_layer(handle);
+	return AppContext::get_executing_app_graphic().delete_layer(handle);
 }
 
 VMINT vm_graphic_active_layer(VMINT handle) {
-	auto& gr = get_current_app_graphic();
+	auto& gr = AppContext::get_executing_app_graphic();
 	if (handle < 0 || handle >= gr.layers.size())
 		return VM_GDI_FAILED;
 	gr.active_layer = handle;
@@ -351,11 +352,11 @@ VMINT vm_graphic_active_layer(VMINT handle) {
 }
 
 VMUINT8* vm_graphic_get_layer_buffer(VMINT handle) {
-	return (VMUINT8*)get_current_app_graphic().get_layer_buf(handle);
+	return (VMUINT8*)AppContext::get_executing_app_graphic().get_layer_buf(handle);
 }
 
 VMINT vm_graphic_clear_layer_bg(VMINT handle) {
-	auto& gr = get_current_app_graphic();
+	auto& gr = AppContext::get_executing_app_graphic();
 
 	if (handle < 0 || handle >= gr.layers.size())
 		return VM_GDI_FAILED;
@@ -371,7 +372,7 @@ VMINT vm_graphic_clear_layer_bg(VMINT handle) {
 }
 
 VM_GDI_RESULT vm_graphic_translate_layer(VMINT handle, VMINT tx, VMINT ty) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	if (handle < 0 || handle >= gr.layers.size())
 		return -1;
@@ -407,22 +408,22 @@ void vm_graphic_set_pixel(VMUINT8* buf, VMINT x, VMINT y, VMUINT16 color) {
 
 	MREngine::RenderBox b(*cfp_dst);
 
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	b.clip(AppContext::get_executing_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	if (b.in(x, y))
 		buf16_dst[y * cfp_dst->width + x] = color;
 }
 
 void vm_graphic_set_pixel_ex(VMINT handle, VMINT x1, VMINT y1) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
 
 	auto& layer = layers[handle];
 
-	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short c = AppContext::get_executing_app_graphic().global_color.vm_color_565;
 
 	vm_graphic_set_pixel((VMUINT8*)layer.buf, x1, y1, c);
 }
@@ -439,8 +440,8 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 
 	MREngine::RenderBox b(*cfp_dst);
 
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	b.clip(AppContext::get_executing_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	if (abs(x1 - x0) >= abs(y1 - y0)) {
 		if (x0 > x1) {
@@ -471,14 +472,14 @@ void vm_graphic_line(VMUINT8* buf, VMINT x0, VMINT y0, VMINT x1, VMINT y1, VMUIN
 }
 
 void vm_graphic_line_ex(VMINT handle, VMINT x0, VMINT y0, VMINT x1, VMINT y1) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
 
 	auto& layer = layers[handle];
 
-	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short c = AppContext::get_executing_app_graphic().global_color.vm_color_565;
 
 	vm_graphic_line((VMUINT8*)layer.buf, x0, y0, x1, y1, c);
 }
@@ -493,8 +494,8 @@ void vm_graphic_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, 
 	MREngine::RenderBox b(x, y, x + width, y + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	b.clip(AppContext::get_executing_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	if (b.st_x <= x && x < b.end_x)
 		for (int sy = b.st_y; sy < b.end_y; ++sy)
@@ -514,14 +515,14 @@ void vm_graphic_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT height, 
 }
 
 void vm_graphic_rect_ex(VMINT handle, VMINT x, VMINT y, VMINT width, VMINT height) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
 
 	auto& layer = layers[handle];
 
-	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short c = AppContext::get_executing_app_graphic().global_color.vm_color_565;
 
 	vm_graphic_rect((VMUINT8*)layer.buf, x, y, width, height, c);
 }
@@ -536,8 +537,8 @@ void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 	MREngine::RenderBox b(x, y, x + width, y + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	b.clip(AppContext::get_executing_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	for (int sy = b.st_y; sy < b.end_y; ++sy)
 		for (int sx = b.st_x; sx < b.end_x; ++sx)
@@ -548,14 +549,14 @@ void vm_graphic_fill_rect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 }
 
 void vm_graphic_fill_rect_ex(VMINT handle, VMINT  x, VMINT  y, VMINT  width, VMINT  height) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
 
 	auto& layer = layers[handle];
 
-	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short c = AppContext::get_executing_app_graphic().global_color.vm_color_565;
 
 	vm_graphic_fill_rect((VMUINT8*)layer.buf, x, y, width, height, c, c);
 }
@@ -580,8 +581,8 @@ void vm_graphic_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 	MREngine::RenderBox b(x, y, x + width , y + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	b.clip(AppContext::get_executing_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	corner_width = std::min(corner_width, std::min(width / 2, height / 2));
 
@@ -601,14 +602,14 @@ void vm_graphic_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT hei
 }
 
 void vm_graphic_roundrect_ex(VMINT handle, VMINT x, VMINT y, VMINT width, VMINT height, VMINT frame_width) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
 
 	auto& layer = layers[handle];
 
-	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short c = AppContext::get_executing_app_graphic().global_color.vm_color_565;
 
 	vm_graphic_roundrect((VMUINT8*)layer.buf, x, y, width, height, frame_width, c);
 }
@@ -632,8 +633,8 @@ void vm_graphic_fill_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMIN
 	MREngine::RenderBox b(x, y, x + width, y + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	b.clip(AppContext::get_executing_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	corner_width = std::min(corner_width, std::min(width / 2, height / 2));
 
@@ -651,14 +652,14 @@ void vm_graphic_fill_roundrect(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMIN
 }
 
 void vm_graphic_fill_roundrect_ex(VMINT handle, VMINT x, VMINT y, VMINT width, VMINT height, VMINT frame_width) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
 
 	auto& layer = layers[handle];
 
-	unsigned short c = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short c = AppContext::get_executing_app_graphic().global_color.vm_color_565;
 
 	vm_graphic_fill_roundrect((VMUINT8*)layer.buf, x, y, width, height, frame_width, c);
 }
@@ -673,8 +674,8 @@ void vm_graphic_ellipse(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT heigh
 	MREngine::RenderBox rb(x, y, x + width, y + height);
 
 	rb.clip(*cfp_dst);
-	rb.clip(get_current_app_graphic().clip);
-	rb.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	rb.clip(AppContext::get_executing_app_graphic().clip);
+	rb.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	auto draw_pixel = [&](int px, int py) {
 		if (rb.in(px, py)) {
@@ -741,8 +742,8 @@ void vm_graphic_fill_ellipse(VMUINT8* buf, VMINT x, VMINT y, VMINT width, VMINT 
 	MREngine::RenderBox b(x, y, x + width, y + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf16_dst));
+	b.clip(AppContext::get_executing_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip_by_buf(buf16_dst));
 
 	long long RX = width;
 	long long RY = height;
@@ -787,7 +788,7 @@ void vm_graphic_fill_polygon(VMINT handle, vm_graphic_point* point, VMINT npoint
 	if (npoints == 0)
 		return;
 
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
@@ -800,10 +801,10 @@ void vm_graphic_fill_polygon(VMINT handle, vm_graphic_point* point, VMINT npoint
 		b.include(point[i].x, point[i].y);
 
 	b.clip(layer);
-	b.clip(get_current_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip);
 	b.clip(layer.clip);
 
-	unsigned short color = get_current_app_graphic().global_color.vm_color_565;
+	unsigned short color = AppContext::get_executing_app_graphic().global_color.vm_color_565;
 	unsigned short* buf16_dst = (unsigned short*)layer.buf;
 
 	for (int sy = b.st_y; sy < b.end_y; ++sy)
@@ -839,7 +840,7 @@ static uint16_t map_color16(uint16_t bc, uint16_t ec, int ib, int ie, int iv) {
 }
 
 void vm_graphic_gradient_paint_rect(VMINT handle, VMINT x1, VMINT y1, VMINT x2, VMINT y2, vm_graphic_color color_start, vm_graphic_color color_end, vm_graphic_gp_style style) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return;
@@ -850,7 +851,7 @@ void vm_graphic_gradient_paint_rect(VMINT handle, VMINT x1, VMINT y1, VMINT x2, 
 	MREngine::RenderBox b(x1, y1, x2, y2);
 
 	b.clip(layer);
-	b.clip(get_current_app_graphic().clip);
+	b.clip(AppContext::get_executing_app_graphic().clip);
 	b.clip(layer.clip);
 
 	uint16_t c1 = color_start.vm_color_565, c2 = color_end.vm_color_565;
@@ -901,7 +902,7 @@ void vm_graphic_gradient_paint_rect(VMINT handle, VMINT x1, VMINT y1, VMINT x2, 
 
 
 VM_GDI_RESULT vm_graphic_get_layer_clip(VMINT handle, clip_rect* curcliprect) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size() || !curcliprect)
 		return VM_GDI_FAILED;
@@ -914,7 +915,7 @@ VM_GDI_RESULT vm_graphic_get_layer_clip(VMINT handle, clip_rect* curcliprect) {
 }
 
 VM_GDI_RESULT vm_graphic_set_layer_clip(VMINT handle, VMINT16 x1, VMINT16 y1, VMINT16 x2, VMINT16 y2) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& layers = AppContext::get_executing_app_graphic().layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return VM_GDI_FAILED;
@@ -928,13 +929,13 @@ VM_GDI_RESULT vm_graphic_set_layer_clip(VMINT handle, VMINT16 x1, VMINT16 y1, VM
 
 
 void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
-	auto& clip = get_current_app_graphic().clip;
+	auto& clip = AppContext::get_executing_app_graphic().clip;
 
 	clip = { (short)x1, (short)y1, (short)x2, (short)y2, 1 };
 }
 
 void vm_graphic_reset_clip(void) {
-	auto& clip = get_current_app_graphic().clip;
+	auto& clip = AppContext::get_executing_app_graphic().clip;
 
 	clip = { 0, 0, (short)graphic->width, (short)graphic->height, 0 };
 }
@@ -945,7 +946,7 @@ void vm_graphic_flush_screen(void) {
 }
 
 VMINT vm_graphic_get_blt_layer_count(void) {
-	return get_current_app_graphic().layers.size();
+	return AppContext::get_executing_app_graphic().layers.size();
 }
 
 VMINT vm_graphic_is_r2l_state(void) {
@@ -953,6 +954,6 @@ VMINT vm_graphic_is_r2l_state(void) {
 }
 
 VM_GDI_RESULT vm_graphic_setcolor(vm_graphic_color* color) {
-	get_current_app_graphic().global_color = *color;
+	AppContext::get_executing_app_graphic().global_color = *color;
 	return VM_GDI_SUCCEED;
 }

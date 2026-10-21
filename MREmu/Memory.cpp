@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <cstring>
+#include "AppContext.h"
 
 #ifndef WIN32
 
@@ -88,18 +89,18 @@ namespace Memory {
 	}
 
 	void* app_malloc(int size) {
-		MemoryManager& mm = get_current_app_memory();
+		MemoryManager& mm = AppContext::get_executing_app_memory();
 		return (void*)mm.malloc(size, false, 4);
 	}
 
 	void* app_realloc(void* p, int size) {
-		MemoryManager& mm = get_current_app_memory();
+		MemoryManager& mm = AppContext::get_executing_app_memory();
 		return (void*)mm.realloc((size_t)p, size);
 	}
 
 	void app_free(void* addr)
 	{
-		MemoryManager& mm = get_current_app_memory();
+		MemoryManager& mm = AppContext::get_executing_app_memory();
 		mm.free((size_t)addr);
 	}
 

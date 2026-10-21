@@ -1,6 +1,7 @@
 #include "Timer.h"
 #include "../Bridge.h"
 #include "../Memory.h"
+#include "../AppContext.h"
 #include <vmtimer.h>
 #include <SFML/System/Clock.hpp>
 
@@ -107,21 +108,21 @@ int MREngine::Timer::destroy(int id, bool gui)
 
 
 VMINT vm_create_timer(VMUINT32 millisec, VM_TIMERPROC_T timerproc) {
-	return get_current_app_timer().create(millisec, timerproc, true);
+	return AppContext::get_executing_app_timer().create(millisec, timerproc, true);
 }
 
 
 VMINT vm_delete_timer(VMINT timerid) {
-	return get_current_app_timer().destroy(timerid, true);
+	return AppContext::get_executing_app_timer().destroy(timerid, true);
 }
 
 
 VMINT vm_create_timer_ex(VMUINT32 millisec, VM_TIMERPROC_T timerproc) {
-	return get_current_app_timer().create(millisec, timerproc, false);
+	return AppContext::get_executing_app_timer().create(millisec, timerproc, false);
 }
 
 
 VMINT vm_delete_timer_ex(VMINT timerid) {
-	return get_current_app_timer().destroy(timerid, false);
+	return AppContext::get_executing_app_timer().destroy(timerid, false);
 }
 

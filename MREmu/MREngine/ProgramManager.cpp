@@ -13,7 +13,7 @@ VM_P_HANDLE vm_pmng_get_current_handle(void) {
 }
 
 void vm_reg_msg_proc(VM_MESSAGE_PROC proc) {
-	MREngine::SystemCallbacks& sc = get_current_app_system_callbacks();
+	MREngine::SystemCallbacks& sc = AppContext::get_executing_app_system_callbacks();
 	sc.msg_proc = proc;
 	//TODO
 }

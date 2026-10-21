@@ -86,5 +86,3 @@ namespace MREngine {
 		void imgui_canvases();
 	};
 }
-
-MREngine::AppGraphic& get_current_app_graphic();

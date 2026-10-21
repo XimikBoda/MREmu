@@ -1,4 +1,5 @@
 #include "Audio.h"
+#include "../AppContext.h"
 #include <SFML/Audio.hpp>
 #include <vmmm.h>
 #include <cstring>
@@ -132,7 +133,7 @@ VMINT vm_bitstream_audio_open_pcm(
 	vm_bitstream_pcm_audio_cfg_struct* audio_type,
 	vm_bitstream_audio_result_callback callback)
 {
-	auto& audio = get_current_app_audio();
+	auto& audio = AppContext::get_executing_app_audio();
 
 	vm_bitstream_pcm_audio_cfg_struct_Remaper audio_type_Remap(audio_type);
 
@@ -156,7 +157,7 @@ VMINT vm_bitstream_audio_open_pcm(
 
 
 VMINT vm_bitstream_audio_finished(VMINT handle) {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
 		audio.bitstreams[handle]->data_finished = true;
@@ -167,7 +168,7 @@ VMINT vm_bitstream_audio_finished(VMINT handle) {
 
 
 VMINT vm_bitstream_audio_close(VMINT handle) {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
 		audio.bitstreams[handle]->dataFinished();
@@ -184,7 +185,7 @@ VMINT vm_bitstream_audio_get_buffer_status(
 	VMINT handle,
 	vm_bitstream_audio_buffer_status* status)
 {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
 		status->total_buf_size = bitstream_buf_size;
@@ -201,7 +202,7 @@ VMINT vm_bitstream_audio_put_data(
 	VMUINT 	buffer_size,
 	VMUINT* written)
 {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
 		auto& bs = *audio.bitstreams[handle];
@@ -219,7 +220,7 @@ VMINT vm_bitstream_audio_start(
 	VMINT handle,
 	vm_bitstream_audio_start_param* para)
 {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
 		audio.bitstreams[handle]->setVolume(para->volume * 100 / 6);
@@ -233,7 +234,7 @@ VMINT vm_bitstream_audio_start(
 
 
 VMINT vm_bitstream_audio_stop(VMINT handle) {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
 		audio.bitstreams[handle]->dataFinished();
@@ -250,7 +251,7 @@ VMINT vm_bitstream_audio_get_play_time(
 	VMINT handle,
 	VMUINT* current_time)
 {
-	MREngine::AppAudio& audio = get_current_app_audio();
+	MREngine::AppAudio& audio = AppContext::get_executing_app_audio();
 
 	if (audio.bitstreams.is_active(handle)) {
 		*current_time = audio.bitstreams[handle]->getPlayingOffset().asMilliseconds();

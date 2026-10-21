@@ -1,7 +1,9 @@
 #include "Resources.h"
 #include "../Bridge.h"
 #include "../Cpu.h"
-#include "../AppManager.h"
+#include "../Log.h"
+#include "../App.h"
+#include "../AppContext.h"
 #include <cstring>
 #include <vmres.h>
 #include <vm4res.h>
@@ -118,14 +120,14 @@ extern AppManager* g_appManager;
 
 uint8_t* MREngine::Resources::call_res_provider(int resid, int* len)
 {
-	auto app = g_appManager->get_current_work_app_id();
+	auto app = AppContext::get_executing_app();
 
 	return app->run<true>(res_provider, resid, len);
 }
 
 
 VMUINT8* vm_load_resource(char* res_name, VMINT* res_size) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	spdlog::debug("vm_load_resource({})", res_name);
 
@@ -147,7 +149,7 @@ VMUINT8* vm_load_resource(char* res_name, VMINT* res_size) {
 }
 
 VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 	if (data == 0)
 		return -1;
 
@@ -163,7 +165,7 @@ VMINT32 vm_resource_get_data(VMUINT8* data, VMUINT32 offset, VMUINT32 size) {
 }
 
 VMUINT vm_get_resource_offset(char* res_name) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	MREngine::res_el* res = resources.find_by_name(to_lower(res_name));
 
@@ -192,7 +194,7 @@ VMINT32 vm_res_init(void) {
 
 
 VMINT32 vm_res_init_with_language(VMUINT32 language) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	MREngine::res_el* res = resources.find_by_id(language | 0xFFFF0000);
 
@@ -237,7 +239,7 @@ VMINT32 vm_res_init_with_language(VMUINT32 language) {
 }
 
 VMINT32 vm_res_deinit(void) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	if (resources.res2_strings) {
 		vm_free(resources.res2_strings);
@@ -252,7 +254,7 @@ VMINT32 vm_res_deinit(void) {
 }
 
 VMUINT8* vm_res_get_string(VMUINT32 string_id) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	auto it = resources.res2_strings_map.find(string_id);
 	if (it != resources.res2_strings_map.end())
@@ -262,7 +264,7 @@ VMUINT8* vm_res_get_string(VMUINT32 string_id) {
 }
 
 VMUINT8* vm_res_get_image_and_size(VMUINT32 image_id, VMUINT32* size) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	MREngine::res_el* res = resources.find_by_id(image_id);
 
@@ -299,7 +301,7 @@ VMUINT8* vm_res_get_audio(VMUINT32 audio_id) {
 }
 
 VMINT32 vm_res_delete(VMUINT32 id) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	auto it = resources.allocated_res_map.find(id);
 	if (it == resources.allocated_res_map.end())
@@ -310,7 +312,7 @@ VMINT32 vm_res_delete(VMUINT32 id) {
 }
 
 void vm_reg_res_provider(VMUINT8* (*fp)(VMINT resid, VMINT* len)) {
-	MREngine::Resources& resources = get_current_app_resources();
+	MREngine::Resources& resources = AppContext::get_executing_app_resources();
 
 	resources.res_provider = fp;
 }

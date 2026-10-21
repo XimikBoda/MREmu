@@ -378,38 +378,6 @@ bool cur_app_is_native() {
 	return get_cur_app()->is_native();
 }
 
-Memory::MemoryManager& get_current_app_memory() { 
-	return get_cur_app()->app_memory;
-}
-
-MREngine::SystemCallbacks& get_current_app_system_callbacks() {
-	return get_cur_app()->system_callbacks;
-}
-
-MREngine::Resources& get_current_app_resources() {
-	return get_cur_app()->resources;
-}
-
-MREngine::AppGraphic& get_current_app_graphic() {
-	return get_cur_app()->graphic;
-}
-
-MREngine::Timer& get_current_app_timer() {
-	return get_cur_app()->timer;
-}
-
-MREngine::AppIO& get_current_app_io() {
-	return get_cur_app()->io;
-}
-
-MREngine::AppSock& get_current_app_sock() {
-	return get_cur_app()->sock;
-}
-
-MREngine::AppAudio& get_current_app_audio() {
-	return get_cur_app()->audio;
-}
-
 fs::path get_current_app_path() {
 	return get_cur_app()->path;
 }

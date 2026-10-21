@@ -19,6 +19,34 @@ namespace AppContext {
 		return get_executing_app()->phandle;
 	}
 
+	Memory::MemoryManager& get_executing_app_memory() {
+		return get_executing_app()->app_memory;
+	}
+
+	MREngine::SystemCallbacks& get_executing_app_system_callbacks() {
+		return get_executing_app()->system_callbacks;
+	}
+
+	MREngine::Resources& get_executing_app_resources() {
+		return get_executing_app()->resources;
+	}
+
+	MREngine::AppGraphic& get_executing_app_graphic() {
+		return get_executing_app()->graphic;
+	}
+
+	MREngine::Timer& get_executing_app_timer() {
+		return get_executing_app()->timer;
+	}
+
+	MREngine::AppIO& get_executing_app_io() {
+		return get_executing_app()->io;
+	}
+
+	MREngine::AppAudio& get_executing_app_audio() {
+		return get_executing_app()->audio;
+	}
+
 	MREngine::AppSock& get_executing_app_sock() {
 		return get_executing_app()->sock;
 	}

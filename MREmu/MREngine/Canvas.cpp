@@ -2,6 +2,7 @@
 #include "Image.h"
 #include "Canvas.h"
 #include "../Memory.h"
+#include "../AppContext.h"
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 #include <vmpromng.h>
@@ -181,8 +182,8 @@ VMINT_CANVAS vm_graphic_create_canvas_cf_FIX(vm_graphic_color_famat cf, VMINT wi
 	cfp->offset = image_size;
 
 #ifndef ANDROID
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
+	std::lock_guard lock(AppContext::get_executing_app_graphic().canvases_list_mutex);
+	AppContext::get_executing_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 #endif // !ANDROID
 
 	return (VMINT_CANVAS)canvas_buf;
@@ -193,9 +194,9 @@ void vm_graphic_release_canvas_FIX(VMINT_CANVAS hcanvas) {
 		return;
 
 	void* hcanvas_adr = hcanvas;
-	auto& canvases_list = get_current_app_graphic().canvases_list;
+	auto& canvases_list = AppContext::get_executing_app_graphic().canvases_list;
 
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
+	std::lock_guard lock(AppContext::get_executing_app_graphic().canvases_list_mutex);
 
 	for (int i = 0; i < canvases_list.size(); ++i)
 		if (canvases_list[i].first == hcanvas_adr) {
