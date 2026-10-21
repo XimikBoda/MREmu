@@ -1,7 +1,8 @@
 #pragma once
 #include <vmsock_fix.h>
 #include <memory>
-#include <asio.hpp>
+#include <asio/ip/tcp.hpp>
+#include <asio/ip/udp.hpp>
 
 namespace MREngine {
     class TcpSock : public std::enable_shared_from_this<TcpSock> {

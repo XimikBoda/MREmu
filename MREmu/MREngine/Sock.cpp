@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "../AppManager.h"
+#include <asio/connect.hpp>
 
 //// TCP
 
