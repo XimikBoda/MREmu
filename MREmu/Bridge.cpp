@@ -3,7 +3,7 @@
 #include "ARModule.h"
 #include "Log.h"
 
-#include "MREngine/Sock.h"
+//#include "MREngine/Sock.h"
 #include "MREngine/Audio.h"
 #include "MREngine/Graphic.h"
 #include "MREngine/Canvas.h"
@@ -34,6 +34,7 @@
 #include <vmsensor.h>
 #include <vmtel.h>
 
+#include <vmsock_fix.h>
 
 VMINT vm_get_res_header();//tmp
 VMWSTR vm_ucs2_string(VMSTR s);
@@ -1433,7 +1434,7 @@ namespace Bridge {
 					read_arg(uc, 0),
 					(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
 					(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					(VMINT(*)(vm_soc_dns_result*))ADDRESS_FROM_EMU(read_arg(uc, 3))
+					(vm_dns_callback_t)ADDRESS_FROM_EMU(read_arg(uc, 3))
 				));
 		}},
 		{FUNCN(vm_tcp_connect), [](uc_engine* uc) {
@@ -1442,7 +1443,7 @@ namespace Bridge {
 					(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
 					read_arg(uc, 1),
 					read_arg(uc, 2),
-					(void (*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 3))
+					(vm_sock_callback_t)ADDRESS_FROM_EMU(read_arg(uc, 3))
 				));
 		}},
 		{FUNCN(vm_tcp_close), [](uc_engine* uc) {
@@ -1469,7 +1470,7 @@ namespace Bridge {
 				vm_udp_create(
 					read_arg(uc, 0),
 					read_arg(uc, 1),
-					(void (*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 2)),
+					(vm_sock_callback_t)ADDRESS_FROM_EMU(read_arg(uc, 2)),
 					read_arg(uc, 3)
 				));
 		}},
