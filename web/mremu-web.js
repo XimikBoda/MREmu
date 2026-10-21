@@ -475,7 +475,10 @@
 
   /* ---------------------------------------------------------------- panel */
 
-  function showPanelView(name, focus) {
+  // animate: whether the incoming view slides in. Opening the sidebar (the
+  // toggle button) must NOT slide; the slide is reserved for the info-icon
+  // button (apps -> stats) and for Backspace on the stats page (stats -> apps).
+  function showPanelView(name, focus, animate) {
     var stats = name === 'stats';
     if (state.view === name) {
       if (focus) {
@@ -493,8 +496,10 @@
 
     var shown = stats ? els.viewStats : els.viewApps;
     shown.classList.remove('view-enter-next', 'view-enter-prev');
-    void shown.offsetWidth;
-    shown.classList.add(stats ? 'view-enter-next' : 'view-enter-prev');
+    if (animate) {
+      void shown.offsetWidth;
+      shown.classList.add(stats ? 'view-enter-next' : 'view-enter-prev');
+    }
 
     if (focus) {
       if (stats) els.statsBack.focus();
@@ -589,6 +594,11 @@
         else if (els.panel.classList.contains('open')) closePanel();
       } else if (event.key === 'Tab' && dialog) {
         cycleConfirmFocus(event);
+      } else if (event.key === 'Backspace' && !typing &&
+                 els.panel.classList.contains('open') &&
+                 state.view === 'stats') {
+        // Backspace on the statistics page goes back to apps, with the slide.
+        showPanelView('apps', true, true);
       }
       event.stopImmediatePropagation();
     }
@@ -751,10 +761,10 @@
     $('panel-close').addEventListener('click', closePanel);
     els.panelInfo.addEventListener('click', function () {
       renderStats();
-      showPanelView('stats', true);
+      showPanelView('stats', true, true);
     });
     els.statsBack.addEventListener('click', function () {
-      showPanelView('apps', true);
+      showPanelView('apps', true, true);
     });
 
     els.addFiles.addEventListener('click', function () {
