@@ -217,6 +217,7 @@
         flex-direction: column;
         width: min(400px, 100vw);
         padding: 24px;
+        overflow-x: hidden;
         overflow-y: auto;
         background: var(--surface);
         border-left: 1px solid var(--line);
@@ -300,10 +301,10 @@
       }
       @keyframes view-out-next {
         from { transform: translateX(0); }
-        to { transform: translateX(-25%); }
+        to { transform: translateX(-100%); }
       }
       @keyframes view-in-prev {
-        from { transform: translateX(-25%); }
+        from { transform: translateX(-100%); }
         to { transform: translateX(0); }
       }
       @keyframes view-out-prev {
