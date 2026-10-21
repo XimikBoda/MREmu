@@ -98,23 +98,23 @@ void AppManager::process_launch_app(launch_el launch_data)
 		apps[current_work_app_id]->resources.file_context = &(apps[current_work_app_id]->file_context); //todo
 	}
 
-	static int ph_app_id = 0;
-	ph_app_id++;
+	static int phandle = 0;
+	phandle++;
 
-	apps[current_work_app_id]->system_callbacks.ph_app_id = ph_app_id;
+	apps[current_work_app_id]->phandle = phandle;
 
 	fix_mtone_wireless(); // file handle 0 fix
 
 	apps[current_work_app_id]->start();
 
-	add_system_event(ph_app_id, VM_MSG_CREATE, 0);
-	add_system_event(ph_app_id, VM_MSG_PAINT, 0);
+	add_system_event(phandle, VM_MSG_CREATE, 0);
+	add_system_event(phandle, VM_MSG_PAINT, 0);
 }
 
 void AppManager::close_app(int id, bool soft)
 {
 	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == id) {
+		if (apps[i]->phandle == id) {
 			auto& state = apps[i]->state;
 			
 			App::State close_state = soft ? App::SoftClosing : App::HardClosing;
@@ -190,7 +190,7 @@ int AppManager::find_app_id_by_phandle(int phandle) {
 	int app_id = -1;
 
 	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == phandle) {
+		if (apps[i]->phandle == phandle) {
 			app_id = i;
 			break;
 		}
@@ -354,7 +354,7 @@ App* AppManager::get_current_work_app_id()
 App* AppManager::get_app_by_phandle(int phandle)
 {
 	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == phandle)
+		if (apps[i]->phandle == phandle)
 			return apps[i].get();
 
 	return 0;

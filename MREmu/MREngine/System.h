@@ -11,7 +11,6 @@ namespace MREngine {
 	public:
 		void (*sysevt)(VMINT message, VMINT param) = 0;
 
-		int ph_app_id;
 		VM_MESSAGE_PROC msg_proc = 0;
 	};
 }

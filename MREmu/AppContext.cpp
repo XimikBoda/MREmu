@@ -16,7 +16,7 @@ namespace AppContext {
 	}
 
 	int get_executing_app_phandle() {
-		return get_executing_app()->system_callbacks.ph_app_id;
+		return get_executing_app()->phandle;
 	}
 
 	MREngine::AppSock& get_executing_app_sock() {

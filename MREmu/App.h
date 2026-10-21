@@ -37,6 +37,8 @@ public:
 
 	State state = Runned; // todo
 
+	int phandle = -1;
+
 	std::u8string app_name;
 
 	MreTags tags;

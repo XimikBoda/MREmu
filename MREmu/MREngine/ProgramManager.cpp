@@ -3,13 +3,13 @@
 #include "CharSet.h"
 #include "../Memory.h"
 #include "../AppManager.h"
+#include "../AppContext.h"
 #include <vmpromng.h>
 
 extern AppManager* g_appManager;
 
 VM_P_HANDLE vm_pmng_get_current_handle(void) {
-	MREngine::SystemCallbacks& sc = get_current_app_system_callbacks();
-	return sc.ph_app_id; //TODO
+	return AppContext::get_executing_app_phandle();;
 }
 
 void vm_reg_msg_proc(VM_MESSAGE_PROC proc) {
