@@ -21,15 +21,12 @@ message(STATUS "Found MRE_SDK: ${MRE_SDK}")
 file(GLOB sdk_headers CONFIGURE_DEPENDS "${MRE_SDK_INCLUDE_DIR}/*.h")
 file(GLOB local_headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 
-add_library(${TARGET_NAME} INTERFACE)
-target_sources(${TARGET_NAME} INTERFACE ${sdk_headers} ${local_headers})
+add_library(${TARGET_NAME} STATIC ${sdk_headers} ${local_headers} null.c)
 
-target_include_directories(${TARGET_NAME} INTERFACE 
+target_include_directories(${TARGET_NAME} PUBLIC
     "${MRE_SDK_INCLUDE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )
-
-add_custom_target(${TARGET_NAME}_headers SOURCES ${sdk_headers} ${local_headers})
 
 source_group("MRE SDK" FILES ${sdk_headers})
 source_group("Local Headers" FILES ${local_headers})
