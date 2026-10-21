@@ -38,6 +38,8 @@ struct system_event_el {
 };
 
 class AppManager {
+	static AppManager* ptr;
+
 	Queue<launch_el> launch_queue;
 	Queue<keyboard_event_el> keyboard_events_queue;
 	Queue<pen_event_el> pen_events_queue;
@@ -79,6 +81,10 @@ class AppManager {
 
 	void loop();
 public:
+	AppManager();
+	~AppManager();
+	static AppManager* getPtr();
+
 	void start();
 	void stop();
 
@@ -97,9 +103,10 @@ public:
 
 	void add_system_event(int phandle, int message, int param);
 
-	static void add_sock_event(sock_event se);
-	static void add_dns_event(dns_event de);
+	void add_sock_event(sock_event se);
+	void add_dns_event(dns_event de);
 
-	App* get_active_app();
+	App* get_active_app(); // TODO: rename it
 	App* get_current_work_app_id();
+
 };

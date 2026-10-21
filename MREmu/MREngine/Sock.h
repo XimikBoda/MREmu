@@ -14,8 +14,6 @@ namespace MREngine {
     };    
 }
 
-MREngine::AppSock& get_current_app_sock();
-
 struct sock_event { //tcp and udp
     vm_sock_callback_t callback;
     int phandle;

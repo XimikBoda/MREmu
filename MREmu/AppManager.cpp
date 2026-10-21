@@ -10,7 +10,24 @@
 extern std::string error_message;
 extern bool show_error;
 
-extern AppManager* g_appManager;
+extern AppManager* g_appManager; //TODO remove this
+
+AppManager* AppManager::ptr = nullptr;
+
+AppManager::AppManager() {
+	if (ptr != nullptr)
+		throw std::runtime_error("Network already exists!");
+
+	ptr = this;
+}
+
+AppManager::~AppManager() {
+	ptr = nullptr;
+}
+
+AppManager* AppManager::getPtr() {
+	return ptr;
+}
 
 void AppManager::fix_mtone_wireless() {
 	auto app = get_active_app();
@@ -212,10 +229,8 @@ void AppManager::process_system_event(system_event_el se)
 
 void AppManager::add_sock_event(sock_event se)
 {
-	if (g_appManager) {
-		g_appManager->sock_events_queue.push(g_appManager->events_mutex, { se });
-		g_appManager->events_cv.notify_one();
-	}
+	sock_events_queue.push(events_mutex, { se });
+	events_cv.notify_one();
 }
 
 void AppManager::process_sock_event(sock_event se)
@@ -231,10 +246,8 @@ void AppManager::process_sock_event(sock_event se)
 
 void AppManager::add_dns_event(dns_event de)
 {
-	if (g_appManager) {
-		g_appManager->dns_events_queue.push(g_appManager->events_mutex, { de });
-		g_appManager->events_cv.notify_one();
-	}
+	dns_events_queue.push(events_mutex, { de });
+	events_cv.notify_one();
 }
 
 void AppManager::process_dns_event(dns_event de)
