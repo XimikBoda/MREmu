@@ -80,6 +80,21 @@ MCP server — client setup, every tool, and the behaviours that surprise people
   tools through `--mcp --mcp-window`, plus an `EnumWindows` check that a real visible window
   opened and that its title tracks the agent's run state. A window flashes on screen.
 
+### Web (Emscripten) build
+
+The WebAssembly build is driven from the launcher, not by hand-invoking emcmake:
+
+- `launch.bat 8 1` / `8 2` — configure + build Release/Debug into `build\em`, then
+  copy the bundle to `bin\Release` / `bin\Debug`. `8 3` serves `bin\Release` on
+  `http://127.0.0.1:8123/` with `tools/web_serve.py`, `8 4` cleans.
+- Do **not** wrap the build with `emcmake`: its Python wrapper exits the calling
+  batch process and on Windows forces `-G "MinGW Makefiles"`. Use plain `cmake`
+  with `-DCMAKE_TOOLCHAIN_FILE=<emsdk>/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake`.
+- The page must be served over HTTP with COOP/COEP headers (the build uses
+  `-pthread`, so `file://` cannot work). `web/shell.html` is the emcc shell.
+- Full details, including the missing-CA-bundle CPM workaround, in
+  [docs/web.md](docs/web.md).
+
 ## Rules the agent must follow
 
 1. **NEVER run `clean` or `./gradlew --stop`.** Both throw away the warm Gradle daemon and caches, forcing a full rebuild.

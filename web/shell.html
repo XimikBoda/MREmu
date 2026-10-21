@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MREmu</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #111;
+        color: #ddd;
+        font: 14px/1.4 system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #stage {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      /* The canvas must have no border or padding, or mouse coordinates drift
+         from the pixels SFML thinks it is drawing to. */
+      canvas#canvas {
+        border: 0 none;
+        padding: 0;
+        background: #000;
+        image-rendering: pixelated;
+        outline: none;
+      }
+      #overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: #111;
+        transition: opacity 200ms ease;
+      }
+      #overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #bar {
+        width: 220px;
+        height: 4px;
+        background: #2a2a2a;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      #bar > div {
+        height: 100%;
+        width: 0%;
+        background: #4a9eff;
+        transition: width 150ms linear;
+      }
+      #status { color: #888; }
+      #hint { color: #555; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    </div>
+    <div id="overlay">
+      <div><strong>MREmu</strong></div>
+      <div id="bar"><div></div></div>
+      <div id="status">Loading&hellip;</div>
+      <div id="hint">Click the screen once to enable keyboard and sound.</div>
+    </div>
+    <script>
+      var overlay = document.getElementById('overlay');
+      var statusElement = document.getElementById('status');
+      var progressFill = document.querySelector('#bar > div');
+
+      var Module = {
+        canvas: (function () {
+          var canvas = document.getElementById('canvas');
+          canvas.addEventListener(
+            'webglcontextlost',
+            function (e) {
+              alert('WebGL context lost. Reload the page to continue.');
+              e.preventDefault();
+            },
+            false
+          );
+          return canvas;
+        })(),
+        setStatus: function (text) {
+          // Emscripten reports progress as "message (done/total)".
+          var m = text && text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+          if (m) {
+            statusElement.textContent = m[1].trim();
+            progressFill.style.width = (parseInt(m[2]) / parseInt(m[4])) * 100 + '%';
+          } else if (text) {
+            statusElement.textContent = text;
+          }
+        },
+        onRuntimeInitialized: function () {
+          overlay.classList.add('hidden');
+          Module.canvas.focus();
+        },
+      };
+
+      // Frames and audio both want a user gesture; hand the first click to the
+      // canvas so the emulated phone actually receives key events.
+      document.getElementById('stage').addEventListener('click', function () {
+        Module.canvas.focus();
+      });
+
+      window.onerror = function () {
+        statusElement.textContent = 'Failed to start - see the browser console.';
+        progressFill.style.width = '0%';
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

@@ -17,7 +17,12 @@ endif()
 
 option(CAPSTONE "Endble capstone" OFF)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+# Emscripten output stays beside build.ninja (index.html/js/wasm/data): launch.bat
+# copies it to bin\<config> to be served, and a Debug web build must not stomp
+# the desktop binaries that live in bin\Release.
+if(NOT EMSCRIPTEN)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+endif()
 
 # Enable optimizations by default
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

@@ -23,6 +23,7 @@ The documentation is organized into modular guides following a simple, topic-foc
 | [**File System & I/O**](io_and_filesystem.md) | Virtual drive mapping (`C:\`, `D:\`, `E:\mre`), host path sandboxing, UCS-2 string handling, file descriptors, and directory search iterators. |
 | [**Networking & Sockets**](networking.md) | Asynchronous network stack powered by Asio: TCP/UDP socket lifecycle, event-driven callbacks, DNS resolution (`vm_soc_get_host_by_name`), and connectivity checks. |
 | [**Desktop & Headless Tooling**](desktop.md) | Desktop application features, dual-window interface (SFML + Dear ImGui), headless inspection flags (`--inspect`, `--json`, `--screen`, `--steps`), and GDB debugging. |
+| [**Web (Emscripten) Build**](web.md) | Building and running the WebAssembly port: emsdk bootstrap through `launch.bat [8]`, the generated `index.html` bundle, why it must be served with COOP/COEP headers, and what differs from the desktop build. |
 | [**Running Without a Window**](running_without_window.md) | Headless operation, script integration, one-shot reporting, and AI agent control overview. |
 | [**AI Agent Control (MCP)**](mcp.md) | Driving MREmu headlessly via the Model Context Protocol (MCP) over stdio with tools for execution control, memory inspection, and VM call tracing. |
 | [**Android Frontend**](android.md) | Architecture of the Android port: `NativeActivity` integration, JNI bridge, Jetpack Compose UI overlay, virtual keypad, and Storage Access Framework (SAF). |

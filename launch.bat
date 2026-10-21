@@ -590,14 +590,19 @@ if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
 set "EM_BUILD=%ROOT%build\em"
 if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
 cd /d "%EM_BUILD%"
-emcmake cmake -S %ROOT% -B . -DCMAKE_BUILD_TYPE=Release -DEMSCRIPTEN=1 -G Ninja
+rem emcmake is deliberately not used: its Python wrapper calls exit, which
+rem terminates this batch the moment configure finishes (the build step never
+rem ran), and on Windows it forces -G "MinGW Makefiles" (the Emscripten setup
+rem expects Ninja here). These are exactly the arguments it would have passed.
+cmake -S %ROOT% -B . -G Ninja -DCMAKE_BUILD_TYPE=Release -DEMSCRIPTEN=1 %EM_TLS_OPT% ^
+  -DCMAKE_TOOLCHAIN_FILE="%EM_TOOLCHAIN%" -DCMAKE_CROSSCOMPILING_EMULATOR="%EMSDK_NODE%"
 set "EM_CFG_RC=%errorlevel%"
 if not "%EM_CFG_RC%"=="0" (
   echo Emscripten configure failed.
   if defined once exit /b %EM_CFG_RC%
   goto web_menu
 )
-emcmake cmake --build .
+cmake --build .
 set "EM_BUILD_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_BUILD_RC%"=="0" (
@@ -620,14 +625,17 @@ if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
 set "EM_BUILD=%ROOT%build\em"
 if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
 cd /d "%EM_BUILD%"
-emcmake cmake -S %ROOT% -B . -DCMAKE_BUILD_TYPE=Debug -DEMSCRIPTEN=1 -G Ninja
+rem See the Release branch above: plain cmake with the Emscripten toolchain,
+rem never emcmake (it exits this batch and forces the wrong generator).
+cmake -S %ROOT% -B . -G Ninja -DCMAKE_BUILD_TYPE=Debug -DEMSCRIPTEN=1 %EM_TLS_OPT% ^
+  -DCMAKE_TOOLCHAIN_FILE="%EM_TOOLCHAIN%" -DCMAKE_CROSSCOMPILING_EMULATOR="%EMSDK_NODE%"
 set "EM_CFG_RC=%errorlevel%"
 if not "%EM_CFG_RC%"=="0" (
   echo Emscripten configure failed.
   if defined once exit /b %EM_CFG_RC%
   goto web_menu
 )
-emcmake cmake --build .
+cmake --build .
 set "EM_BUILD_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_BUILD_RC%"=="0" (
@@ -641,51 +649,91 @@ if defined once exit /b 0
 goto web_menu
 
 :web_env
-if exist "%EM_SDK%\emsdk_env.bat" (
-  call "%EM_SDK%\emsdk_env.bat" >nul 2>&1
-) else (
-  for /d %%D in ("%EM_SDK%\*") do if exist "%%D\emsdk_env.bat" call "%%D\emsdk_env.bat" >nul 2>&1
+rem emsdk_env.bat only edits PATH when emsdk.py decides the parent shell is
+rem cmd.exe. Started from Git Bash (MSYSTEM set) it emits emsdk_set_env.sh
+rem instead, so the call reports success while PATH never changes and
+rem "emcmake" looks missing. Set the toolchain environment explicitly, then
+rem still run emsdk_env.bat for anything not covered here.
+set "EMSDK=%EM_SDK%"
+set "PATH=%EM_SDK%\upstream\emscripten;%EM_SDK%;%PATH%"
+for /d %%D in ("%EM_SDK%\node\*_64bit") do (
+  set "PATH=%%D;%PATH%"
+  set "EMSDK_NODE=%%D\node.exe"
 )
-if errorlevel 1 (
-  echo Failed to activate emsdk environment.
+for /d %%D in ("%EM_SDK%\python\*_64bit") do set "EMSDK_PYTHON=%%D\python.exe"
+if exist "%EM_SDK%\emsdk_env.bat" call "%EM_SDK%\emsdk_env.bat" >nul 2>&1
+if not exist "%EM_SDK%\upstream\emscripten\emcc.bat" (
+  echo Emscripten toolchain not found under "%EM_SDK%".
+  exit /b 1
+)
+set "EM_TOOLCHAIN=%EM_SDK%\upstream\emscripten\cmake\Modules\Platform\Emscripten.cmake"
+if not exist "%EM_TOOLCHAIN%" (
+  echo Emscripten CMake toolchain file not found at "%EM_TOOLCHAIN%".
   exit /b 1
 )
 
-rem CPM.cmake is downloaded from GitHub at configure time. If SSL inspection
-rem blocks the download, pre-place CPM_0.40.2.cmake at
-rem   %ROOT%em\emsdk_cache\cpm\CPM_0.40.2.cmake
-rem and set CPM_SOURCE_CACHE=%ROOT%em\emsdk_cache to avoid the download.
+rem CPM.cmake bootstraps itself from GitHub during configure (deps/asio.cmake is
+rem a submodule, so the download cannot be patched here). Reuse a cached copy
+rem when there is one, and otherwise let cmake skip TLS transport verification:
+rem CMake shipped with Visual Studio has no CA bundle at all, so every HTTPS
+rem download fails with "certificate signer not trusted". The file is pinned by
+rem EXPECTED_HASH, which is what actually guards its integrity.
 if not defined CPM_SOURCE_CACHE if exist "%ROOT%em\emsdk_cache\cpm\CPM_0.40.2.cmake" (
   set "CPM_SOURCE_CACHE=%ROOT%em\emsdk_cache"
 )
+rem Disable TLS verification only when a download is actually going to happen.
+set "EM_TLS_OPT=-DCMAKE_TLS_VERIFY=OFF"
+if defined CPM_SOURCE_CACHE if exist "%CPM_SOURCE_CACHE%\cpm\CPM_0.40.2.cmake" set "EM_TLS_OPT="
+if not defined CPM_SOURCE_CACHE if exist "%ROOT%build\em\cmake\CPM_0.40.2.cmake" set "EM_TLS_OPT="
 exit /b 0
 
 :copy_web_to_bin
-set "WEB_BUILD=%ROOT%build\em"
+rem The Emscripten target emits a complete index.html/.js/.wasm/.data bundle
+rem into build\em (see MREmu/CMakeLists.txt). Snapshot it per configuration so
+rem Release and Debug builds of the page do not overwrite each other.
+set "WEB_OUT=%ROOT%build\em"
 set "OUT_DIR=%ROOT%bin\%~1"
-if exist "%WEB_BUILD%\index.html" (
-  if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
-  copy /y "%WEB_BUILD%\index.html" "%OUT_DIR%\index.html" >nul
-  copy /y "%WEB_BUILD%\index.js" "%OUT_DIR%\index.js" >nul 2>&1
-  copy /y "%WEB_BUILD%\index.wasm" "%OUT_DIR%\index.wasm" >nul 2>&1
-  copy /y "%WEB_BUILD%\index.data" "%OUT_DIR%\index.data" >nul 2>&1
-  echo Web artifacts copied to: %OUT_DIR%
-) else (
-  echo No index.html found in "%WEB_BUILD%". Build first.
+if not exist "%WEB_OUT%\index.html" (
+  echo No index.html found in "%WEB_OUT%". Build first.
   exit /b 1
 )
+if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
+for %%F in (index.html index.js index.wasm index.data) do (
+  if exist "%WEB_OUT%\%%F" (
+    copy /y "%WEB_OUT%\%%F" "%OUT_DIR%\%%F" >nul
+    if errorlevel 1 (
+      echo Failed to copy %%F to "%OUT_DIR%".
+      exit /b 1
+    )
+  )
+)
+echo Web artifacts copied to: %OUT_DIR%
 exit /b 0
 
 :web_launch
-set "WEB_BUILD=%ROOT%bin\Release"
-if not exist "%WEB_BUILD%\index.html" (
+set "WEB_DIR=%ROOT%bin\Release"
+if not exist "%WEB_DIR%\index.html" (
   echo Web build not found. Build first [1].
   if defined once exit /b 1
   goto web_menu
 )
+rem pthreads needs SharedArrayBuffer, which browsers only grant to
+rem cross-origin-isolated pages, so the build must be served over loopback HTTP
+rem with COOP/COEP headers. file:// cannot work.
+python --version >nul 2>&1
+if errorlevel 1 (
+  echo Python not found on PATH; it is needed to serve the web build.
+  if defined once exit /b 1
+  goto web_menu
+)
+set "WEB_PORT=8123"
 echo.
-echo Launching web build in default browser...
-start "" "%WEB_BUILD%\index.html"
+echo Serving %WEB_DIR% at http://127.0.0.1:%WEB_PORT%/
+echo A browser tab opens automatically; close the minimized server window to stop.
+start "MREmu web server" /min python "%ROOT%tools\web_serve.py" --dir "%WEB_DIR%" --port %WEB_PORT%
+rem Let the server bind before the browser asks for the page.
+ping -n 3 127.0.0.1 >nul 2>&1
+start "" "http://127.0.0.1:%WEB_PORT%/"
 if defined once exit /b 0
 goto web_menu
 
@@ -693,10 +741,15 @@ goto web_menu
 echo.
 echo Cleaning web build artifacts...
 if exist "build\em" rmdir /s /q "build\em"
-if exist "bin\Release\index.html" del /q bin\Release\index.html >nul 2>&1
-if exist "bin\Release\index.js" del /q bin\Release\index.js >nul 2>&1
-if exist "bin\Release\index.wasm" del /q bin\Release\index.wasm >nul 2>&1
-if exist "bin\Release\index.data" del /q bin\Release\index.data >nul 2>&1
+rem Drop the per-config snapshots too; the bundle itself lives in build\em.
+for %%F in (index.html index.js index.wasm index.data) do (
+  if exist "bin\Release\%%F" del /q "bin\Release\%%F" >nul 2>&1
+  if exist "bin\Debug\%%F" del /q "bin\Debug\%%F" >nul 2>&1
+)
+rem Bundles left by the older layout that linked straight into bin.
+for %%F in (MREmu.js MREmu.wasm MREmu.data MREmu.worker.js) do (
+  if exist "bin\%%F" del /q "bin\%%F" >nul 2>&1
+)
 echo Web build cleaned.
 if defined once exit /b 0
 goto web_menu

@@ -32,7 +32,8 @@
 #include "ArmApp.h"
 #include "DLLApp.h"
 
-#ifndef ANDROID
+// MCP server is desktop-only; the web build links without it.
+#if !defined(ANDROID) && !defined(__EMSCRIPTEN__)
 #include "McpServer.h"
 namespace McpHost {
 	void setup(AppManager*, KeyboardControl*, Mcp::Control*, MREngine::Graphic*);
@@ -559,6 +560,7 @@ static int run_inspection(MREngine::Graphic& graphic,
 	return rc;
 }
 
+#if !defined(__EMSCRIPTEN__)
 // ---------------------------------------------------------------------------
 // Watchable MCP mode
 // ---------------------------------------------------------------------------
@@ -660,7 +662,8 @@ static void run_mcp_window(MREngine::Graphic& graphic, KeyboardControl& kc,
 		win.display();
 	}
 }
-#endif
+#endif // __EMSCRIPTEN__: MCP not built on the web
+#endif // ANDROID
 
 int main(int argc, char** argv) {
     std::string app_path = "";
@@ -705,7 +708,7 @@ int main(int argc, char** argv) {
 		mcp_window = env && env[0] != 0 && env[0] != '0';
 	}
 
-#ifndef ANDROID
+#if !defined(__EMSCRIPTEN__)
 	// Claim stdout for JSON-RPC before anything logs. This must precede every
 	// spdlog call, including the one below, because once spdlog's stdout sink is
 	// live on fd 1 any log line corrupts the protocol stream.
@@ -727,7 +730,12 @@ int main(int argc, char** argv) {
 	GDB::gdb_mode = parser.get<bool>("g");
 	GDB::gdb_port = parser.get<int>("p");
 
-	fs::current_path(fs::path(argv[0]).parent_path());
+	// Emscripten's argv[0] has no directory component; current_path("") throws.
+	{
+		fs::path exe_dir = fs::path(argv[0]).parent_path();
+		if (!exe_dir.empty())
+			fs::current_path(exe_dir);
+	}
 #else
     auto android_logger = spdlog::android_logger_mt("android_logger", "MREmu");
 
@@ -768,6 +776,7 @@ int main(int argc, char** argv) {
 			inspect_json, inspect_screen, inspect_steps);
 	}
 
+#if !defined(__EMSCRIPTEN__)
 	// MCP mode: the emulator is pumped on a worker thread while this thread
 	// speaks MCP over stdio, so an agent can inspect and drive a running VXP on
 	// a machine with no display.
@@ -846,6 +855,7 @@ int main(int argc, char** argv) {
 		appManager.stop();
 		return serve_rc.load();
 	}
+#endif // __EMSCRIPTEN__: MCP not built on the web
 
 #ifdef DEBUG_WINDOW
 	sf::RenderWindow win_debug(sf::VideoMode(1000, 600), "MREmu Debug");
