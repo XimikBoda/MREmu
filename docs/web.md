@@ -133,8 +133,9 @@ from the toggle button. Below 640px it becomes a bottom sheet that slides up
 instead, with a drag handle: drag it down to dismiss, with a finger or with
 the mouse. Switching to the statistics view and back slides the two views
 past each other at the same time - the outgoing one leaves completely to the
-left (or right, when going back) while the incoming one arrives from the
-opposite edge, on an ease-out curve and with no crossfade. It is triggered by
+left (or right, when going back) while fading out, and the incoming one
+arrives from the opposite edge on an ease-out curve. There is no crossfade on
+the incoming view. It is triggered by
 the statistics button and by Backspace on the statistics page; opening the
 panel itself never slides. It offers:
 

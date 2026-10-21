@@ -300,16 +300,16 @@
         to { transform: translateX(0); }
       }
       @keyframes view-out-next {
-        from { transform: translateX(0); }
-        to { transform: translateX(-100%); }
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(-100%); opacity: 0; }
       }
       @keyframes view-in-prev {
         from { transform: translateX(-100%); }
         to { transform: translateX(0); }
       }
       @keyframes view-out-prev {
-        from { transform: translateX(0); }
-        to { transform: translateX(100%); }
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
       }
       .group {
         display: flex;
