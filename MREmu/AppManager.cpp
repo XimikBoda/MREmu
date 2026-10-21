@@ -10,8 +10,6 @@
 extern std::string error_message;
 extern bool show_error;
 
-extern AppManager* g_appManager; //TODO remove this
-
 AppManager* AppManager::ptr = nullptr;
 
 AppManager::AppManager() {
@@ -107,8 +105,8 @@ void AppManager::process_launch_app(launch_el launch_data)
 
 	apps[current_work_app_id]->start();
 
-	add_system_event(phandle, VM_MSG_CREATE, 0);
-	add_system_event(phandle, VM_MSG_PAINT, 0);
+	push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_CREATE, 0} });
+	push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
 }
 
 void AppManager::close_app(int id, bool soft)
@@ -143,52 +141,9 @@ void AppManager::close_apps()
 	}
 }
 
-void AppManager::add_message_event(int phandle, unsigned int msg_id,
-	int wparam, int lparam, int phandle_sender)
-{
-	message_events_queue.push(events_mutex, { phandle, msg_id, wparam, lparam, phandle_sender });
-	events_cv.notify_one(); // TODO: Do I need it here
-}
-
-int AppManager::find_app_id_by_phandle(int phandle) {
-	int app_id = -1;
-
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->phandle == phandle) {
-			app_id = i;
-			break;
-		}
-
-	return app_id;
-}
-
-void AppManager::process_message_event(message_event_el me)
-{
-	current_work_app_id = find_app_id_by_phandle(me.phandle);
-	if (current_work_app_id == -1)
-		return;
-
-	App *cur_app = apps[current_work_app_id].get();
-	if (cur_app && cur_app->system_callbacks.msg_proc)
-		cur_app->run(cur_app->system_callbacks.msg_proc,
-			me.phandle_sender, me.msg_id, me.wparam, me.lparam);
-}
-
-void AppManager::add_system_event(int phandle, int message, int param)
-{
-	system_events_queue.push(events_mutex, { phandle, message, param });
-	events_cv.notify_one(); // TODO: here too
-}
-
-void AppManager::process_system_event(system_event_el se)
-{
-	current_work_app_id = find_app_id_by_phandle(se.phandle);
-	if (current_work_app_id == -1)
-		return;
-
-	App& cur_app = *apps[current_work_app_id];
-	if (cur_app.system_callbacks.sysevt)
-		cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
+void AppManager::push_event(const Event::system& ev) {
+	system_events_queue.push(events_mutex, ev);
+	events_cv.notify_one();
 }
 
 void AppManager::push_event(const Event::input& ev) {
@@ -201,6 +156,24 @@ void AppManager::push_event(const Event::network& ev) {
 	events_cv.notify_one();
 }
 
+void AppManager::process_event(const Event::system& ev) {
+	App* app = set_executing_app_by_phandle(ev.phandle);
+
+	if (app)
+		std::visit([app](auto&& arg) {
+		using T = std::decay_t<decltype(arg)>;
+
+		if constexpr (std::is_same_v<T, Event::system_msg>) {
+			if (auto handler = app->system_callbacks.sysevt)
+				app->run(handler, arg.message, arg.param);
+		}
+		else if constexpr (std::is_same_v<T, Event::message>) {
+			if (auto handler = app->system_callbacks.msg_proc)
+				app->run(handler, arg.phandle_sender, arg.msg_id, arg.wparam, arg.lparam);
+		}
+			}, ev.data);
+}
+
 void AppManager::process_event(const Event::input& ev) {
 	App* app = set_foreground_as_executing();
 
@@ -209,12 +182,12 @@ void AppManager::process_event(const Event::input& ev) {
 		using T = std::decay_t<decltype(arg)>;
 
 		if constexpr (std::is_same_v<T, Event::keyboard>) {
-			if (app->io.key_handler)
-				app->run(app->io.key_handler, arg.event, arg.keycode);
+			if (auto handler = app->io.key_handler)
+				app->run(handler, arg.event, arg.keycode);
 		}
 		else if constexpr (std::is_same_v<T, Event::pen>) {
-			if (app->io.pen_handler)
-				app->run(app->io.pen_handler, arg.event, arg.x, arg.y);
+			if (auto handler = app->io.pen_handler)
+				app->run(handler, arg.event, arg.x, arg.y);
 		}
 			}, ev.data);
 }
@@ -255,10 +228,10 @@ sf::Time AppManager::get_time_for_nearest_timer()
 }
 
 bool AppManager::is_all_events_empty() {
-	return launch_queue.empty() &&
-		input_events_queue.empty() &&
-		message_events_queue.empty() && system_events_queue.empty() &&
-		network_events_queue.empty();
+	return launch_queue.empty()
+		&& input_events_queue.empty()
+		&& system_events_queue.empty()
+		&& network_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -288,8 +261,7 @@ void AppManager::loop() {
 			event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
 
 		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
-		run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
-		run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
+		run_queue(system_events_queue, lock, [this](Event::system data) { process_event(data); });
 		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
 		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
 		
@@ -346,6 +318,15 @@ App* AppManager::get_app_by_phandle(int phandle)
 	return 0;
 }
 
+App* AppManager::get_app_by_mem_adr(size_t offset_mem) 
+{
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->offset_mem == offset_mem)
+			return apps[i].get();
+
+	return 0;
+}
+
 App* AppManager::set_executing_app_by_phandle(int phandle)
 {
 	for (int i = 0; i < apps.size(); ++i)
@@ -365,30 +346,4 @@ App* AppManager::set_foreground_as_executing()
 		current_work_app_id = active_app_id;
 		return apps[active_app_id].get();
 	}
-}
-
-MreTags* get_tags_by_mem_adr(size_t offset_mem) {
-	if (!g_appManager)
-		return 0;
-
-	auto &apps = g_appManager->apps;
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->offset_mem == offset_mem)
-			return &apps[i]->tags;
-
-	return 0;
-}
-
-void add_message_event(int phandle, unsigned int msg_id,
-	int wparam, int lparam, int phandle_sender) 
-{
-	if (g_appManager)
-		g_appManager->add_message_event(phandle, msg_id, wparam, 
-			lparam, phandle_sender);
-}
-
-void add_system_event(int phandle, int message, int param)
-{
-	if (g_appManager)
-		g_appManager->add_system_event(phandle, message, param);
 }

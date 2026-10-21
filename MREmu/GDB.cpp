@@ -3,6 +3,7 @@
 #include <SFML/Network.hpp>
 #include <unicorn/unicorn.h>
 #include "AppManager.h"
+#include "AppContext.h"
 #include "Log.h"
 
 #include <iostream>
@@ -14,7 +15,6 @@
 using namespace std::string_literals;
 
 extern uc_engine* uc;
-extern AppManager* g_appManager;
 
 namespace GDB {
 	sf::TcpListener tcpListner;
@@ -273,7 +273,7 @@ namespace GDB {
 	}
 
 	void process_qXfer_exec_file(std::string_view parameters) {
-		auto app = g_appManager->get_active_app();
+		auto app = AppContext::get_foreground_app(); // TODO: foreground or executing?
 		if (!app)
 			return;
 
@@ -356,7 +356,7 @@ namespace GDB {
 
 		spdlog::info("GDB vRun path: {}", path);
 
-		g_appManager->add_app_for_launch(path, 0);
+		AppManager::getPtr()->add_app_for_launch(path, 0);
 		make_answer("S00");
 	}
 
@@ -384,7 +384,7 @@ namespace GDB {
 		if (c != 3)
 			return;
 
-		auto app = g_appManager->get_active_app();
+		auto app = AppContext::get_foreground_app(); // TODO: foreground or executing?
 		if (!app)
 			return;
 

@@ -636,7 +636,7 @@ VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { //
 }
 
 VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size) {
-	MreTags* tags = get_tags_by_mem_adr(ADDRESS_TO_EMU(rom));
+	MreTags* tags = AppContext::get_tags_by_mem_adr(ADDRESS_TO_EMU(rom));
 	if (!tags)
 		return GET_TAG_ERROR;
 

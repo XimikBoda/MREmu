@@ -13,27 +13,12 @@ struct launch_el {
 	const nativeapp_conf* conf = 0;
 };
 
-struct message_event_el {
-	int phandle;
-	unsigned int msg_id;
-	int wparam;
-	int lparam;
-	int phandle_sender;
-};
-
-struct system_event_el {
-	int phandle;
-	int message;
-	int param;
-};
-
 class AppManager {
 	static AppManager* ptr;
 
 	Queue<launch_el> launch_queue;
 	Queue<Event::input> input_events_queue;
-	Queue<message_event_el> message_events_queue;
-	Queue<system_event_el> system_events_queue;
+	Queue<Event::system> system_events_queue;
 	Queue<Event::network> network_events_queue;
 
 	std::mutex events_mutex;
@@ -56,9 +41,7 @@ class AppManager {
 
 	int find_app_id_by_phandle(int phandle);
 
-	void process_message_event(message_event_el me);
-	void process_system_event(system_event_el se);
-
+	void process_event(const Event::system& ev);
 	void process_event(const Event::input& ev);
 	void process_event(const Event::network& ev);
 
@@ -80,17 +63,14 @@ public:
 	void close_app(int id, bool soft);
 	void close_apps();
 
-	void add_message_event(int phandle, unsigned int msg_id,
-		int wparam, int lparam, int phandle_sender);
-
-	void add_system_event(int phandle, int message, int param);
-
+	void push_event(const Event::system& ev);
 	void push_event(const Event::input& ev);
 	void push_event(const Event::network& ev);
 
 	App* get_active_app(); // TODO: rename it
 	App* get_current_work_app_id();
 	App* get_app_by_phandle(int phandle);
+	App* get_app_by_mem_adr(size_t offset_mem);
 	App* set_executing_app_by_phandle(int phandle);
 	App* set_foreground_as_executing();
 };

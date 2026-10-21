@@ -5,6 +5,8 @@
 #include <fstream>
 #include <sstream>
 #include <vmsys.h>
+#include <elfio/elfio.hpp>
+#include <elfio/elf_types.hpp>
 
 using namespace std::string_literals;
 

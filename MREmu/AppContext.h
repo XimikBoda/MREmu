@@ -5,6 +5,8 @@
 class App;
 class AppManager;
 
+class MreTags;
+
 namespace MREngine {
 	class AppSock;
 	class SystemCallbacks;
@@ -18,12 +20,12 @@ namespace MREngine {
 namespace Event {
 	struct network;
 	struct input;
+	struct system;
 }
 
 namespace Memory {
 	class MemoryManager;
 }
-namespace fs = std::filesystem;
 
 namespace AppContext {
 	AppManager* get_app_manager();
@@ -42,9 +44,13 @@ namespace AppContext {
 	MREngine::AppIO&			get_executing_app_io();
 	MREngine::AppAudio&			get_executing_app_audio();
 	MREngine::AppSock&			get_executing_app_sock();
-	fs::path					get_executing_app_path();
+	std::filesystem::path		get_executing_app_path();
 	bool						is_executing_app_native();
+
+
+	MreTags* get_tags_by_mem_adr(size_t offset_mem);
 
 	void push_event(const Event::network& ev);
 	void push_event(const Event::input& ev);
+	void push_event(const Event::system& ev);
 };

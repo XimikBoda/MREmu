@@ -1,5 +1,6 @@
 #include "Graphic.h"
 #include "Canvas.h"
+#include "System.h"
 #include "../Memory.h"
 #include "../AppContext.h"
 #include <SFML/Graphics/Image.hpp>
@@ -941,8 +942,7 @@ void vm_graphic_reset_clip(void) {
 }
 
 void vm_graphic_flush_screen(void) {
-	void add_system_event(int phandle, int message, int param);
-	add_system_event(vm_pmng_get_current_handle(), VM_MSG_PAINT, 0);
+	AppContext::push_event(Event::system{ vm_pmng_get_current_handle(), Event::system_msg{ VM_MSG_PAINT, 0} });
 }
 
 VMINT vm_graphic_get_blt_layer_count(void) {

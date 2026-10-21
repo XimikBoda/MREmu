@@ -11,8 +11,6 @@
 #include "MREngine/Audio.h"
 #include <filesystem>
 #include <vector>
-#include <elfio/elfio.hpp>
-#include <elfio/elf_types.hpp>
 #include "Bridge.h"
 
 namespace fs = std::filesystem;

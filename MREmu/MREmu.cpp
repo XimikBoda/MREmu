@@ -37,8 +37,6 @@ sf::Clock global_clock;
 std::string error_message = "";
 bool show_error = false;
 
-AppManager* g_appManager = 0;
-
 #ifdef ANDROID
 #include <spdlog/sinks/android_sink.h>
 
@@ -99,7 +97,6 @@ int main(int argc, char** argv) {
 #endif
 
     AppManager appManager;
-    g_appManager = &appManager;
 
 	if(GDB::gdb_mode)
 		GDB::wait();

@@ -67,11 +67,22 @@ namespace AppContext {
 		return get_executing_app()->is_native();
 	}
 
+	MreTags* get_tags_by_mem_adr(size_t offset_mem) {
+		App* app = get_app_manager()->get_app_by_mem_adr(offset_mem);
+		if (app)
+			return &app->tags;
+		return 0;
+	}
+
 	void push_event(const Event::network& ev) {
 		get_app_manager()->push_event(ev);
 	}
 
 	void push_event(const Event::input& ev) {
+		get_app_manager()->push_event(ev);
+	}
+
+	void push_event(const Event::system& ev) {
 		get_app_manager()->push_event(ev);
 	}
 }
