@@ -189,15 +189,17 @@
       /* Options panel ------------------------------------------------------ */
       #panel-open {
         position: absolute;
-        top: 16px;
-        right: 16px;
+        top: 24px;
+        right: 24px;
         z-index: 20;
         width: 44px;
+        height: 44px;
         min-height: 44px;
         padding: 0;
         background: var(--surface);
       }
-      #panel-open svg { width: 20px; height: 20px; }
+      #panel-open svg,
+      #panel-close svg { width: 20px; height: 20px; }
       #panel {
         position: absolute;
         top: 0;
@@ -226,11 +228,11 @@
         font-weight: 600;
       }
       #panel-close {
-        width: 40px;
-        min-height: 40px;
+        width: 44px;
+        height: 44px;
+        min-height: 44px;
         padding: 0;
       }
-      #panel-close svg { width: 18px; height: 18px; }
       .group {
         display: flex;
         flex-direction: column;
