@@ -536,26 +536,49 @@ set "WEB_DIR=%ROOT%em"
 set "EM_SDK_FOUND=0"
 for /d %%D in ("%EM_SDK%\*") do if exist "%%D\emsdk_env.bat" set "EM_SDK_FOUND=1"
 if exist "%EM_SDK%\emsdk_env.bat" set "EM_SDK_FOUND=1"
-if "%EM_SDK_FOUND%"=="0" goto web_fail_noemsdk
+if "%EM_SDK_FOUND%"=="1" (
+  echo   Emscripten SDK found at: %EM_SDK%
+  exit /b 0
+)
 
-echo   Emscripten SDK found at: %EM_SDK%
+echo.
+echo Emscripten SDK not found. Installing it now (one-time, ~1-2 minutes)...
+set "EM_INSTALL_DIR=%ROOT%em\emsdk"
+if not exist "%EM_INSTALL_DIR%" mkdir "%EM_INSTALL_DIR%"
+cd /d "%EM_INSTALL_DIR%"
+if not exist "%EM_INSTALL_DIR%\emsdk.bat" (
+  git clone https://github.com/emscripten-core/emsdk.git "%EM_INSTALL_DIR%"
+  if errorlevel 1 (
+    echo git clone of emsdk failed. Check your internet connection.
+    cd /d "%ROOT%"
+    exit /b 1
+  )
+)
+echo Installing emsdk 3.1.67...
+call emsdk install 3.1.67
+if errorlevel 1 (
+  echo emsdk install failed.
+  cd /d "%ROOT%"
+  exit /b 1
+)
+echo Activating emsdk 3.1.67...
+call emsdk activate 3.1.67
+if errorlevel 1 (
+  echo emsdk activate failed.
+  cd /d "%ROOT%"
+  exit /b 1
+)
+call emsdk_env.bat >nul 2>&1
+if errorlevel 1 (
+  echo emsdk_env failed.
+  cd /d "%ROOT%"
+  exit /b 1
+)
+set "EM_SDK=%EM_INSTALL_DIR%"
+set "EM_SDK_FOUND=1"
+cd /d "%ROOT%"
+echo Emscripten SDK installed and activated at: %EM_SDK%
 exit /b 0
-
-:web_fail_noemsdk
-echo.
-echo Web build prerequisites not met.
-echo   - Need the Emscripten SDK (emsdk).
-echo   - Install it to one of:
-echo     * %ROOT%em\emsdk
-echo     * %USERPROFILE%\AppData\Local\emscripten\emsdk
-echo     * C:\Program Files\Emscripten\emsdk
-echo.
-echo   Install steps (one-time):
-echo     git clone https://github.com/emscripten-core/emsdk.git %ROOT%em\emsdk
-echo     %ROOT%em\emsdk\emsdk install 3.1.67
-echo     %ROOT%em\emsdk\emsdk activate 3.1.67
-echo.
-exit /b 1
 
 :web_build_release
 call :web_checks
@@ -567,7 +590,7 @@ if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
 set "EM_BUILD=%ROOT%build\em"
 if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
 cd /d "%EM_BUILD%"
-"%CMAKE%" -S "%ROOT%" -B . -DCMAKE_BUILD_TYPE=Release -DEMSCRIPTEN=1
+emcmake cmake -S %ROOT% -B . -DCMAKE_BUILD_TYPE=Release -DEMSCRIPTEN=1 -G Ninja
 set "EM_CFG_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_CFG_RC%"=="0" (
@@ -575,7 +598,7 @@ if not "%EM_CFG_RC%"=="0" (
   if defined once exit /b %EM_CFG_RC%
   goto web_menu
 )
-"%CMAKE%" --build . --config Release
+emcmake cmake --build . --config Release
 set "EM_BUILD_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_BUILD_RC%"=="0" (
@@ -598,7 +621,7 @@ if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
 set "EM_BUILD=%ROOT%build\em"
 if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
 cd /d "%EM_BUILD%"
-"%CMAKE%" -S "%ROOT%" -B . -DCMAKE_BUILD_TYPE=Debug -DEMSCRIPTEN=1
+emcmake cmake -S %ROOT% -B . -DCMAKE_BUILD_TYPE=Debug -DEMSCRIPTEN=1 -G Ninja
 set "EM_CFG_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_CFG_RC%"=="0" (
@@ -606,7 +629,7 @@ if not "%EM_CFG_RC%"=="0" (
   if defined once exit /b %EM_CFG_RC%
   goto web_menu
 )
-"%CMAKE%" --build . --config Debug
+emcmake cmake --build . --config Debug
 set "EM_BUILD_RC=%errorlevel%"
 cd /d "%ROOT%"
 if not "%EM_BUILD_RC%"=="0" (
