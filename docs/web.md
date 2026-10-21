@@ -103,7 +103,8 @@ Consequences:
 The UI uses Inter, loaded from Google Fonts with a `system-ui` fallback. It is
 the only third-party request the page makes and is purely cosmetic: if it is
 blocked or the page is offline, the fallback is used and the emulator still
-boots.
+boots. Icons are Hugeicons Free (MIT), inlined as an SVG sprite, so they add no
+network request.
 
 ## Apps panel and uploads
 

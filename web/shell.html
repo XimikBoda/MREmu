@@ -84,12 +84,25 @@
         border-radius: var(--radius);
         cursor: pointer;
       }
-      input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        margin: 0;
-        accent-color: var(--accent);
-        cursor: pointer;
+      .icon {
+        width: 18px;
+        height: 18px;
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .icon-sm {
+        width: 14px;
+        height: 14px;
+      }
+      .icon-sprite {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
       }
 
       #stage {
@@ -246,10 +259,56 @@
       }
       .control-row select, .control-row button { width: 100%; }
       .check {
+        position: relative;
         display: inline-flex;
         align-items: center;
         gap: 8px;
         min-height: 40px;
+        cursor: pointer;
+      }
+      .check input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .checkbox {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        color: var(--on-accent);
+        transition: background-color 160ms ease-out, border-color 160ms ease-out;
+      }
+      .checkbox .icon {
+        opacity: 0;
+        transform: scale(0.75);
+        transition: opacity 160ms ease-out, transform 160ms ease-out;
+      }
+      .check input:checked + .checkbox {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .check input:checked + .checkbox .icon {
+        opacity: 1;
+        transform: scale(1);
+      }
+      .check input:focus-visible + .checkbox {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      @media (hover: hover) {
+        .check:hover .checkbox { border-color: var(--muted); }
+        .check:hover input:checked + .checkbox {
+          background: var(--accent-hover);
+          border-color: var(--accent-hover);
+        }
       }
       .hintline {
         max-width: 60ch;
@@ -285,7 +344,7 @@
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
       }
-      #uploads-table .action { width: 88px; text-align: right; }
+      #uploads-table .action { width: 96px; text-align: right; }
       .upload-name {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -334,6 +393,43 @@
     </style>
   </head>
   <body>
+    <!-- Icons: Hugeicons Free (https://hugeicons.com), MIT License,
+         Copyright (c) 2025 Hugeicons. -->
+    <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <symbol id="icon-file-add" viewBox="0 0 24 24">
+        <path d="M4 12.0005L4 14.5446C4 17.7896 4 19.4122 4.88607 20.5111C5.06508 20.7331 5.26731 20.9354 5.48933 21.1144C6.58831 22.0005 8.21082 22.0005 11.4558 22.0005C12.1614 22.0005 12.5141 22.0005 12.8372 21.8865C12.9044 21.8627 12.9702 21.8355 13.0345 21.8047C13.3436 21.6569 13.593 21.4075 14.0919 20.9086L18.8284 16.172C19.4065 15.594 19.6955 15.3049 19.8478 14.9374C20 14.5699 20 14.1611 20 13.3436V10.0005C20 6.22922 20 4.34361 18.8284 3.17203C17.7693 2.11287 16.1265 2.01125 13.0345 2.0015M13 21.5005V21.0005C13 18.172 13 16.7578 13.8787 15.8791C14.7574 15.0005 16.1716 15.0005 19 15.0005H19.5"/>
+        <path d="M12 5.99954H4M8 1.99954V9.99954"/>
+      </symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24">
+        <path d="M19.5 5.5L18.8803 15.5251C18.7219 18.0864 18.6428 19.3671 18.0008 20.2879C17.6833 20.7431 17.2747 21.1273 16.8007 21.416C15.8421 22 14.559 22 11.9927 22C9.42312 22 8.1383 22 7.17905 21.4149C6.7048 21.1257 6.296 20.7408 5.97868 20.2848C5.33688 19.3626 5.25945 18.0801 5.10461 15.5152L4.5 5.5"/>
+        <path d="M3 5.5H21M16.0557 5.5L15.3731 4.09173C14.9196 3.15626 14.6928 2.68852 14.3017 2.39681C14.215 2.3321 14.1231 2.27454 14.027 2.2247C13.5939 2 13.0741 2 12.0345 2C10.9688 2 10.436 2 9.99568 2.23412C9.8981 2.28601 9.80498 2.3459 9.71729 2.41317C9.32164 2.7167 9.10063 3.20155 8.65861 4.17126L8.05292 5.5"/>
+        <path d="M9.5 16.5L9.5 10.5"/>
+        <path d="M14.5 16.5L14.5 10.5"/>
+      </symbol>
+      <symbol id="icon-fullscreen" viewBox="0 0 24 24">
+        <path d="M15.5 21C16.8956 21 17.5933 21 18.1611 20.8278C19.4395 20.44 20.44 19.4395 20.8278 18.1611C21 17.5933 21 16.8956 21 15.5M21 8.5C21 7.10444 21 6.40666 20.8278 5.83886C20.44 4.56046 19.4395 3.56004 18.1611 3.17224C17.5933 3 16.8956 3 15.5 3M8.5 21C7.10444 21 6.40666 21 5.83886 20.8278C4.56046 20.44 3.56004 19.4395 3.17224 18.1611C3 17.5933 3 16.8956 3 15.5M3 8.5C3 7.10444 3 6.40666 3.17224 5.83886C3.56004 4.56046 4.56046 3.56004 5.83886 3.17224C6.40666 3 7.10444 3 8.5 3"/>
+      </symbol>
+      <symbol id="icon-reload" viewBox="0 0 24 24">
+        <path d="M16.5 7.99976H18C19.4142 7.99976 20.1213 7.99976 20.5607 7.56042C21 7.12108 21 6.41397 21 4.99976V3.49976"/>
+        <path d="M3 11.9998C3 7.02919 7.0293 2.99976 12 2.99976C15.571 2.99976 18.0948 4.73029 20 7.08347M21 11.9998C21 16.9703 16.9707 20.9998 12 20.9998C8.42904 20.9998 5.90524 19.2692 4 16.916"/>
+        <path d="M7.5 15.9998H6C4.58579 15.9998 3.87868 15.9998 3.43934 16.4391C3 16.8784 3 17.5855 3 18.9998V20.4998"/>
+      </symbol>
+      <symbol id="icon-tick" viewBox="0 0 24 24">
+        <path d="M5 14L8.5 17.5L19 6.5"/>
+      </symbol>
+      <symbol id="icon-filter" viewBox="0 0 24 24">
+        <path d="M3 7H6"/>
+        <path d="M3 17H9"/>
+        <path d="M18 17L21 17"/>
+        <path d="M15 7L21 7"/>
+        <path d="M6 7C6 6.06812 6 5.60218 6.15224 5.23463C6.35523 4.74458 6.74458 4.35523 7.23463 4.15224C7.60218 4 8.06812 4 9 4C9.93188 4 10.3978 4 10.7654 4.15224C11.2554 4.35523 11.6448 4.74458 11.8478 5.23463C12 5.60218 12 6.06812 12 7C12 7.93188 12 8.39782 11.8478 8.76537C11.6448 9.25542 11.2554 9.64477 10.7654 9.84776C10.3978 10 9.93188 10 9 10C8.06812 10 7.60218 10 7.23463 9.84776C6.74458 9.64477 6.35523 9.25542 6.15224 8.76537C6 8.39782 6 7.93188 6 7Z"/>
+        <path d="M12 17C12 16.0681 12 15.6022 12.1522 15.2346C12.3552 14.7446 12.7446 14.3552 13.2346 14.1522C13.6022 14 14.0681 14 15 14C15.9319 14 16.3978 14 16.7654 14.1522C17.2554 14.3552 17.6448 14.7446 17.8478 15.2346C18 15.6022 18 16.0681 18 17C18 17.9319 18 18.3978 17.8478 18.7654C17.6448 19.2554 17.2554 19.6448 16.7654 19.8478C16.3978 20 15.9319 20 15 20C14.0681 20 13.6022 20 13.2346 19.8478C12.7446 19.6448 12.3552 19.2554 12.1522 18.7654C12 18.3978 12 17.9319 12 17Z"/>
+      </symbol>
+      <symbol id="icon-cancel" viewBox="0 0 24 24">
+        <path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>
+      </symbol>
+    </svg>
+
     <div id="stage">
       <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
     </div>
@@ -341,36 +437,27 @@
     <button id="panel-open" type="button" hidden aria-controls="panel"
             aria-expanded="false" aria-label="Apps and options"
             title="Apps and options">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <line x1="21" y1="4" x2="14" y2="4"/>
-        <line x1="10" y1="4" x2="3" y2="4"/>
-        <line x1="21" y1="12" x2="12" y2="12"/>
-        <line x1="8" y1="12" x2="3" y2="12"/>
-        <line x1="21" y1="20" x2="16" y2="20"/>
-        <line x1="12" y1="20" x2="3" y2="20"/>
-        <line x1="14" y1="2" x2="14" y2="6"/>
-        <line x1="8" y1="10" x2="8" y2="14"/>
-        <line x1="16" y1="18" x2="16" y2="22"/>
-      </svg>
+      <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-filter"/></svg>
     </button>
 
     <aside id="panel" hidden aria-label="Apps and options">
       <header>
         <h2>Apps and options</h2>
         <button id="panel-close" type="button" aria-label="Close panel" title="Close panel">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <path d="M18 6 6 18"/>
-            <path d="m6 6 12 12"/>
-          </svg>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-cancel"/></svg>
         </button>
       </header>
 
       <section class="group">
         <div class="button-row">
-          <button id="add-files" type="button" class="primary">Add .vxp files</button>
-          <button id="uploads-clear" type="button" hidden>Remove all</button>
+          <button id="add-files" type="button" class="primary">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-file-add"/></svg>
+            <span>Add .vxp files</span>
+          </button>
+          <button id="uploads-clear" type="button" hidden>
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-trash"/></svg>
+            <span>Remove all</span>
+          </button>
         </div>
         <input id="file-input" type="file" accept=".vxp,application/octet-stream"
                multiple tabindex="-1">
@@ -404,17 +491,29 @@
               <option value="3">3&times;</option>
               <option value="4">4&times;</option>
             </select>
-            <button id="fullscreen" type="button">Fullscreen</button>
+            <button id="fullscreen" type="button">
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-fullscreen"/></svg>
+              <span>Fullscreen</span>
+            </button>
           </div>
         </div>
         <div class="field">
           <span class="field-label">Audio</span>
-          <label class="check"><input id="muted" type="checkbox"> Mute</label>
+          <label class="check">
+            <input id="muted" type="checkbox">
+            <span class="checkbox" aria-hidden="true">
+              <svg class="icon icon-sm" focusable="false"><use href="#icon-tick"/></svg>
+            </span>
+            <span>Mute</span>
+          </label>
         </div>
       </section>
 
       <div class="panel-footer">
-        <button id="reload" type="button">Reload page</button>
+        <button id="reload" type="button">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-reload"/></svg>
+          <span>Reload page</span>
+        </button>
       </div>
     </aside>
 

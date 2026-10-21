@@ -216,7 +216,9 @@
       var remove = document.createElement('button');
       remove.className = 'upload-remove';
       remove.type = 'button';
-      remove.textContent = 'Remove';
+      remove.innerHTML =
+        '<svg class="icon icon-sm" aria-hidden="true" focusable="false">' +
+        '<use href="#icon-trash"></use></svg><span>Remove</span>';
       remove.setAttribute('aria-label', 'Remove ' + row.name);
       remove.addEventListener('click', function () {
         deleteUpload(row.name);
