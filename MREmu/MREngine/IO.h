@@ -4,6 +4,7 @@
 #include <fstream>
 #include <regex>
 #include <filesystem>
+#include <variant>
 
 #include <vmio.h>
 
@@ -41,8 +42,20 @@ namespace MREngine {
 	};
 };
 
+namespace Event {
+	struct keyboard {
+		int event;
+		int keycode;
+	};
 
-fs::path get_current_app_path();
+	struct pen {
+		int event;
+		int x, y;
+	};
 
-void add_keyboard_event(int event, int keycode);
+	struct input {
+		std::variant<keyboard, pen> data;
+	};
+}
+
 fs::path path_from_emu(fs::path path);

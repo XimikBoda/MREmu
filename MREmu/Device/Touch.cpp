@@ -1,8 +1,12 @@
 #include "Touch.h"
+#include "../MREngine/IO.h"
+#include "../AppContext.h"
 #include <SFML/Graphics/Texture.hpp>
 #include <vmio.h>
 
-void add_pen_event(int event, int x, int y);
+static void add_pen_event(int event, int x, int y) {
+	AppContext::push_event(Event::input{ Event::pen{ event, x, y } });
+}
 
 void Touch::update() {}
 

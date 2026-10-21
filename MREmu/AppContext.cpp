@@ -15,6 +15,14 @@ namespace AppContext {
 		return get_app_manager()->get_current_work_app_id();
 	}
 
+	std::u8string_view get_foreground_app_name() {
+		App* app = get_foreground_app();
+		if (app)
+			return get_foreground_app()->app_name;
+		else
+			return u8"";
+	}
+
 	int get_executing_app_phandle() {
 		return get_executing_app()->phandle;
 	}
@@ -51,7 +59,19 @@ namespace AppContext {
 		return get_executing_app()->sock;
 	}
 
+	fs::path get_executing_app_path() {
+		return get_executing_app()->path;
+	}
+
+	bool is_executing_app_native() {
+		return get_executing_app()->is_native();
+	}
+
 	void push_event(const Event::network& ev) {
+		get_app_manager()->push_event(ev);
+	}
+
+	void push_event(const Event::input& ev) {
 		get_app_manager()->push_event(ev);
 	}
 }

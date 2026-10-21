@@ -16,7 +16,7 @@ class vm_bitstream_pcm_audio_cfg_struct_Remaper { // Must be beter solution
 public:
 	vm_bitstream_pcm_audio_cfg_struct_Remaper(vm_bitstream_pcm_audio_cfg_struct* p) {
 		this->p = p;
-		is_native = cur_app_is_native();
+		is_native = AppContext::is_executing_app_native();
 	}
 
 	vm_bitstream_codec_type_enum get_vm_codec_type() {

@@ -1,10 +1,8 @@
 #include "Menubar.h"
-#include "../App.h"
+#include "../AppContext.h"
 #include "../MREngine/CharSet.h"
 #include "../jni/ScreenCorner.h"
 #include <SFML/Graphics.hpp>
-
-App* get_active_app();
 
 sf::Texture u16text_to_texture(std::u16string str, sf::Color c);
 
@@ -17,13 +15,12 @@ int Menubar::getHeight() {
 }
 
 void Menubar::draw(sf::RenderTarget* rt) {
-	auto app = get_active_app();
-	if (app) {
-		auto& app_name = app->app_name;
+	{
+		auto app_name = AppContext::get_foreground_app_name();
 
 		if (last_app_name != app_name) {
 			last_app_name = app_name;
-			auto u16str = utf8_to_utf16(app_name);
+			auto u16str = utf8_to_utf16(last_app_name);
 			name_tex = u16text_to_texture(u16str, sf::Color::White);
 		}
 

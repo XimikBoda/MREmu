@@ -13,16 +13,6 @@ struct launch_el {
 	const nativeapp_conf* conf = 0;
 };
 
-struct keyboard_event_el {
-	int event;
-	int keycode;
-};
-
-struct pen_event_el {
-	int event;
-	int x, y;
-};
-
 struct message_event_el {
 	int phandle;
 	unsigned int msg_id;
@@ -41,8 +31,7 @@ class AppManager {
 	static AppManager* ptr;
 
 	Queue<launch_el> launch_queue;
-	Queue<keyboard_event_el> keyboard_events_queue;
-	Queue<pen_event_el> pen_events_queue;
+	Queue<Event::input> input_events_queue;
 	Queue<message_event_el> message_events_queue;
 	Queue<system_event_el> system_events_queue;
 	Queue<Event::network> network_events_queue;
@@ -65,14 +54,12 @@ class AppManager {
 
 	void process_launch_app(launch_el launch_data);
 
-	void process_keyboard_event(keyboard_event_el ke);
-	void process_pen_event(pen_event_el pe);
-
 	int find_app_id_by_phandle(int phandle);
 
 	void process_message_event(message_event_el me);
 	void process_system_event(system_event_el se);
 
+	void process_event(const Event::input& ev);
 	void process_event(const Event::network& ev);
 
 	sf::Time get_time_for_nearest_timer();
@@ -93,17 +80,17 @@ public:
 	void close_app(int id, bool soft);
 	void close_apps();
 
-	void add_keyboard_event(int event, int keycode);
-	void add_pen_event(int event, int x, int y);
-
 	void add_message_event(int phandle, unsigned int msg_id,
 		int wparam, int lparam, int phandle_sender);
 
 	void add_system_event(int phandle, int message, int param);
 
+	void push_event(const Event::input& ev);
 	void push_event(const Event::network& ev);
 
 	App* get_active_app(); // TODO: rename it
 	App* get_current_work_app_id();
 	App* get_app_by_phandle(int phandle);
+	App* set_executing_app_by_phandle(int phandle);
+	App* set_foreground_as_executing();
 };
