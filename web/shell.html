@@ -437,13 +437,6 @@
           border-color: var(--accent-hover);
         }
       }
-      .hintline {
-        max-width: 60ch;
-        margin: 0;
-        font-size: 13px;
-        line-height: 1.5;
-        color: var(--muted);
-      }
       #uploads-wrap {
         max-height: 40vh;
         overflow-y: auto;
@@ -648,14 +641,9 @@
           </div>
           <input id="file-input" type="file" accept=".vxp,application/octet-stream"
                  multiple tabindex="-1">
-          <div id="uploads-summary" class="hintline"></div>
           <div id="uploads-wrap">
             <ul id="uploads" aria-label="Uploaded apps" hidden></ul>
           </div>
-          <p class="hintline">
-            Uploads are stored in this browser and are mounted again on every load.
-            Drop .vxp files anywhere on the page to import them.
-          </p>
         </section>
 
         <section class="group">

@@ -202,16 +202,12 @@
 
     if (!state.uploads.length) {
       els.uploads.hidden = true;
-      els.uploadsSummary.textContent = 'No apps uploaded yet.';
       els.clearAll.hidden = true;
       renderStats();
       return;
     }
 
-    var total = 0;
     state.uploads.forEach(function (row) {
-      total += row.size || 0;
-
       var li = document.createElement('li');
       li.className = 'upload-row';
       li.innerHTML =
@@ -249,11 +245,6 @@
     });
 
     els.uploads.hidden = false;
-    els.uploadsSummary.textContent =
-      state.uploads.length +
-      (state.uploads.length === 1 ? ' app, ' : ' apps, ') +
-      formatBytes(total) +
-      ' stored in this browser.';
     els.clearAll.hidden = false;
     renderStats();
   }
@@ -663,7 +654,6 @@
     els.statsApps = $('stats-apps');
     els.statsSize = $('stats-size');
     els.uploads = $('uploads');
-    els.uploadsSummary = $('uploads-summary');
     els.fileInput = $('file-input');
     els.addFiles = $('add-files');
     els.clearAll = $('uploads-clear');
