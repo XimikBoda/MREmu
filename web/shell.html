@@ -220,6 +220,14 @@
         overflow-y: auto;
         background: var(--surface);
         border-left: 1px solid var(--line);
+        /* Circular reveal that grows from the toggle button (top-right of the
+           panel) and clips the sidebar content while it opens/closes. */
+        clip-path: circle(0px at calc(100% - 46px) 46px);
+        transition: clip-path 320ms cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: clip-path;
+      }
+      #panel.open {
+        clip-path: circle(2000px at calc(100% - 46px) 46px);
       }
       .panel-header {
         display: flex;
@@ -479,7 +487,7 @@
         align-items: center;
         gap: 12px;
         width: 100%;
-        min-height: 40px;
+        min-height: 48px;
         padding: 8px 12px;
         background: var(--surface);
         border: 1px solid var(--line);

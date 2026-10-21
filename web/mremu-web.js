@@ -502,10 +502,19 @@
     }
   }
 
+  var panelHideTimer = null;
+
   function openPanel() {
     showPanelView('apps', false);
-    els.panel.classList.add('open');
+    if (panelHideTimer) {
+      clearTimeout(panelHideTimer);
+      panelHideTimer = null;
+    }
+    // Start from the collapsed clip so the ripple actually plays.
+    els.panel.classList.remove('open');
     els.panel.removeAttribute('hidden');
+    void els.panel.offsetWidth;
+    els.panel.classList.add('open');
     els.panelOpen.setAttribute('aria-expanded', 'true');
     renderUploads();
     try {
@@ -515,12 +524,18 @@
 
   function closePanel() {
     els.panel.classList.remove('open');
-    els.panel.setAttribute('hidden', '');
     els.panelOpen.setAttribute('aria-expanded', 'false');
     els.canvas.focus();
     try {
       localStorage.setItem(PREF_PANEL, '0');
     } catch (e) {}
+    if (panelHideTimer) clearTimeout(panelHideTimer);
+    panelHideTimer = setTimeout(function () {
+      if (!els.panel.classList.contains('open')) {
+        els.panel.setAttribute('hidden', '');
+      }
+      panelHideTimer = null;
+    }, 360);
   }
 
   function togglePanel() {
