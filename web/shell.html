@@ -25,6 +25,9 @@
         --accent-hover: #ffc95e;
         --accent-active: #d9a02f;
         --on-accent: #17130a;
+        --danger: #ff6b70;
+        --danger-soft: rgba(255, 107, 112, 0.14);
+        --danger-soft-strong: rgba(255, 107, 112, 0.22);
         --radius: 8px;
         --radius-sm: 4px;
       }
@@ -322,40 +325,74 @@
       #uploads-wrap {
         max-height: 40vh;
         overflow-y: auto;
+        border-radius: var(--radius);
       }
-      #uploads-table {
+      #uploads {
         width: 100%;
-        table-layout: fixed;
-        border-collapse: collapse;
-        font-size: 14px;
-      }
-      #uploads-table th, #uploads-table td {
-        padding: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        background: var(--surface);
         border: 1px solid var(--line);
-        text-align: left;
-        vertical-align: middle;
+        border-radius: var(--radius);
+        overflow: hidden;
       }
-      #uploads-table th {
-        font-size: 13px;
-        font-weight: 500;
+      .upload-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 48px;
+        padding: 8px 8px 8px 12px;
+      }
+      .upload-row + .upload-row { border-top: 1px solid var(--line); }
+      .upload-file-icon {
+        flex: none;
         color: var(--muted);
       }
-      #uploads-table .size {
-        width: 72px;
-        text-align: right;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
-      #uploads-table .action { width: 96px; text-align: right; }
       .upload-name {
+        flex: 1 1 auto;
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .upload-size {
+        flex: none;
+        color: var(--muted);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
       }
       .upload-remove {
+        flex: none;
+        width: 32px;
+        height: 32px;
         min-height: 32px;
-        padding: 0 8px;
-        font-size: 14px;
+        padding: 0;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--muted);
+        transition: background-color 160ms ease-out, color 160ms ease-out;
+      }
+      .upload-remove .icon { width: 16px; height: 16px; }
+      @media (hover: hover) {
+        .upload-remove:hover {
+          color: var(--danger);
+          background: var(--danger-soft);
+        }
+      }
+      .upload-remove:active {
+        color: var(--danger);
+        background: var(--danger-soft-strong);
+      }
+      .upload-remove:focus-visible {
+        outline: 2px solid var(--danger);
+        outline-offset: 2px;
+        color: var(--danger);
+        background: var(--danger-soft);
       }
       /* Visible to the accessibility tree and still activatable by the Add
          button, but out of the flow and out of the tab order. */
@@ -401,6 +438,9 @@
       <symbol id="icon-file-add" viewBox="0 0 24 24">
         <path d="M4 12.0005L4 14.5446C4 17.7896 4 19.4122 4.88607 20.5111C5.06508 20.7331 5.26731 20.9354 5.48933 21.1144C6.58831 22.0005 8.21082 22.0005 11.4558 22.0005C12.1614 22.0005 12.5141 22.0005 12.8372 21.8865C12.9044 21.8627 12.9702 21.8355 13.0345 21.8047C13.3436 21.6569 13.593 21.4075 14.0919 20.9086L18.8284 16.172C19.4065 15.594 19.6955 15.3049 19.8478 14.9374C20 14.5699 20 14.1611 20 13.3436V10.0005C20 6.22922 20 4.34361 18.8284 3.17203C17.7693 2.11287 16.1265 2.01125 13.0345 2.0015M13 21.5005V21.0005C13 18.172 13 16.7578 13.8787 15.8791C14.7574 15.0005 16.1716 15.0005 19 15.0005H19.5"/>
         <path d="M12 5.99954H4M8 1.99954V9.99954"/>
+      </symbol>
+      <symbol id="icon-file" viewBox="0 0 24 24">
+        <path d="M8 17h8m-8-4h4m1-10.5V3c0 2.828 0 4.243.879 5.121C14.757 9 16.172 9 19 9h.5m.5 1.657V14c0 3.771 0 5.657-1.172 6.828S15.771 22 12 22s-5.657 0-6.828-1.172S4 17.771 4 14V9.456c0-3.245 0-4.868.886-5.967a4 4 0 0 1 .603-.603C6.59 2 8.211 2 11.456 2c.705 0 1.058 0 1.381.114q.1.036.197.082c.31.148.559.397 1.058.896l4.736 4.736c.579.578.867.868 1.02 1.235c.152.368.152.776.152 1.594"/>
       </symbol>
       <symbol id="icon-trash" viewBox="0 0 24 24">
         <path d="M19.5 5.5L18.8803 15.5251C18.7219 18.0864 18.6428 19.3671 18.0008 20.2879C17.6833 20.7431 17.2747 21.1273 16.8007 21.416C15.8421 22 14.559 22 11.9927 22C9.42312 22 8.1383 22 7.17905 21.4149C6.7048 21.1257 6.296 20.7408 5.97868 20.2848C5.33688 19.3626 5.25945 18.0801 5.10461 15.5152L4.5 5.5"/>
@@ -465,16 +505,7 @@
                multiple tabindex="-1">
         <div id="uploads-summary" class="hintline"></div>
         <div id="uploads-wrap">
-          <table id="uploads-table" aria-label="Uploaded apps" hidden>
-            <thead>
-              <tr>
-                <th scope="col">App</th>
-                <th scope="col" class="size">Size</th>
-                <th scope="col" class="action">Action</th>
-              </tr>
-            </thead>
-            <tbody id="uploads"></tbody>
-          </table>
+          <ul id="uploads" aria-label="Uploaded apps" hidden></ul>
         </div>
         <p class="hintline">
           Uploads are stored in this browser and are mounted again on every load.

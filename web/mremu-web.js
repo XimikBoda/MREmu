@@ -190,7 +190,7 @@
     els.uploads.textContent = '';
 
     if (!state.uploads.length) {
-      els.uploadsTable.hidden = true;
+      els.uploads.hidden = true;
       els.uploadsSummary.textContent = 'No apps uploaded yet.';
       els.clearAll.hidden = true;
       return;
@@ -200,38 +200,43 @@
     state.uploads.forEach(function (row) {
       total += row.size || 0;
 
-      var tr = document.createElement('tr');
+      var li = document.createElement('li');
+      li.className = 'upload-row';
+      li.innerHTML =
+        '<svg class="icon upload-file-icon" aria-hidden="true" focusable="false">' +
+        '<use href="#icon-file"></use></svg>';
 
-      var name = document.createElement('td');
+      var sizeLabel = formatBytes(row.size || 0);
+      li.setAttribute('aria-label', row.name + ', ' + sizeLabel);
+
+      var name = document.createElement('span');
       name.className = 'upload-name';
       name.textContent = row.name;
       name.title = row.name;
 
-      var size = document.createElement('td');
-      size.className = 'size';
-      size.textContent = formatBytes(row.size || 0);
+      var size = document.createElement('span');
+      size.className = 'upload-size';
+      size.textContent = sizeLabel;
 
-      var action = document.createElement('td');
-      action.className = 'action';
       var remove = document.createElement('button');
       remove.className = 'upload-remove';
       remove.type = 'button';
       remove.innerHTML =
-        '<svg class="icon icon-sm" aria-hidden="true" focusable="false">' +
-        '<use href="#icon-trash"></use></svg><span>Remove</span>';
+        '<svg class="icon" aria-hidden="true" focusable="false">' +
+        '<use href="#icon-trash"></use></svg>';
       remove.setAttribute('aria-label', 'Remove ' + row.name);
+      remove.title = 'Remove ' + row.name;
       remove.addEventListener('click', function () {
         deleteUpload(row.name);
       });
-      action.appendChild(remove);
 
-      tr.appendChild(name);
-      tr.appendChild(size);
-      tr.appendChild(action);
-      els.uploads.appendChild(tr);
+      li.appendChild(name);
+      li.appendChild(size);
+      li.appendChild(remove);
+      els.uploads.appendChild(li);
     });
 
-    els.uploadsTable.hidden = false;
+    els.uploads.hidden = false;
     els.uploadsSummary.textContent =
       state.uploads.length +
       (state.uploads.length === 1 ? ' app, ' : ' apps, ') +
@@ -552,7 +557,6 @@
     els.panel = $('panel');
     els.panelOpen = $('panel-open');
     els.uploads = $('uploads');
-    els.uploadsTable = $('uploads-table');
     els.uploadsSummary = $('uploads-summary');
     els.fileInput = $('file-input');
     els.addFiles = $('add-files');
