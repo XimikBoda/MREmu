@@ -1,7 +1,7 @@
 @echo off
 rem MREmu launcher: configure, build, run, and clean using the
 rem Visual Studio (Win32 / x86) CMake generator.
-rem   Usage: launch.bat [0-7] [android 0-6] [abi 0-3]   (no argument = interactive menu)
+rem   Usage: launch.bat [0-8] [android 0-6] [abi 0-3] [web 0-4]   (no argument = interactive menu)
 rem     [0] -> exit
 rem     [1] -> build Release
 rem     [2] -> build Debug
@@ -10,12 +10,14 @@ rem     [4] -> run Debug
 rem     [5] -> clean build artifacts
 rem     [6] -> reconfigure + build Release
 rem     [7] -> Android build menu
+rem     [8] -> Web (Emscripten) build menu
 rem   Menu keys take effect immediately; no Enter key needed.
 rem   Pass a second argument to answer the Android menu non-interactively,
 rem   e.g. launch.bat 7 4 -> install + launch the Release APK.
 rem   Android option [6] opens the per-ABI build menu (0=back, 1=arm64-v8a,
 rem   2=armeabi-v7a, 3=x86_64), which also takes a third argument:
 rem   e.g. launch.bat 7 6 2 -> build a Release armeabi-v7a APK into Downloads.
+rem   Web option [3] launches the web build in the default browser.
 setlocal
 
 set "ANDROID_PACKAGE=com.ximikboda.mremu"
@@ -50,11 +52,12 @@ echo   [4] Run Debug
 echo   [5] Clean
 echo   [6] Reconfigure + build Release
 echo   [7] Android build menu
+echo   [8] Web (Emscripten) build menu
 echo.
 echo   Press a listed key. Other keys beep and are ignored.
 echo.
-choice /c:01234567 /n
-if errorlevel 9 goto prompt_menu
+choice /c:012345678 /n
+if errorlevel 10 goto prompt_menu
 set "choice=%errorlevel%"
 set /a choice-=1
 goto run_choice
@@ -62,7 +65,7 @@ goto run_choice
 rem Fallback if choice is unavailable (e.g. very old Windows).
 :prompt_menu
 set "choice="
-set /p "choice=Choose 0-7: "
+set /p "choice=Choose 0-8: "
 goto run_choice
 
 :run_choice
@@ -74,8 +77,9 @@ if "%choice%"=="4" goto run_debug
 if "%choice%"=="5" goto clean
 if "%choice%"=="6" goto reconfigure
 if "%choice%"=="7" goto android_menu
+if "%choice%"=="8" goto web_menu
 if defined once (
-  echo Unknown option "%~1". Use 0, 1, 2, 3, 4, 5, 6 or 7.
+  echo Unknown option "%~1". Use 0, 1, 2, 3, 4, 5, 6, 7 or 8.
   exit /b 1
 )
 goto menu
@@ -474,6 +478,199 @@ if not "%ANDROID_RC%"=="0" (
 echo Android build cleaned.
 if defined once exit /b 0
 goto android_menu
+
+:web_menu
+set "EMSDK_ROOT=%ROOT%\em\emsdk"
+set "EM_SDK=%USERPROFILE%\AppData\Local\emscripten\emsdk"
+if exist "%EMSDK_ROOT%" set "EM_SDK=%EMSDK_ROOT%"
+if exist "C:\Program Files\Emscripten\emsdk" set "EM_SDK=C:\Program Files\Emscripten\emsdk"
+
+set "EM_SDK_EXISTS=0"
+for /d %%D in ("%EM_SDK%\*") do if exist "%%D\emsdk_env.bat" set "EM_SDK_EXISTS=1"
+if exist "%EM_SDK%\emsdk_env.bat" set "EM_SDK_EXISTS=1"
+
+echo.
+echo   Web (Emscripten) - what do you want to do?
+echo   [0] Back
+echo   [1] Configure + build Release for web
+echo   [2] Build Debug for web
+echo   [3] Launch web build in browser
+echo   [4] Clean web build artifacts
+echo.
+echo   Press a listed key. Other keys beep and are ignored.
+echo.
+if not "%~2"=="" (
+  set "wchoice=%~2"
+  goto run_wchoice
+)
+choice /c:01234 /n
+if errorlevel 6 goto prompt_web
+set "wchoice=%errorlevel%"
+set /a wchoice-=1
+goto run_wchoice
+
+rem Fallback if choice is unavailable.
+:prompt_web
+set "wchoice="
+set /p "wchoice=Choose 0-4: "
+
+:run_wchoice
+set "wchoice=%wchoice: =%"
+if "%wchoice%"=="0" (
+  if defined once exit /b 0
+  goto menu
+)
+if "%wchoice%"=="1" goto web_build_release
+if "%wchoice%"=="2" goto web_build_debug
+if "%wchoice%"=="3" goto web_launch
+if "%wchoice%"=="4" goto web_clean
+if defined once (
+  echo Unknown Web option "%wchoice%".
+  exit /b 1
+)
+goto web_menu
+
+:web_checks
+set "WEB_DIR=%ROOT%em"
+
+set "EM_SDK_FOUND=0"
+for /d %%D in ("%EM_SDK%\*") do if exist "%%D\emsdk_env.bat" set "EM_SDK_FOUND=1"
+if exist "%EM_SDK%\emsdk_env.bat" set "EM_SDK_FOUND=1"
+if "%EM_SDK_FOUND%"=="0" goto web_fail_noemsdk
+
+echo   Emscripten SDK found at: %EM_SDK%
+exit /b 0
+
+:web_fail_noemsdk
+echo.
+echo Web build prerequisites not met.
+echo   - Need the Emscripten SDK (emsdk).
+echo   - Install it to one of:
+echo     * %ROOT%em\emsdk
+echo     * %USERPROFILE%\AppData\Local\emscripten\emsdk
+echo     * C:\Program Files\Emscripten\emsdk
+echo.
+echo   Install steps (one-time):
+echo     git clone https://github.com/emscripten-core/emsdk.git %ROOT%em\emsdk
+echo     %ROOT%em\emsdk\emsdk install 3.1.67
+echo     %ROOT%em\emsdk\emsdk activate 3.1.67
+echo.
+exit /b 1
+
+:web_build_release
+call :web_checks
+if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
+echo.
+echo Configuring Emscripten Release build in build\em...
+call :web_env
+if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
+set "EM_BUILD=%ROOT%build\em"
+if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
+cd /d "%EM_BUILD%"
+"%CMAKE%" -S "%ROOT%" -B . -DCMAKE_BUILD_TYPE=Release -DEMSCRIPTEN=1
+set "EM_CFG_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%EM_CFG_RC%"=="0" (
+  echo Emscripten configure failed.
+  if defined once exit /b %EM_CFG_RC%
+  goto web_menu
+)
+"%CMAKE%" --build . --config Release
+set "EM_BUILD_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%EM_BUILD_RC%"=="0" (
+  echo Emscripten Release build failed.
+  if defined once exit /b %EM_BUILD_RC%
+  goto web_menu
+)
+echo Emscripten Release build succeeded.
+call :copy_web_to_bin Release
+if defined once exit /b 0
+goto web_menu
+
+:web_build_debug
+call :web_checks
+if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
+echo.
+echo Configuring Emscripten Debug build in build\em...
+call :web_env
+if errorlevel 1 ( if defined once exit /b 1 & goto web_menu )
+set "EM_BUILD=%ROOT%build\em"
+if not exist "%EM_BUILD%" mkdir "%EM_BUILD%"
+cd /d "%EM_BUILD%"
+"%CMAKE%" -S "%ROOT%" -B . -DCMAKE_BUILD_TYPE=Debug -DEMSCRIPTEN=1
+set "EM_CFG_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%EM_CFG_RC%"=="0" (
+  echo Emscripten configure failed.
+  if defined once exit /b %EM_CFG_RC%
+  goto web_menu
+)
+"%CMAKE%" --build . --config Debug
+set "EM_BUILD_RC=%errorlevel%"
+cd /d "%ROOT%"
+if not "%EM_BUILD_RC%"=="0" (
+  echo Emscripten Debug build failed.
+  if defined once exit /b %EM_BUILD_RC%
+  goto web_menu
+)
+echo Emscripten Debug build succeeded.
+call :copy_web_to_bin Debug
+if defined once exit /b 0
+goto web_menu
+
+:web_env
+if exist "%EM_SDK%\emsdk_env.bat" (
+  call "%EM_SDK%\emsdk_env.bat" >nul 2>&1
+) else (
+  for /d %%D in ("%EM_SDK%\*") do if exist "%%D\emsdk_env.bat" call "%%D\emsdk_env.bat" >nul 2>&1
+)
+if errorlevel 1 (
+  echo Failed to activate emsdk environment.
+  exit /b 1
+)
+exit /b 0
+
+:copy_web_to_bin
+set "WEB_BUILD=%ROOT%build\em"
+set "OUT_DIR=%ROOT%bin\%~1"
+if exist "%WEB_BUILD%\index.html" (
+  if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
+  copy /y "%WEB_BUILD%\index.html" "%OUT_DIR%\index.html" >nul
+  copy /y "%WEB_BUILD%\index.js" "%OUT_DIR%\index.js" >nul 2>&1
+  copy /y "%WEB_BUILD%\index.wasm" "%OUT_DIR%\index.wasm" >nul 2>&1
+  copy /y "%WEB_BUILD%\index.data" "%OUT_DIR%\index.data" >nul 2>&1
+  echo Web artifacts copied to: %OUT_DIR%
+) else (
+  echo No index.html found in "%WEB_BUILD%". Build first.
+  exit /b 1
+)
+exit /b 0
+
+:web_launch
+set "WEB_BUILD=%ROOT%bin\Release"
+if not exist "%WEB_BUILD%\index.html" (
+  echo Web build not found. Build first [1].
+  if defined once exit /b 1
+  goto web_menu
+)
+echo.
+echo Launching web build in default browser...
+start "" "%WEB_BUILD%\index.html"
+if defined once exit /b 0
+goto web_menu
+
+:web_clean
+echo.
+echo Cleaning web build artifacts...
+if exist "build\em" rmdir /s /q "build\em"
+if exist "bin\Release\index.html" del /q bin\Release\index.html >nul 2>&1
+if exist "bin\Release\index.js" del /q bin\Release\index.js >nul 2>&1
+if exist "bin\Release\index.wasm" del /q bin\Release\index.wasm >nul 2>&1
+if exist "bin\Release\index.data" del /q bin\Release\index.data >nul 2>&1
+echo Web build cleaned.
+if defined once exit /b 0
+goto web_menu
 
 :done
 echo.
