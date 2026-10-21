@@ -10,8 +10,11 @@
 #include <regex>
 #include <codecvt>
 #include <filesystem>
+
+#ifdef DEBUG_WINDOW
 #include <imgui.h>
 #include <imgui-SFML.h>
+#endif
 
 using namespace std::string_literals;
 
@@ -35,9 +38,12 @@ void MREngine::IO::init()
 	fs::create_directories(base_path / fs::path("fs/c").make_preferred(), ec);
 	fs::create_directories(base_path / fs::path("fs/d").make_preferred(), ec);
 	fs::create_directories(base_path / fs::path("fs/e/mre").make_preferred(), ec);
+	fs::create_directories(base_path / fs::path("screenshots").make_preferred(), ec);
 }
 
-
+std::string get_screenshots_path() {
+	return (base_path / fs::path("screenshots/")).make_preferred().string();
+}
 
 bool validate_path(fs::path path) {
 	std::regex pr("^[a-сA-С]:[\\\\\\/](?:[^\\\\\\/:*?\"<>|\\r\\n]+[\\\\\\/]*)*[^\\\\\\/:*?\"<>|\\r\\n]*$"s); // I hope it`s correct

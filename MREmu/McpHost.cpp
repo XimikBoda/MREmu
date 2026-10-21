@@ -5,9 +5,10 @@
 #include "ArmApp.h"
 #include "Bridge.h"
 #include "Cpu.h"
-#include "Keyboard.h"
+#include "Device/KeyboardControl.h"
 #include "Log.h"
 #include "MREmu.h"
+#include "MREngine/CharSet.h"
 #include "MREngine/Graphic.h"
 #include "MreTags.h"
 
@@ -36,7 +37,7 @@ namespace McpHost {
 using Mcp::Command;
 
 AppManager* g_app_manager = nullptr;
-Keyboard* g_keyboard = nullptr;
+KeyboardControl* g_keyboard = nullptr;
 Mcp::Control* g_ctl = nullptr;
 MREngine::Graphic* g_graphic = nullptr;
 
@@ -166,7 +167,7 @@ static std::vector<std::string> list_apps() {
 		App* a = g_app_manager->app_at(i);
 		if (!a) continue;
 		std::ostringstream o;
-		o << "index=" << i << " name=" << a->app_name
+		o << "index=" << i << " name=" << u8_to_utf8(a->app_name)
 		  << " running=" << ((int)a->state == (int)App::Runned ? "true" : "false")
 		  << " segments_size=" << a->segments_size
 		  << " mem_size=" << a->mem_size;
@@ -200,8 +201,8 @@ static std::string screen_png_base64(int max_side) {
 
 static bool inject_key(int key, bool down) {
 	if (!g_keyboard) return false;
-	if (down) g_keyboard->kc.press_key(key, KeyboardControl::ImGui);
-	else g_keyboard->kc.unpress_key(key);
+	if (down) g_keyboard->press_key(key, KeyboardControl::ImGui);
+	else g_keyboard->unpress_key(key);
 	return true;
 }
 
@@ -377,7 +378,7 @@ static void publish_snapshot(bool running) {
 	s.trace_ready = Bridge::dispatch_ready();
 	if (cur) {
 		s.app_running = true;
-		s.app_name = cur->app_name;
+		s.app_name = u8_to_utf8(cur->app_name);
 	}
 
 	if (g_graphic) {
@@ -513,7 +514,7 @@ void tick(bool running) {
 	publish_snapshot(running);
 }
 
-void setup(AppManager* am, Keyboard* kb, Mcp::Control* ctl, MREngine::Graphic* g) {
+void setup(AppManager* am, KeyboardControl* kb, Mcp::Control* ctl, MREngine::Graphic* g) {
 	g_app_manager = am;
 	g_keyboard = kb;
 	g_ctl = ctl;

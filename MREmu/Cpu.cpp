@@ -2,10 +2,13 @@
 #include "Memory.h"
 #include "Disassembler.h"
 #include "Log.h"
+
+#ifdef DEBUG_WINDOW
 #include <imgui.h>
 #include <imgui-SFML.h>
-#include <unicorn/unicorn.h>
+#endif
 
+#include <unicorn/unicorn.h>
 
 #ifdef CAPSTONE
 #include <capstone/capstone.h>
@@ -77,6 +80,7 @@ namespace Cpu {
 		return out;
 	}
 
+#ifdef DEBUG_WINDOW
 	void imgui_REG() {
 		uint32_t v, cpsr;
 		std::string reg_nms[7] = { "SP", "LR", "PC", "N", "Z", "C", "V" };
@@ -110,6 +114,7 @@ namespace Cpu {
 		}
 		ImGui::End();
 	}
+#endif
 
 	static void print_code(unsigned char* data, int size) {
 		printf("Code:");

@@ -1,13 +1,21 @@
 cmake_minimum_required (VERSION 3.8)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
+project ("MREmu")
+
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-project ("MREmu")
+if(NOT EMSCRIPTEN AND NOT ANDROID)
+    option(DEBUG_WINDOW "Turn on additional debugging windows" ON)
+else()
+    set(DEBUG_WINDOW FALSE)
+endif()
+
+option(CAPSTONE "Endble capstone" OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
@@ -17,10 +25,48 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 endif()
 
-option(CAPSTONE "Endble capstone" OFF)
-
-if(CAPSTONE)
-    add_definitions(-DCAPSTONE)
+if(EMSCRIPTEN)
+    add_compile_options(-pthread)
+    
+    add_link_options(
+        "-pthread"
+        "-sPTHREAD_POOL_SIZE=4"
+        #"-sPROXY_TO_PTHREAD=1"
+        "-sINITIAL_MEMORY=67108864"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sUSE_OGG=1"
+        "-sUSE_VORBIS=1"
+        "-sEMULATE_FUNCTION_POINTER_CASTS=1"
+        "-sSUPPORT_LONGJMP=emscripten"
+        "-sSTACK_SIZE=4mb"
+        "-sASYNCIFY=1"
+        "-sFULL_ES2=1"
+        "-sMIN_WEBGL_VERSION=1"
+        "-sMAX_WEBGL_VERSION=1"
+        "-sGL_EXPLICIT_UNIFORM_LOCATION=1"
+        "-sGL_EXPLICIT_UNIFORM_BINDING=1"
+        "-sFORCE_FILESYSTEM=1"
+        "--preload-file" "${PROJECT_SOURCE_DIR}/bin/Release/fs@/fs"
+        "-sWASM=1"
+    )
+    
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(-g3) 
+        add_link_options(
+            "-g3"
+            "-sASSERTIONS=2"
+            "-sALLOW_TABLE_GROWTH=1" 
+            "-sEXPORT_ALL=1"
+        )
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-O3 -flto)
+        add_link_options(
+            "-O3"
+            "-flto"
+            "-sASSERTIONS=0"
+            "-sASYNCIFY_IGNORE_INDIRECT=1"
+        )
+    endif()
 endif()
 
 add_definitions(-DLIBICONV_PLUG)

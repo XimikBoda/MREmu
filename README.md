@@ -44,6 +44,8 @@ For platform-specific dependencies and build instructions, see:
 - [libiconv-cmake](https://github.com/winlibs/libiconv-cmake) - Character set conversion
 - [TurboStitchGIF](https://github.com/Ferki-git-creator/TurboStitchGIF-HeaderOnly-Fast-ZeroAllocation-PlatformIndependent-Embedded-C-GIF-Decoder) - GIF image decoding
 - [miniz](https://github.com/richgel999/miniz) - ZIP compression and decompression
+- [unicorn.js](https://github.com/AlexAltea/unicorn.js) - Unicorn port to JavaScript, for the Emscripten build
+- [SFML (Emscripten port)](https://github.com/Zombieschannel/SFML) - SFML fork used by the Emscripten build
 
 ## Documentation and References
 

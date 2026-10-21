@@ -1,5 +1,7 @@
 cmake_minimum_required (VERSION 3.8)
 
+set(CMAKE_FOLDER "MREmu")
+
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
 						"Memory.cpp" "Memory.h" 
@@ -15,11 +17,10 @@ set(SOURCES
 						"Disassembler.cpp" "Disassembler.h"
 						"ARModule.cpp" "ARModule.h"
 						"AppManager.cpp" "AppManager.h"
-						"Keyboard.cpp" "Keyboard.h"
-						"Touch.cpp" "Touch.h"
 						"Log.cpp" "Log.h" 
 						"miniz.c" "miniz.h" "mutex_wrapper.h" "Queue.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
+						"jni/ScreenCorner.cpp" "jni/ScreenCorner.h"
 						"DragAndDrop.cpp" "DragAndDrop.h"
 )
 
@@ -44,16 +45,23 @@ endif()
 target_link_libraries(MREmu sfml-graphics)
 target_link_libraries(MREmu sfml-network)
 target_link_libraries(MREmu sfml-audio)
-target_link_libraries(MREmu imgui)
 target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu ADLMIDI_static)
-target_link_libraries(MREmu MREngine)
-target_link_libraries(MREmu NativeApps)
 target_link_libraries(MREmu libiconv)
 target_link_libraries(MREmu spdlog)
 
+target_link_libraries(MREmu MREngine)
+target_link_libraries(MREmu NativeApps)
+target_link_libraries(MREmu Device)
+
+if(DEBUG_WINDOW)
+    target_link_libraries(MREmu imgui)
+    target_compile_definitions(MREmu PRIVATE DEBUG_WINDOW)
+endif()
+
 if(CAPSTONE)
 	target_link_libraries(MREmu capstone)
+    target_compile_definitions(MREmu PRIVATE CAPSTONE)
 endif()
 
 if(WIN32)
@@ -70,3 +78,6 @@ endif()
 
 add_subdirectory (MREngine)
 add_subdirectory (NativeApps)
+add_subdirectory (Device)
+
+unset(CMAKE_FOLDER)

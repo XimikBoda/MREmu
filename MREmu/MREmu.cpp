@@ -3,8 +3,10 @@
 #include <fstream>
 #include <cstdlib>
 
+#ifdef DEBUG_WINDOW
 #include "imgui.h"
 #include "imgui-SFML.h"
+#endif
 
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
@@ -15,8 +17,7 @@
 #include "Bridge.h"
 #include "App.h"
 #include "AppManager.h"
-#include "Keyboard.h"
-#include "Touch.h"
+#include "Device/Device.h"
 #include "Log.h"
 
 #include "MREngine/Graphic.h"
@@ -34,7 +35,7 @@
 #ifndef ANDROID
 #include "McpServer.h"
 namespace McpHost {
-	void setup(AppManager*, Keyboard*, Mcp::Control*, MREngine::Graphic*);
+	void setup(AppManager*, KeyboardControl*, Mcp::Control*, MREngine::Graphic*);
 	void bootstrap_launch(const std::string& path, bool local);
 	void pump(AppManager&);
 	void tick(bool running);
@@ -471,7 +472,7 @@ static int run_inspection(MREngine::Graphic& graphic,
 
 		// Loader facts, reported even when preparation failed so a failure is
 		// diagnosable rather than just "invalid ELF".
-		S("app_name", app.app_name);
+		S("app_name", u8_to_utf8(app.app_name));
 		B("is_ads", app.is_ads);
 		B("is_vre_ads", app.tags.is_vre_ads());
 		B("is_zipped", app.is_zipped);
@@ -588,7 +589,7 @@ static std::string mcp_status_line(const Mcp::Snapshot& s) {
 	return t;
 }
 
-static void run_mcp_window(MREngine::Graphic& graphic, Keyboard& keyboard, Touch& touch,
+static void run_mcp_window(MREngine::Graphic& graphic, KeyboardControl& kc,
 	Mcp::Control& ctl, const std::atomic<bool>& client_gone)
 {
 	sf::RenderWindow win(sf::VideoMode(graphic.width, graphic.height + 208),
@@ -596,12 +597,12 @@ static void run_mcp_window(MREngine::Graphic& graphic, Keyboard& keyboard, Touch
 	win.setVerticalSyncEnabled(true);
 	win.setKeyRepeatEnabled(false);
 
-	// Touch and the keyboard widget both map window coordinates back onto the
-	// sprite, so they need the very sprite being drawn. Scale stays 1 here, which
-	// makes window coordinates equal emulated screen coordinates.
-	sf::Sprite sp(graphic.screen_tex);
-	touch.screen = &sp;
-	keyboard.screen = &sp;
+	// The Device owns the screen sprite, the keypad and the menubar. The MCP
+	// window shows the screen and a status line only, so the menubar is
+	// switched off: it would otherwise leave an empty band above the screen
+	// and push the status line out of place.
+	Device device(win, graphic, kc);
+	device.set_show_menubar(false);
 
 	sf::Texture status_tex;
 	std::string last_status, last_title;
@@ -615,22 +616,21 @@ static void run_mcp_window(MREngine::Graphic& graphic, Keyboard& keyboard, Touch
 			}
 			// Same input path the GUI uses, so a human can click and type in the
 			// window while the agent works, and the app sees one consistent stream.
-			keyboard.event(ev);
-			touch.sf_event(ev);
+			device.event(ev);
 		}
 
-		keyboard.update();
+		device.update();
 
 		const Mcp::Snapshot snap = ctl.snapshot();
 
 		// Same order as the GUI loop: refresh the texture from the framebuffer the
 		// app thread writes, then draw it.
 		graphic.update_screen();
-		sp.setTexture(graphic.screen_tex, true);
+		device.screen_sprite().setTexture(graphic.screen_tex, true);
 
 		const std::string status = mcp_status_line(snap);
 		win.clear(sf::Color::Black);
-		win.draw(sp);
+		win.draw(device.screen_sprite());
 
 		// Status line sits in the band under the screen, where the GUI shows the
 		// keyboard. Re-rasterise only when it changes: u16text_to_texture walks
@@ -752,10 +752,12 @@ int main(int argc, char** argv) {
 	MREngine::Graphic graphic;
 	MREngine::NetworkManager nm;
 
-	// Declared before the platform split: the Android main loop uses them, and the
-	// headless modes below need them before the windowed code declares its own.
-	Keyboard keyboard;
-	Touch touch;
+	// The shared key state, declared before the platform split because the
+	// headless modes below need it before the windowed code declares its own.
+	// The Device, the on-screen keypad and the MCP host all drive this one
+	// object, so a key pressed through any of them is released through any of
+	// them.
+	KeyboardControl kc;
 
 #ifndef ANDROID
 	// Headless inspection runs before any window is created. SFML window creation
@@ -771,7 +773,7 @@ int main(int argc, char** argv) {
 	// a machine with no display.
 	if (mcp_mode) {
 		static Mcp::Control ctl;
-		McpHost::setup(&appManager, &keyboard, &ctl, &graphic);
+		McpHost::setup(&appManager, &kc, &ctl, &graphic);
 		appManager.start();
 		// AppManager::loop drains the launch queue on its own thread, so queue the
 		// argv VXP after start() and it gets picked up like the GUI path does.
@@ -814,7 +816,7 @@ int main(int argc, char** argv) {
 		});
 
 		try {
-			run_mcp_window(graphic, keyboard, touch, ctl, client_gone);
+			run_mcp_window(graphic, kc, ctl, client_gone);
 		}
 		catch (const std::exception& e) {
 			// No display, or the window could not be created. The agent still needs
@@ -902,8 +904,15 @@ int main(int argc, char** argv) {
 		appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
 
 
+	// The front end: the emulated screen, the on-screen keypad and the
+	// menubar strip above it. The Device lays the widgets out; the window
+	// size policy stays here, because the desktop build resizes the window to
+	// the scaled content while Android keeps a fixed window and scales the
+	// sprite inside it.
+	Device device(win_device, graphic, kc);
+
 	int base_w = graphic.width;
-	int base_h = graphic.height + 208;
+	int base_h = graphic.height + device.menubar_height() + 208;
 	DragAndDrop::set_base_size(base_w, base_h);
 
 // Options button state. Declared before repaint_device() because that is where the
@@ -915,9 +924,6 @@ int main(int argc, char** argv) {
 #endif
 
 	float scale = 1.f;
-	sf::Sprite screen_sp(graphic.screen_tex);
-	touch.screen = &screen_sp;
-	keyboard.screen = &screen_sp;
 
 	auto repaint_device = [&]() {
 		win_device.clear(sf::Color::Black);
@@ -926,8 +932,7 @@ int main(int argc, char** argv) {
 			graphic.screen_changed = true;
 			graphic.update_screen();
 		}
-		screen_sp.setTexture(graphic.screen_tex, true);
-		win_device.draw(screen_sp);
+		device.draw();
 
 		if (show_warning) {
 			float elapsed = warning_clock.getElapsedTime().asSeconds();
@@ -962,8 +967,6 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		keyboard.draw(&win_device);
-
 #ifdef ANDROID
 		draw_options_button(win_device, options_btn, options_btn_pressed);
 #endif
@@ -993,10 +996,8 @@ int main(int argc, char** argv) {
 
 		win_device.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)target_w, (float)target_h)));
 
-		screen_sp.setScale(scale, scale);
-		screen_sp.setPosition(0.f, 0.f);
-
-		keyboard.update_resize(target_w, target_h);
+		device.set_scale(scale);
+		device.update_size();
 
 		repaint_device();
 
@@ -1016,7 +1017,7 @@ int main(int argc, char** argv) {
 	// Recomputed every frame because the device window gets resized (and scaled) after startup.
 #ifdef ANDROID
 	options_btn = options_button_rect(
-		win_device.getSize().x, win_device.getSize().y, keyboard.bottom());
+		win_device.getSize().x, win_device.getSize().y, device.keyboard_bottom());
 #endif
 
 	sf::Clock fps;
@@ -1033,7 +1034,7 @@ int main(int argc, char** argv) {
     ) {
 #ifdef ANDROID
 		options_btn = options_button_rect(
-			win_device.getSize().x, win_device.getSize().y, keyboard.bottom());
+			win_device.getSize().x, win_device.getSize().y, device.keyboard_bottom());
 #endif
 #ifdef ANDROID
 		// Surface a pending fatal error to the Compose dialog. Android-only: the desktop
@@ -1076,8 +1077,8 @@ int main(int argc, char** argv) {
 
 			graphic.reset();
 
-			keyboard.kc.pkey.clear();
-			touch.touching = false;
+			kc.pkey.clear();
+			device.touch_ref().touching = false;
 
 			if (GDB::gdb_mode)
 				GDB::cpu_state = GDB::Stop;
@@ -1109,8 +1110,7 @@ int main(int argc, char** argv) {
 					continue;
 				}
 			}
-			keyboard.event(event);
-			touch.sf_event(event);
+			device.event(event);
 
 			// Options button: taps land below the emulated screen, so Touch ignores
 			// them. Handle them here before the rest of the input pipeline.
@@ -1193,12 +1193,7 @@ int main(int argc, char** argv) {
 
 		graphic.update_screen();
 
-		{
-			screen_sp.setTexture(graphic.screen_tex, true);
-			win_device.draw(screen_sp);
-		}
-
-		keyboard.draw(&win_device);
+		device.draw();
 
 #ifndef ANDROID
 		if (ImGui::Begin("Fps")) {
@@ -1206,7 +1201,7 @@ int main(int argc, char** argv) {
 		}
 		ImGui::End();
 
-		keyboard.imgui_keyboard();
+		device.imgui();
 		graphic.imgui_screen();
 
 		std::lock_guard lock(appManager.active_app_mutex);
@@ -1282,14 +1277,14 @@ int main(int argc, char** argv) {
 		}
 #endif
 
-		keyboard.update();
+		device.update();
 
 		repaint_device();
 
 #ifndef ANDROID
 		Cpu::imgui_REG();
 
-		keyboard.imgui_keyboard();
+		device.imgui();
 #endif
 
 #ifndef ANDROID

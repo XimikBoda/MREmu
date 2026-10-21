@@ -29,10 +29,14 @@ endif()
 
 target_link_libraries(MREngine sfml-graphics)
 target_link_libraries(MREngine sfml-audio)
-target_link_libraries(MREngine imgui)
 target_link_libraries(MREngine ADLMIDI_static)
 target_link_libraries(MREngine libiconv)
 target_link_libraries(MREngine spdlog)
 target_link_libraries(MREngine asio::asio)
+
+if(DEBUG_WINDOW)
+    target_link_libraries(MREngine imgui)
+    target_compile_definitions(MREngine PUBLIC DEBUG_WINDOW)
+endif()
 
 target_include_directories(MREngine PUBLIC "$ENV{MRE_SDK}/include")

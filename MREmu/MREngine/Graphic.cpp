@@ -1,11 +1,15 @@
 #include "Graphic.h"
 #include "Canvas.h"
 #include "../Memory.h"
-#include <imgui.h>
-#include <imgui-SFML.h>
 #include <SFML/Graphics/Image.hpp>
 #include <vmgraph.h>
 #include <vmpromng.h>
+#include <format>
+
+#ifdef DEBUG_WINDOW
+#include <imgui.h>
+#include <imgui-SFML.h>
+#endif
 
 namespace MREngine {
 	Graphic* graphic = 0;
@@ -170,6 +174,7 @@ void MREngine::Graphic::update_screen() {
 	}
 }
 
+#ifdef DEBUG_WINDOW
 void MREngine::Graphic::imgui_screen() {
 	ImGui::SetNextWindowPos(ImVec2(195, 10), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(255, 380), ImGuiCond_FirstUseEver);
@@ -179,6 +184,22 @@ void MREngine::Graphic::imgui_screen() {
 			vm_graphic_flush_screen();
 	}
 	ImGui::End();
+}
+#endif
+
+std::string get_screenshots_path();
+
+void MREngine::Graphic::screenshot(std::u8string name) {
+	vm_time_t time;
+	vm_get_time(&time);
+
+	int ms = vm_get_tick_count();
+
+	std::string file_name = std::format("{:04}_{:02}_{:02}_{:02}_{:02}_{:02}_{:03}_{}.png",
+		time.year, time.mon, time.day, time.hour, time.min, time.sec, ms % 1000, (char*)name.c_str());
+
+	auto im = screen_tex.copyToImage();
+	im.saveToFile(get_screenshots_path() + file_name);
 }
 
 void MREngine::Graphic::reset() {
@@ -298,6 +319,7 @@ void* MREngine::AppGraphic::get_layer_buf(int handle) {
 	return layers[handle].buf;
 }
 
+#ifdef DEBUG_WINDOW
 void MREngine::AppGraphic::imgui_layers() {
 	ImGui::SetNextWindowPos(ImVec2(460, 195), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(260, 395), ImGuiCond_FirstUseEver);
@@ -314,6 +336,7 @@ void MREngine::AppGraphic::imgui_layers() {
 	}
 	ImGui::End();
 }
+#endif
 
 //MRE API
 

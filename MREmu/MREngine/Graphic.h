@@ -25,6 +25,8 @@ namespace MREngine {
 		void imgui_screen();
 		void reset();
 
+		void screenshot(std::u8string name);
+
 		~Graphic();
 	};
 

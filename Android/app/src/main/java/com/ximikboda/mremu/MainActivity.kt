@@ -20,6 +20,7 @@ import android.os.VibratorManager
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.view.RoundedCorner
 import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -1534,6 +1535,30 @@ private enum class OptionsPage(val title: String) {
             vibrator?.hasVibrator() ?: false
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * Radius of the display's top-left rounded corner, in pixels, or 0 when the
+     * display has square corners.
+     *
+     * The native side uses this to keep the menubar's artwork clear of the corner
+     * cutout, so the bar does not get clipped on a device with a rounded screen.
+     * Only API 31 and up report rounded corners, so everything older answers 0
+     * and is drawn to the edge.
+     */
+    fun getScreenCornerRadius(): Int {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val insets = window.decorView.rootWindowInsets
+                if (insets != null) {
+                    val corner = insets.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)
+                    return corner?.radius ?: 0
+                }
+            }
+            0
+        } catch (e: Exception) {
+            0
         }
     }
 }

@@ -1,75 +1,15 @@
-#include "AppManager.h"
+#include "../AppManager.h"
 #include "Keyboard.h"
 #include <vmio.h>
 #include <vector>
-#include <algorithm>
 #include <SFML/Graphics.hpp>
 
-#include "imgui.h"
-#include "imgui-SFML.h"
-
-KeyboardControl::pkey_t::pkey_t(int key_code, key_source source) {
-	this->key_code = key_code;
-	this->source = source;
-}
-
-void KeyboardControl::update() {
-	for (int i = 0; i < pkey.size(); ++i) {
-		int threshold = pkey[i].repeat_started ? pkey_t::REPEAT_INTERVAL_MS : pkey_t::INITIAL_REPEAT_DELAY_MS;
-		if (pkey[i].tim.getElapsedTime().asMilliseconds() >= threshold) {
-			pkey[i].tim.restart();
-			pkey[i].repeat_started = true;
-			add_keyboard_event(VM_KEY_EVENT_REPEAT, pkey[i].key_code);
-		}
-	}
-}
-
-int KeyboardControl::find_key(int key_code) {
-	for (int i = 0; i < pkey.size(); ++i)
-		if (pkey[i].key_code == key_code)
-			return i;
-	return -1;
-}
-
-void KeyboardControl::press_key(int key_code, key_source source) {
-	if (key_code == MREMU_KEY_NONE)
-		return;
-
-	int i = find_key(key_code);
-	if (i == -1) {
-#ifdef ANDROID
-		if (Touch0 <= source && source <= Touch9) {
-			vibration.vibrate(sf::milliseconds(50));
-		}
+#ifdef DEBUG_WINDOW
+#include <imgui.h>
+#include <imgui-SFML.h>
 #endif
 
-		pkey.push_back(pkey_t(key_code, source));
-		add_keyboard_event(VM_KEY_EVENT_DOWN, key_code);
-	}
-}
-
-void KeyboardControl::unpress_key(int key_code) {
-	int i = find_key(key_code);
-	if (i != -1) {
-		pkey.erase(pkey.begin() + i);
-		add_keyboard_event(VM_KEY_EVENT_UP, key_code);
-	}
-}
-
-void KeyboardControl::unpress_by_source(key_source source) {
-	for (int i = 0; i < pkey.size(); ++i)
-		if (pkey[i].source == source) {
-#ifdef ANDROID
-			if (Touch0 <= source && source <= Touch9) {
-				vibration.vibrate(sf::milliseconds(40));
-			}
-#endif
-
-			add_keyboard_event(VM_KEY_EVENT_UP, pkey[i].key_code);
-			pkey.erase(pkey.begin() + i);
-			--i;
-		}
-}
+Keyboard::Keyboard(KeyboardControl& keyboardControl) : kc(keyboardControl) {}
 
 struct Keys {
 	char name[20] = "";
@@ -102,51 +42,50 @@ const Keys keys_imgui[3 * 7] =
 
 const std::map<sf::Keyboard::Key, int> key_to_key =
 {
-	{sf::Keyboard::Up, VM_KEY_UP},
-	{sf::Keyboard::Down, VM_KEY_DOWN},
-	{sf::Keyboard::Left, VM_KEY_LEFT},
-	{sf::Keyboard::Right, VM_KEY_RIGHT},
-	{sf::Keyboard::W, VM_KEY_UP},
-	{sf::Keyboard::S, VM_KEY_DOWN},
-	{sf::Keyboard::A, VM_KEY_LEFT},
-	{sf::Keyboard::D, VM_KEY_RIGHT},
+	{sf::Keyboard::Up,			VM_KEY_UP},
+	{sf::Keyboard::Down,		VM_KEY_DOWN},
+	{sf::Keyboard::Left,		VM_KEY_LEFT},
+	{sf::Keyboard::Right,		VM_KEY_RIGHT},
+	// WASD as an alternative to the arrow keys, for a physical keyboard.
+	{sf::Keyboard::W,			VM_KEY_UP},
+	{sf::Keyboard::S,			VM_KEY_DOWN},
+	{sf::Keyboard::A,			VM_KEY_LEFT},
+	{sf::Keyboard::D,			VM_KEY_RIGHT},
+	{sf::Keyboard::Slash,		VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::RShift,		VM_KEY_RIGHT_SOFTKEY},
+	{sf::Keyboard::Q,			VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::E,			VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::F1,			VM_KEY_LEFT_SOFTKEY},
+	{sf::Keyboard::Enter,		VM_KEY_OK},
+	{sf::Keyboard::Space,		VM_KEY_OK},
+	{sf::Keyboard::BackSpace,	VM_KEY_CLEAR},
+	{sf::Keyboard::Escape,		VM_KEY_BACK},
+	{sf::Keyboard::Numpad7,		VM_KEY_NUM1},
+	{sf::Keyboard::Numpad8,		VM_KEY_NUM2},
+	{sf::Keyboard::Numpad9,		VM_KEY_NUM3},
+	{sf::Keyboard::Numpad4,		VM_KEY_NUM4},
+	{sf::Keyboard::Numpad5,		VM_KEY_NUM5},
+	{sf::Keyboard::Numpad6,		VM_KEY_NUM6},
+	{sf::Keyboard::Numpad1,		VM_KEY_NUM7},
+	{sf::Keyboard::Numpad2,		VM_KEY_NUM8},
+	{sf::Keyboard::Numpad3,		VM_KEY_NUM9},
+	{sf::Keyboard::Divide,		VM_KEY_STAR},
+	{sf::Keyboard::Numpad0,		VM_KEY_NUM0},
+	{sf::Keyboard::Multiply,	VM_KEY_POUND},
+	{sf::Keyboard::Num1,		VM_KEY_NUM1},
+	{sf::Keyboard::Num2,		VM_KEY_NUM2},
+	{sf::Keyboard::Num3,		VM_KEY_NUM3},
+	{sf::Keyboard::Num4,		VM_KEY_NUM4},
+	{sf::Keyboard::Num5,		VM_KEY_NUM5},
+	{sf::Keyboard::Num6,		VM_KEY_NUM6},
+	{sf::Keyboard::Num7,		VM_KEY_NUM7},
+	{sf::Keyboard::Num8,		VM_KEY_NUM8},
+	{sf::Keyboard::Num9,		VM_KEY_NUM9},
+	{sf::Keyboard::Num0,		VM_KEY_NUM0},
+	{sf::Keyboard::Add,			VM_KEY_VOL_UP},
+	{sf::Keyboard::Subtract,	VM_KEY_VOL_DOWN},
 
-	{sf::Keyboard::Slash, VM_KEY_LEFT_SOFTKEY},
-	{sf::Keyboard::RShift, VM_KEY_RIGHT_SOFTKEY},
-	{sf::Keyboard::Q, VM_KEY_LEFT_SOFTKEY},
-	{sf::Keyboard::E, VM_KEY_RIGHT_SOFTKEY},
-	{sf::Keyboard::F1, VM_KEY_LEFT_SOFTKEY},
-	{sf::Keyboard::F2, VM_KEY_RIGHT_SOFTKEY},
-
-	{sf::Keyboard::Enter, VM_KEY_OK},
-	{sf::Keyboard::Space, VM_KEY_OK},
-
-	{sf::Keyboard::BackSpace, VM_KEY_CLEAR},
-	{sf::Keyboard::Escape, VM_KEY_BACK},
-
-	{sf::Keyboard::Num1, VM_KEY_NUM1},
-	{sf::Keyboard::Num2, VM_KEY_NUM2},
-	{sf::Keyboard::Num3, VM_KEY_NUM3},
-	{sf::Keyboard::Num4, VM_KEY_NUM4},
-	{sf::Keyboard::Num5, VM_KEY_NUM5},
-	{sf::Keyboard::Num6, VM_KEY_NUM6},
-	{sf::Keyboard::Num7, VM_KEY_NUM7},
-	{sf::Keyboard::Num8, VM_KEY_NUM8},
-	{sf::Keyboard::Num9, VM_KEY_NUM9},
-	{sf::Keyboard::Num0, VM_KEY_NUM0},
-
-	{sf::Keyboard::Numpad7, VM_KEY_NUM1},
-	{sf::Keyboard::Numpad8, VM_KEY_NUM2},
-	{sf::Keyboard::Numpad9, VM_KEY_NUM3},
-	{sf::Keyboard::Numpad4, VM_KEY_NUM4},
-	{sf::Keyboard::Numpad5, VM_KEY_NUM5},
-	{sf::Keyboard::Numpad6, VM_KEY_NUM6},
-	{sf::Keyboard::Numpad1, VM_KEY_NUM7},
-	{sf::Keyboard::Numpad2, VM_KEY_NUM8},
-	{sf::Keyboard::Numpad3, VM_KEY_NUM9},
-	{sf::Keyboard::Divide, VM_KEY_STAR},
-	{sf::Keyboard::Numpad0, VM_KEY_NUM0},
-	{sf::Keyboard::Multiply, VM_KEY_POUND},
+	{sf::Keyboard::F2,			MREMU_KEY_PRINTSCREEN},
 };
 
 bool Keyboard::event(sf::Event& event) {
@@ -182,10 +121,9 @@ bool Keyboard::event(sf::Event& event) {
 	return false;
 }
 
+#ifdef DEBUG_WINDOW
 void Keyboard::imgui_keyboard() {
 	ImVec2 v = { 60,20 };
-	ImGui::SetNextWindowPos(ImVec2(195, 395), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(255, 195), ImGuiCond_FirstUseEver);
 	ImGui::Begin("KeyBoard");
 	for (int i = 0; i < 3 * 7; ++i) {
 		if (i % 3 != 0)
@@ -209,6 +147,7 @@ void Keyboard::imgui_keyboard() {
 	}
 	ImGui::End();
 }
+#endif
 
 void Keyboard::draw(sf::RenderTarget* rt) {
 	for (int i = 0; i < kc.pkey.size(); ++i)
@@ -378,7 +317,7 @@ void Keyboard::update() {
 	kc.update();
 }
 
-void Keyboard::update_resize(int win_w, int win_h) {
+void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 	int screen_x = screen->getPosition().x;
 	int screen_y = screen->getPosition().y;
 	int screen_w = screen->getScale().x * screen->getTextureRect().width;
@@ -392,12 +331,14 @@ void Keyboard::update_resize(int win_w, int win_h) {
 		right = { x + size.x / 2, y, size.x / 2, size.y };
 	}
 	else {
-		auto size = size_by_aspect_ratio((win_w - screen_w) / 2, win_h, 3.f / 4.f);
+		auto size = size_by_aspect_ratio((win_w - screen_w) / 2, win_h - menu_h, 3.f / 4.f);
 		int y = win_h - size.y;
 		left = { (screen_x - size.x) / 2, y, size.x, size.y };
 		right = { screen_x + screen_w, y, size.x, size.y };
 	}
 
+	// Lowest row the keypad reaches. Anything under it in the window is free
+	// space, which is where the Options button goes.
 	m_bottom = std::max(left.top + left.height, right.top + right.height);
 
 	{

@@ -94,7 +94,8 @@ std::u8string MreTags::raw_to_u8(void* data, int size) {
 		return ucs2_to_utf8(str16);
 	}
 	else
-		return std::u8string((char8_t*)data, size);
+		return gb2312_to_utf8(std::string((char*)data, size));
+		//return std::u8string((char8_t*)data, size);
 }
 
 
