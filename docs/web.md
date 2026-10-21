@@ -117,8 +117,8 @@ fill, never its border colour, and the primary button's border is transparent
 so its outline never shifts. Pressing any button or the mute toggle scales it
 to 0.95 for 160ms and back, which is the only motion in the panel.
 
-Section headers in the panel ("DISPLAY", "AUDIO") are uppercase, brighter than
-the rest of the text, and sit a uniform 8px above their control.
+Section headers in the panel ("Display", "Audio") are a muted grey, 13px and
+semibold, with a uniform 8px gap above and a little padding below.
 
 ## Apps panel and uploads
 
