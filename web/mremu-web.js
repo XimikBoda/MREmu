@@ -190,8 +190,8 @@
     els.uploads.textContent = '';
 
     if (!state.uploads.length) {
-      els.uploadsSummary.textContent =
-        'No apps uploaded yet. Drop .vxp files here or use "Add .vxp files".';
+      els.uploadsTable.hidden = true;
+      els.uploadsSummary.textContent = 'No apps uploaded yet.';
       els.clearAll.hidden = true;
       return;
     }
@@ -200,18 +200,19 @@
     state.uploads.forEach(function (row) {
       total += row.size || 0;
 
-      var item = document.createElement('div');
-      item.className = 'upload';
+      var tr = document.createElement('tr');
 
-      var name = document.createElement('span');
+      var name = document.createElement('td');
       name.className = 'upload-name';
       name.textContent = row.name;
       name.title = row.name;
 
-      var size = document.createElement('span');
-      size.className = 'upload-size';
+      var size = document.createElement('td');
+      size.className = 'size';
       size.textContent = formatBytes(row.size || 0);
 
+      var action = document.createElement('td');
+      action.className = 'action';
       var remove = document.createElement('button');
       remove.className = 'upload-remove';
       remove.type = 'button';
@@ -220,13 +221,15 @@
       remove.addEventListener('click', function () {
         deleteUpload(row.name);
       });
+      action.appendChild(remove);
 
-      item.appendChild(name);
-      item.appendChild(size);
-      item.appendChild(remove);
-      els.uploads.appendChild(item);
+      tr.appendChild(name);
+      tr.appendChild(size);
+      tr.appendChild(action);
+      els.uploads.appendChild(tr);
     });
 
+    els.uploadsTable.hidden = false;
     els.uploadsSummary.textContent =
       state.uploads.length +
       (state.uploads.length === 1 ? ' app, ' : ' apps, ') +
@@ -547,8 +550,10 @@
     els.panel = $('panel');
     els.panelOpen = $('panel-open');
     els.uploads = $('uploads');
+    els.uploadsTable = $('uploads-table');
     els.uploadsSummary = $('uploads-summary');
     els.fileInput = $('file-input');
+    els.addFiles = $('add-files');
     els.clearAll = $('uploads-clear');
     els.scale = $('scale');
     els.muted = $('muted');
@@ -564,6 +569,9 @@
     els.panelOpen.addEventListener('click', togglePanel);
     $('panel-close').addEventListener('click', closePanel);
 
+    els.addFiles.addEventListener('click', function () {
+      els.fileInput.click();
+    });
     els.fileInput.addEventListener('change', function () {
       addFiles(els.fileInput.files).then(function () {
         els.fileInput.value = '';

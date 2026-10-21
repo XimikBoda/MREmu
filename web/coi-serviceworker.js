@@ -93,15 +93,11 @@ if (typeof window === 'undefined') {
         });
       })
       .then(function (registration) {
-        // Already controlling this page (repeat visit): nothing to reload.
-        if (navigator.serviceWorker.controller) {
-          window.MREmuCoi.ready = true;
-          return;
-        }
-
-        // On a first visit the worker may already have activated and claimed
-        // clients before ready resolved, so `installing || waiting` is empty by
-        // then. registration.active is the one that matters.
+        // Always reload once the worker is active when the page is still not
+        // isolated. `clients.claim()` can make navigator.serviceWorker.controller
+        // non-null for a document whose navigation response was already sent
+        // without COOP/COEP, so being controlled does not mean this document
+        // has the headers. The sessionStorage flag below still prevents loops.
         var worker =
           registration.installing || registration.waiting || registration.active;
         if (!worker) {

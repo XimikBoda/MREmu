@@ -56,6 +56,15 @@ if (EMSCRIPTEN)
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
   target_link_options(MREmu PRIVATE "--shell-file=${PROJECT_SOURCE_DIR}/web/shell.html")
 
+  # The shell is embedded by the link step, so it must force a relink when it
+  # changes; otherwise Ninja sees no dependency and leaves the old page behind.
+  # The two copied scripts are listed for the same reason: their post-build
+  # copy only runs after a link.
+  set_property(TARGET MREmu APPEND PROPERTY LINK_DEPENDS
+    "${PROJECT_SOURCE_DIR}/web/shell.html"
+    "${PROJECT_SOURCE_DIR}/web/mremu-web.js"
+    "${PROJECT_SOURCE_DIR}/web/coi-serviceworker.js")
+
   # The page loads these next to index.js; emcc only embeds the shell itself.
   # coi-serviceworker.js is what makes the bundle work on a static host such as
   # GitHub Pages, which cannot send COOP/COEP headers itself.

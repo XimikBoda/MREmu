@@ -100,16 +100,21 @@ Consequences:
   reload.
 - `.nojekyll` is included so GitHub Pages serves every bundle file verbatim.
 
+The UI uses Inter, loaded from Google Fonts with a `system-ui` fallback. It is
+the only third-party request the page makes and is purely cosmetic: if it is
+blocked or the page is offline, the fallback is used and the emulator still
+boots.
+
 ## Apps panel and uploads
 
-The gear button (top-left of the page, once the runtime has started) opens the
-apps panel. It offers:
+The apps button (top-right of the page, once the runtime has started) opens the
+options panel. It offers:
 
 - **Add .vxp files** - a multi-file picker; only `.vxp` files are accepted.
   Dropping `.vxp` files anywhere on the page opens the panel and imports them
   too.
-- A list of uploaded apps with their sizes, a **Remove** button per app, and
-  **Remove all**.
+- A table of uploaded apps (name, size, action) with a **Remove** button per
+  row, and **Remove all**.
 - Display scale (Fit, 1x-4x), fullscreen, host mute, and a page reload button.
 
 Uploads are stored as `ArrayBuffer`s in IndexedDB (`mremu-web` database, `vxps`
