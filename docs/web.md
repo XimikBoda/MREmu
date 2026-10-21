@@ -126,7 +126,8 @@ both start empty; this panel is how apps get into the web build. It offers:
 - An icon-only **Statistics** button opens a second panel view with the uploaded
   app count, storage used, and notes about local persistence and drop importing.
   A back button returns to the apps view.
-- Display scale (Fit, 1x-4x), fullscreen, host mute, and a page reload button.
+- Display scale (Fit, 1x-4x) with an icon-only fullscreen button, host mute,
+  and a page reload button.
 
 Uploads are stored as `ArrayBuffer`s in IndexedDB (`mremu-web` database, `vxps`
 object store, keyed by file name) and `navigator.storage.persist()` is requested
@@ -152,6 +153,12 @@ They also appear in the emulator's app list without extra steps:
 Click or tap the screen once before typing: browsers only start audio and route
 keyboard input to the canvas after a user gesture, and the emulator ignores keys
 while the document is unfocused.
+
+Display scale changes the canvas's on-screen size without changing the emulated
+framebuffer. Pointer coordinates are translated back into canvas pixels before
+SFML sees them, so clicks and taps hit the same guest pixel at Fit and at every
+fixed scale. A fixed scale taller than the viewport makes the stage scroll
+instead of cropping the menu bar and the top of the screen.
 
 - Arrow keys move the selection (they auto-repeat when held).
 - **Space** activates the highlighted item ("Choose") and is the most reliable

@@ -114,8 +114,10 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 12px;
+        padding: 16px;
+        overflow: auto;
       }
       #stage.dropping {
         outline: 2px dashed var(--accent);
@@ -125,6 +127,8 @@
          from the pixels SFML thinks it is drawing to. */
       canvas#canvas {
         display: block;
+        flex: none;
+        margin: auto;
         border: 0 none;
         padding: 0;
         background: #000;
@@ -372,10 +376,15 @@
       }
       .control-row {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
       }
-      .control-row select, .control-row button { width: 100%; }
+      .control-row select { width: 100%; }
+      .control-row .icon-button {
+        width: 40px;
+        height: 40px;
+        min-height: 40px;
+      }
       .check {
         position: relative;
         display: inline-flex;
@@ -660,9 +669,9 @@
                 <option value="3">3&times;</option>
                 <option value="4">4&times;</option>
               </select>
-              <button id="fullscreen" type="button">
+              <button id="fullscreen" type="button" class="icon-button"
+                      aria-label="Toggle fullscreen" title="Toggle fullscreen">
                 <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-fullscreen"/></svg>
-                <span>Fullscreen</span>
               </button>
             </div>
           </div>

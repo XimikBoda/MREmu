@@ -397,6 +397,65 @@
     if (target.requestFullscreen) target.requestFullscreen().catch(function () {});
   }
 
+  /**
+   * Keep pointer coordinates in canvas pixels.
+   *
+   * Emscripten reports clientX/clientY relative to the canvas in CSS pixels,
+   * while SFML treats them as framebuffer pixels. When the shell scales the
+   * canvas with CSS (Fit, 2x-4x), a tap therefore lands further from the
+   * top-left than the pixel under the finger. Rewrite the coordinates in the
+   * window capture phase, before Emscripten's own canvas listeners run, so the
+   * guest sees the same position at every scale.
+   */
+  function normalizeCanvasPointer(canvas) {
+    var mouseEvents = ['mousedown', 'mouseup', 'mousemove', 'mouseover',
+      'mouseout', 'mouseenter', 'mouseleave', 'click', 'dblclick'];
+    var touchEvents = ['touchstart', 'touchmove', 'touchend', 'touchcancel'];
+
+    function setCoord(object, name, value) {
+      try {
+        Object.defineProperty(object, name, { configurable: true, value: value });
+      } catch (e) {}
+    }
+
+    function normalize(event) {
+      if (event.target !== canvas) return;
+      var rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height || !canvas.width || !canvas.height) return;
+
+      var scaleX = canvas.width / rect.width;
+      var scaleY = canvas.height / rect.height;
+      if (Math.abs(scaleX - 1) < 0.001 && Math.abs(scaleY - 1) < 0.001) return;
+
+      // Emscripten subtracts the integer top-left of the canvas, so use the
+      // same integer origin when translating back into canvas pixels.
+      var left = Math.trunc(rect.left);
+      var top = Math.trunc(rect.top);
+      if (typeof event.clientX === 'number' && typeof event.clientY === 'number') {
+        setCoord(event, 'clientX', left + (event.clientX - rect.left) * scaleX);
+        setCoord(event, 'clientY', top + (event.clientY - rect.top) * scaleY);
+      }
+
+      // TouchEvent's coordinate lists are read-only; patch each Touch object
+      // instead. The same Touch can appear in more than one list.
+      var touches = [];
+      [event.touches, event.changedTouches, event.targetTouches].forEach(function (list) {
+        if (!list) return;
+        for (var i = 0; i < list.length; i++) {
+          var touch = list[i];
+          if (touches.indexOf(touch) !== -1) continue;
+          touches.push(touch);
+          setCoord(touch, 'clientX', left + (touch.clientX - rect.left) * scaleX);
+          setCoord(touch, 'clientY', top + (touch.clientY - rect.top) * scaleY);
+        }
+      });
+    }
+
+    mouseEvents.concat(touchEvents).forEach(function (type) {
+      window.addEventListener(type, normalize, true);
+    });
+  }
+
   function applyMuted(muted) {
     els.muted.checked = muted;
     try {
@@ -617,6 +676,7 @@
     } catch (e) {}
 
     els.scale.value = state.scale;
+    normalizeCanvasPointer(els.canvas);
     trapKeys();
 
     els.panelOpen.addEventListener('click', togglePanel);
