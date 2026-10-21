@@ -31,6 +31,7 @@
     uploads: [],
     scale: 'fit',
     started: false,
+    view: 'apps',
   };
 
   /* ------------------------------------------------------------------ util */
@@ -186,6 +187,16 @@
 
   /* --------------------------------------------------------------- uploads */
 
+  function renderStats() {
+    var count = state.uploads.length;
+    var total = 0;
+    state.uploads.forEach(function (row) {
+      total += row.size || 0;
+    });
+    els.statsApps.textContent = count + (count === 1 ? ' app' : ' apps');
+    els.statsSize.textContent = formatBytes(total);
+  }
+
   function renderUploads() {
     els.uploads.textContent = '';
 
@@ -193,6 +204,7 @@
       els.uploads.hidden = true;
       els.uploadsSummary.textContent = 'No apps uploaded yet.';
       els.clearAll.hidden = true;
+      renderStats();
       return;
     }
 
@@ -243,6 +255,7 @@
       formatBytes(total) +
       ' stored in this browser.';
     els.clearAll.hidden = false;
+    renderStats();
   }
 
   function acceptFile(file) {
@@ -397,7 +410,35 @@
 
   /* ---------------------------------------------------------------- panel */
 
+  function showPanelView(name, focus) {
+    var stats = name === 'stats';
+    if (state.view === name) {
+      if (focus) {
+        if (stats) els.statsBack.focus();
+        else els.panelInfo.focus();
+      }
+      return;
+    }
+
+    state.view = name;
+    els.viewApps.hidden = stats;
+    els.viewStats.hidden = !stats;
+    els.panel.setAttribute('aria-label', stats ? 'Statistics' : 'Apps and options');
+    els.panel.scrollTop = 0;
+
+    var shown = stats ? els.viewStats : els.viewApps;
+    shown.classList.remove('view-enter-next', 'view-enter-prev');
+    void shown.offsetWidth;
+    shown.classList.add(stats ? 'view-enter-next' : 'view-enter-prev');
+
+    if (focus) {
+      if (stats) els.statsBack.focus();
+      else els.panelInfo.focus();
+    }
+  }
+
   function openPanel() {
+    showPanelView('apps', false);
     els.panel.classList.add('open');
     els.panel.removeAttribute('hidden');
     els.panelOpen.setAttribute('aria-expanded', 'true');
@@ -556,6 +597,12 @@
     els.toast = $('toast');
     els.panel = $('panel');
     els.panelOpen = $('panel-open');
+    els.viewApps = $('view-apps');
+    els.viewStats = $('view-stats');
+    els.panelInfo = $('panel-info');
+    els.statsBack = $('stats-back');
+    els.statsApps = $('stats-apps');
+    els.statsSize = $('stats-size');
     els.uploads = $('uploads');
     els.uploadsSummary = $('uploads-summary');
     els.fileInput = $('file-input');
@@ -574,6 +621,13 @@
 
     els.panelOpen.addEventListener('click', togglePanel);
     $('panel-close').addEventListener('click', closePanel);
+    els.panelInfo.addEventListener('click', function () {
+      renderStats();
+      showPanelView('stats', true);
+    });
+    els.statsBack.addEventListener('click', function () {
+      showPanelView('apps', true);
+    });
 
     els.addFiles.addEventListener('click', function () {
       els.fileInput.click();

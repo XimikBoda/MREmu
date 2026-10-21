@@ -122,7 +122,10 @@ both start empty; this panel is how apps get into the web build. It offers:
   Dropping `.vxp` files anywhere on the page opens the panel and imports them
   too.
 - A conjoined list of uploaded apps (file icon, name, size) with an icon-only
-  **Remove** button per row, and **Remove all**.
+  **Remove** button per row, plus an icon-only **Remove all** button.
+- An icon-only **Statistics** button opens a second panel view with the uploaded
+  app count, storage used, and notes about local persistence and drop importing.
+  A back button returns to the apps view.
 - Display scale (Fit, 1x-4x), fullscreen, host mute, and a page reload button.
 
 Uploads are stored as `ArrayBuffer`s in IndexedDB (`mremu-web` database, `vxps`
