@@ -8,7 +8,8 @@
 //// TCP
 
 void MREngine::TcpSock::push_event(int event) {
-    AppContext::push_event(sock_event{ callback, phandle, handle, event});
+    using namespace Event;
+    AppContext::push_event(network{ phandle, sock{callback, handle, event} });
 }
 
 MREngine::TcpSock::TcpSock(asio::io_context& ctx, void (*c)(int, int), int app_handle) 
@@ -142,7 +143,8 @@ static void asio_to_mre_endpoint(const asio::ip::udp::endpoint& asio_ep, vm_sock
 }
 
 void MREngine::UdpSock::push_event(int event) {
-    AppContext::push_event(sock_event{ callback, phandle, handle, event });
+    using namespace Event;
+    AppContext::push_event(network{ phandle, sock{callback, handle, event} });
 }
 
 MREngine::UdpSock::UdpSock(asio::io_context& ctx, void (*c)(int, int), int app_handle)
@@ -311,9 +313,8 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
         [phandle, callback, resolver](const asio::error_code& ec, asio::ip::tcp::resolver::results_type results) {
             if (ec == asio::error::operation_aborted) return;
 
-            dns_event event_data;
+            Event::dns event_data;
             event_data.callback = callback;
-            event_data.phandle = phandle;
 
             if (!ec) {
                 std::vector<asio::ip::address_v4> ips;
@@ -326,7 +327,8 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
             else
                 fill_dns_result(&event_data.result, {}, VM_E_SOC_ERROR);
 
-            AppContext::push_event(event_data);
+            using namespace Event;
+            AppContext::push_event(network{ phandle, event_data });
         });
 
     return VM_E_SOC_WOULDBLOCK;

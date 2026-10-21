@@ -227,41 +227,30 @@ void AppManager::process_system_event(system_event_el se)
 		cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
 }
 
-void AppManager::add_sock_event(sock_event se)
-{
-	sock_events_queue.push(events_mutex, { se });
+void AppManager::push_event(const Event::network& ev) {
+	network_events_queue.push(events_mutex, ev);
 	events_cv.notify_one();
 }
 
-void AppManager::process_sock_event(sock_event se)
-{
-	current_work_app_id = find_app_id_by_phandle(se.phandle);
-	if (current_work_app_id == -1)
-		return;
+void AppManager::process_event(const Event::network& ev) {
+	App* app = get_app_by_phandle(ev.phandle);
 
-	App& cur_app = *apps[current_work_app_id];
-	if (se.callback)
-		cur_app.run(se.callback, se.handle, se.event);
-}
+	if (app)
+		std::visit([app](auto&& arg) {
+			using T = std::decay_t<decltype(arg)>;
 
-void AppManager::add_dns_event(dns_event de)
-{
-	dns_events_queue.push(events_mutex, { de });
-	events_cv.notify_one();
-}
+			if constexpr (std::is_same_v<T, Event::sock>) {
+				if (arg.callback) 
+					app->run(arg.callback, arg.handle, arg.event);
+			}
+			else if constexpr (std::is_same_v<T, Event::dns>) {
+				static vm_soc_dns_result* g_result = (vm_soc_dns_result*)Memory::shared_malloc(sizeof(vm_soc_dns_result));
+				*g_result = arg.result;
 
-void AppManager::process_dns_event(dns_event de)
-{
-	current_work_app_id = find_app_id_by_phandle(de.phandle);
-	if (current_work_app_id == -1)
-		return;
-
-	static vm_soc_dns_result* g_result = (vm_soc_dns_result*)Memory::shared_malloc(sizeof(vm_soc_dns_result));
-	*g_result = de.result;
-
-	App& cur_app = *apps[current_work_app_id];
-	if (de.callback)
-		cur_app.run(de.callback, g_result);
+				if (arg.callback)
+					app->run(arg.callback, g_result);
+			}
+			}, ev.data);
 }
 
 sf::Time AppManager::get_time_for_nearest_timer()
@@ -282,7 +271,7 @@ bool AppManager::is_all_events_empty() {
 	return launch_queue.empty() &&
 		keyboard_events_queue.empty() && pen_events_queue.empty() &&
 		message_events_queue.empty() && system_events_queue.empty() &&
-		sock_events_queue.empty() && dns_events_queue.empty();
+		network_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -316,9 +305,8 @@ void AppManager::loop() {
 		run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
 		run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
 		run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
-		run_queue(sock_events_queue, lock, [this](sock_event data) { process_sock_event(data); });
-		run_queue(dns_events_queue, lock, [this](dns_event data) { process_dns_event(data); });
-
+		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
+		
 		lock.unlock();
 
 		for (int i = 0; i < apps.size(); ++i) {
@@ -352,7 +340,7 @@ App* AppManager::get_active_app()
 	if (active_app_id < 0 || active_app_id >= apps.size())
 		return 0;
 	else
-		return &*apps[active_app_id];
+		return apps[active_app_id].get();
 }
 
 App* AppManager::get_current_work_app_id()
@@ -360,7 +348,16 @@ App* AppManager::get_current_work_app_id()
 	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
 		return 0;
 	else
-		return &*apps[current_work_app_id];
+		return apps[current_work_app_id].get();
+}
+
+App* AppManager::get_app_by_phandle(int phandle)
+{
+	for (int i = 0; i < apps.size(); ++i)
+		if (apps[i]->system_callbacks.ph_app_id == phandle)
+			return apps[i].get();
+
+	return 0;
 }
 
 App* get_active_app() {

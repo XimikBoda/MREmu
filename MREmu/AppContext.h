@@ -7,8 +7,9 @@ namespace MREngine {
 	class AppSock;
 }
 
-struct sock_event;
-struct dns_event;
+namespace Event {
+	struct network;
+}
 
 namespace AppContext {
 	AppManager* get_app_manager();
@@ -19,6 +20,5 @@ namespace AppContext {
 	int get_executing_app_phandle();
 	MREngine::AppSock& get_executing_app_sock();
 
-	void push_event(const sock_event& ev);
-	void push_event(const dns_event& ev);
+	void push_event(const Event::network& ev);
 };

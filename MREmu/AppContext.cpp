@@ -23,10 +23,7 @@ namespace AppContext {
 		return get_executing_app()->sock;
 	}
 
-	void push_event(const sock_event& ev) {
-		get_app_manager()->add_sock_event(ev);
-	}
-	void push_event(const dns_event& ev) {
-		get_app_manager()->add_dns_event(ev);
+	void push_event(const Event::network& ev) {
+		get_app_manager()->push_event(ev);
 	}
 }
