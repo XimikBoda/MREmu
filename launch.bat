@@ -673,18 +673,15 @@ if not exist "%EM_TOOLCHAIN%" (
 )
 
 rem CPM.cmake bootstraps itself from GitHub during configure (deps/asio.cmake is
-rem a submodule, so the download cannot be patched here). Reuse a cached copy
-rem when there is one, and otherwise let cmake skip TLS transport verification:
-rem CMake shipped with Visual Studio has no CA bundle at all, so every HTTPS
-rem download fails with "certificate signer not trusted". The file is pinned by
-rem EXPECTED_HASH, which is what actually guards its integrity.
-if not defined CPM_SOURCE_CACHE if exist "%ROOT%em\emsdk_cache\cpm\CPM_0.40.2.cmake" (
-  set "CPM_SOURCE_CACHE=%ROOT%em\emsdk_cache"
-)
-rem Disable TLS verification only when a download is actually going to happen.
+rem a submodule, so the download cannot be patched here). CMake shipped with
+rem Visual Studio has no CA bundle at all, so every HTTPS download fails with
+rem "certificate signer not trusted". The file is pinned by EXPECTED_HASH, which
+rem is what actually guards its integrity, so skip only transport verification.
+rem Do not redirect CPM_SOURCE_CACHE elsewhere: get_cpm.cmake re-downloads on
+rem every configure, and CPM.cmake's include guard returns silently when the
+rem file's directory differs from the one recorded in CMakeCache (CPM_DIRECTORY),
+rem leaving CPMAddPackage undefined.
 set "EM_TLS_OPT=-DCMAKE_TLS_VERIFY=OFF"
-if defined CPM_SOURCE_CACHE if exist "%CPM_SOURCE_CACHE%\cpm\CPM_0.40.2.cmake" set "EM_TLS_OPT="
-if not defined CPM_SOURCE_CACHE if exist "%ROOT%build\em\cmake\CPM_0.40.2.cmake" set "EM_TLS_OPT="
 exit /b 0
 
 :copy_web_to_bin
@@ -698,7 +695,7 @@ if not exist "%WEB_OUT%\index.html" (
   exit /b 1
 )
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
-for %%F in (index.html index.js index.wasm index.data) do (
+for %%F in (index.html index.js index.wasm index.data index.worker.js mremu-web.js coi-serviceworker.js .nojekyll) do (
   if exist "%WEB_OUT%\%%F" (
     copy /y "%WEB_OUT%\%%F" "%OUT_DIR%\%%F" >nul
     if errorlevel 1 (
@@ -742,7 +739,9 @@ echo.
 echo Cleaning web build artifacts...
 if exist "build\em" rmdir /s /q "build\em"
 rem Drop the per-config snapshots too; the bundle itself lives in build\em.
-for %%F in (index.html index.js index.wasm index.data) do (
+rem MREmu.* is the older output name, which the snapshot copy used to leave
+rem behind next to index.* in bin\Release and bin\Debug.
+for %%F in (index.html index.js index.wasm index.data index.worker.js mremu-web.js coi-serviceworker.js .nojekyll MREmu.js MREmu.wasm MREmu.data MREmu.worker.js) do (
   if exist "bin\Release\%%F" del /q "bin\Release\%%F" >nul 2>&1
   if exist "bin\Debug\%%F" del /q "bin\Debug\%%F" >nul 2>&1
 )

@@ -51,6 +51,13 @@ if(EMSCRIPTEN)
         "-sGL_EXPLICIT_UNIFORM_LOCATION=1"
         "-sGL_EXPLICIT_UNIFORM_BINDING=1"
         "-sFORCE_FILESYSTEM=1"
+        # Modularized: the page has to read its uploaded .vxp files from
+        # IndexedDB before instantiating the runtime, and needs a handle on
+        # Module.FS afterwards to add or remove them. FS is not exported by
+        # default any more.
+        "-sMODULARIZE=1"
+        "-sEXPORT_NAME=MREmuModule"
+        "-sEXPORTED_RUNTIME_METHODS=FS"
         "--preload-file" "${PROJECT_SOURCE_DIR}/bin/Release/fs@/fs"
         "-sWASM=1"
     )

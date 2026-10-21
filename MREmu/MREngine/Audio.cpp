@@ -131,24 +131,48 @@ VMINT vm_audio_stop(void (*f)(VMINT result)) {
 	return VM_AUDIO_SUCCEED;
 }
 
+// The guest's own volume (0..6), kept separately from what the output is
+// actually set to so a host-side mute is not undone by the next vm_set_volume
+// from an app, and so vm_get_volume still reports what the guest asked for.
+static VMINT g_volume = 6;
+static bool g_muted = false;
+
+static void apply_output_volume() {
+	// Force SFML AudioDevice initialization by creating a dummy object.
+	// This prevents AL_INVALID_OPERATION if this is the first audio call on this thread.
+	static sf::SoundBuffer dummy_buffer;
+
+	sf::Listener::setGlobalVolume(g_muted ? 0.f : (float)(g_volume * 100 / 6));
+}
+
 void vm_set_volume(VMINT volume) {
 	if (volume < 0)
 		volume = 0;
 	if (volume > 6)
 		volume = 6;
-		
-	// Force SFML AudioDevice initialization by creating a dummy object.
-	// This prevents AL_INVALID_OPERATION if this is the first audio call on this thread.
-	static sf::SoundBuffer dummy_buffer; 
-	
-	sf::Listener::setGlobalVolume(volume * 100 / 6);
+
+	g_volume = volume;
+	apply_output_volume();
 }
 
 VMINT vm_get_volume(void) {
 	static sf::SoundBuffer dummy_buffer;
 
-	return sf::Listener::getGlobalVolume() * 6 / 100;
+	return g_volume;
 }
+
+void mremu_set_muted(bool muted) {
+	g_muted = muted;
+	apply_output_volume();
+}
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+// Called from the web options panel (see web/mremu-web.js).
+extern "C" EMSCRIPTEN_KEEPALIVE void mremu_web_set_muted(int muted) {
+	mremu_set_muted(muted != 0);
+}
+#endif
 
 VMINT vm_midi_play(VMINT resid, VMINT repeat, void (*f)(VMINT handle, VMINT event)) {
 	return vm_midi_play_ex(resid, 0, repeat, 0, f);

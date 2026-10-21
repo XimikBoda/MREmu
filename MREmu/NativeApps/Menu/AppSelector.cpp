@@ -26,6 +26,11 @@ VMWSTR vm_ucs2_string(VMSTR s);
 extern AppManager* g_appManager;
 
 namespace NativeApps::Menu::AppSelector {
+	// Set when the browser uploads or deletes a .vxp (see mremu_web_apps_changed
+	// at the bottom of this file). Consumed by timer_cb, which performs the
+	// rescan on the app's own tick rather than from inside a JS call.
+	bool g_apps_changed = false;
+
 	int layer_h = 0;
 	VMUINT8* layer_buf = 0;
 	int w = 0, h = 0;
@@ -1864,15 +1869,29 @@ namespace NativeApps::Menu::AppSelector {
 		vm_graphic_flush_layer(&layer_h, 1);
 	}
 
+	// True while this menu is the app the emulator is actually running, i.e.
+	// while redrawing from a timer tick is safe.
+	bool menu_is_active() {
+		if (!g_appManager)
+			return true;
+		App* act = g_appManager->get_active_app();
+		return !(act && act->system_callbacks.ph_app_id != vm_pmng_get_current_handle());
+	}
+
 	void timer_cb(VMINT tid) {
+		// Checked before the vxps.empty() guard: adding the first app to an empty
+		// folder is exactly the case where a rescan is needed most.
+		if (g_apps_changed && layer_buf && menu_is_active()) {
+			g_apps_changed = false;
+			rescan();
+			return;
+		}
+
 		if (!layer_buf || vxps.empty() || touched)
 			return;
 
-		if (g_appManager) {
-			App* act = g_appManager->get_active_app();
-			if (act && act->system_callbacks.ph_app_id != vm_pmng_get_current_handle())
-				return;
-		}
+		if (!menu_is_active())
+			return;
 
 		if (scrollbar_visible && vm_get_tick_count() - last_scroll_time >= 2000) {
 			scrollbar_visible = false;
@@ -2192,3 +2211,14 @@ namespace NativeApps::Menu::AppSelector {
 		draw();
 	}
 }
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+// The web build writes uploaded .vxp files straight into the Emscripten
+// filesystem, then calls this so the list picks them up without a reload.
+// Only a flag is set: the rescan itself runs from the menu's own timer (see
+// timer_cb), never inside this call and never in the middle of a frame.
+extern "C" EMSCRIPTEN_KEEPALIVE void mremu_web_apps_changed() {
+	NativeApps::Menu::AppSelector::g_apps_changed = true;
+}
+#endif

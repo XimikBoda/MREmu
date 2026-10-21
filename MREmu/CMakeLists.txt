@@ -55,6 +55,17 @@ if (EMSCRIPTEN)
     SUFFIX ".html"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
   target_link_options(MREmu PRIVATE "--shell-file=${PROJECT_SOURCE_DIR}/web/shell.html")
+
+  # The page loads these next to index.js; emcc only embeds the shell itself.
+  # coi-serviceworker.js is what makes the bundle work on a static host such as
+  # GitHub Pages, which cannot send COOP/COEP headers itself.
+  add_custom_command(TARGET MREmu POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${PROJECT_SOURCE_DIR}/web/mremu-web.js"
+      "${PROJECT_SOURCE_DIR}/web/coi-serviceworker.js"
+      "$<TARGET_FILE_DIR:MREmu>"
+    COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_FILE_DIR:MREmu>/.nojekyll"
+    COMMENT "Copying web host assets next to index.html")
 endif()
 
 target_link_libraries(MREmu sfml-graphics)

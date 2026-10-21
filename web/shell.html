@@ -5,13 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>MREmu</title>
     <style>
+      :root {
+        --bg: #111;
+        --fg: #ddd;
+        --muted: #888;
+        --accent: #4a9eff;
+        --panel: #1a1a1e;
+        --line: #2a2a2e;
+      }
+      * { box-sizing: border-box; }
       html, body {
         margin: 0;
         height: 100%;
-        background: #111;
-        color: #ddd;
+        background: var(--bg);
+        color: var(--fg);
         font: 14px/1.4 system-ui, sans-serif;
         overflow: hidden;
+      }
+      button, select, label.button {
+        font: inherit;
+        color: inherit;
+      }
+      button, label.button {
+        display: inline-block;
+        padding: 6px 10px;
+        background: #26262c;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      button:hover, label.button:hover {
+        background: #2e2e36;
+        border-color: #3c3c44;
+      }
+      select {
+        background: #26262c;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 5px 8px;
       }
       #stage {
         position: absolute;
@@ -21,6 +52,10 @@
         align-items: center;
         justify-content: center;
         gap: 12px;
+      }
+      #stage.dropping {
+        outline: 2px dashed var(--accent);
+        outline-offset: -8px;
       }
       /* The canvas must have no border or padding, or mouse coordinates drift
          from the pixels SFML thinks it is drawing to. */
@@ -56,68 +91,209 @@
       #bar > div {
         height: 100%;
         width: 0%;
-        background: #4a9eff;
+        background: var(--accent);
         transition: width 150ms linear;
       }
-      #status { color: #888; }
+      #status { color: var(--muted); }
       #hint { color: #555; font-size: 12px; }
+
+      /* Options panel ------------------------------------------------------ */
+      #panel-open {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 20;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        font-size: 18px;
+        line-height: 1;
+        background: rgba(26, 26, 30, 0.85);
+      }
+      #panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        width: min(360px, 90vw);
+        padding: 16px;
+        overflow-y: auto;
+        background: var(--panel);
+        border-left: 1px solid var(--line);
+        box-shadow: -12px 0 30px rgba(0, 0, 0, 0.5);
+      }
+      #panel[hidden] { display: none; }
+      #panel header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      #panel h2 { margin: 0; font-size: 15px; }
+      .group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .label {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .hintline { color: var(--muted); font-size: 12px; }
+      #uploads {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 38vh;
+        overflow-y: auto;
+      }
+      .upload {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        background: #232329;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      .upload-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .upload-size { color: var(--muted); font-size: 12px; }
+      .upload-remove { padding: 2px 8px; font-size: 12px; }
+      /* Visible to the accessibility tree and still activatable by its label,
+         but out of the flow: the styled label opens the picker. */
+      #file-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+      #toast {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        z-index: 40;
+        max-width: 80vw;
+        padding: 8px 14px;
+        background: #2b2b33;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        opacity: 0;
+        transform: translate(-50%, 12px);
+        pointer-events: none;
+        transition: opacity 180ms ease, transform 180ms ease;
+      }
+      #toast.visible { opacity: 1; transform: translate(-50%, 0); }
+      @media (max-width: 640px) {
+        #panel { width: 100vw; border-left: 0; }
+      }
     </style>
   </head>
   <body>
     <div id="stage">
       <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
     </div>
+
+    <button id="panel-open" type="button" hidden aria-controls="panel"
+            aria-expanded="false" title="Apps and options">&#9881;</button>
+
+    <aside id="panel" hidden aria-label="Apps and options">
+      <header>
+        <h2>Apps &amp; options</h2>
+        <button id="panel-close" type="button" aria-label="Close panel">&#10005;</button>
+      </header>
+
+      <section class="group">
+        <div class="row">
+          <label class="button" for="file-input">Add .vxp files</label>
+          <button id="uploads-clear" type="button" hidden>Remove all</button>
+        </div>
+        <input id="file-input" type="file" accept=".vxp,application/octet-stream" multiple>
+        <div id="uploads-summary" class="hintline"></div>
+        <div id="uploads"></div>
+        <div class="hintline">
+          Uploads are stored in this browser and mounted again on every load.
+          Dropping .vxp files anywhere on the page imports them too.
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="row">
+          <span class="label">Display</span>
+          <select id="scale">
+            <option value="fit">Fit</option>
+            <option value="1">1&times;</option>
+            <option value="2">2&times;</option>
+            <option value="3">3&times;</option>
+            <option value="4">4&times;</option>
+          </select>
+          <button id="fullscreen" type="button">Fullscreen</button>
+        </div>
+        <div class="row">
+          <span class="label">Audio</span>
+          <label class="row"><input id="muted" type="checkbox"> Mute</label>
+        </div>
+        <div class="row">
+          <button id="reload" type="button">Reload page</button>
+        </div>
+      </section>
+    </aside>
+
     <div id="overlay">
       <div><strong>MREmu</strong></div>
       <div id="bar"><div></div></div>
       <div id="status">Loading&hellip;</div>
       <div id="hint">Click the screen once to enable keyboard and sound.</div>
     </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
     <script>
-      var overlay = document.getElementById('overlay');
-      var statusElement = document.getElementById('status');
-      var progressFill = document.querySelector('#bar > div');
-
-      var Module = {
-        canvas: (function () {
-          var canvas = document.getElementById('canvas');
-          canvas.addEventListener(
-            'webglcontextlost',
-            function (e) {
-              alert('WebGL context lost. Reload the page to continue.');
-              e.preventDefault();
-            },
-            false
-          );
-          return canvas;
-        })(),
-        setStatus: function (text) {
-          // Emscripten reports progress as "message (done/total)".
-          var m = text && text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-          if (m) {
-            statusElement.textContent = m[1].trim();
-            progressFill.style.width = (parseInt(m[2]) / parseInt(m[4])) * 100 + '%';
-          } else if (text) {
-            statusElement.textContent = text;
-          }
-        },
-        onRuntimeInitialized: function () {
-          overlay.classList.add('hidden');
-          Module.canvas.focus();
-        },
-      };
-
       // Frames and audio both want a user gesture; hand the first click to the
       // canvas so the emulated phone actually receives key events.
+      var canvas = document.getElementById('canvas');
+      canvas.addEventListener(
+        'webglcontextlost',
+        function (e) {
+          alert('WebGL context lost. Reload the page to continue.');
+          e.preventDefault();
+        },
+        false
+      );
       document.getElementById('stage').addEventListener('click', function () {
-        Module.canvas.focus();
+        canvas.focus();
       });
 
       window.onerror = function () {
-        statusElement.textContent = 'Failed to start - see the browser console.';
-        progressFill.style.width = '0%';
+        var overlay = document.getElementById('overlay');
+        var status = document.getElementById('status');
+        var bar = document.querySelector('#bar > div');
+        if (overlay) overlay.classList.remove('hidden');
+        if (status) status.textContent = 'Failed to start - see the browser console.';
+        if (bar) bar.style.width = '0%';
       };
     </script>
+    <script src="coi-serviceworker.js"></script>
+    <script src="mremu-web.js"></script>
     {{{ SCRIPT }}}
   </body>
 </html>
