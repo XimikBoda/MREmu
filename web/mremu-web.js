@@ -25,6 +25,7 @@
   var PREF_SCALE = 'mremu.scale';
   var PREF_MUTED = 'mremu.muted';
   var PREF_PANEL = 'mremu.panel';
+  var PREF_VOLUME = 'mremu.volume';
 
   var els = {};
   var state = {
@@ -459,6 +460,19 @@
     }
   }
 
+  function applyVolume(value) {
+    value = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
+    if (els.volume) els.volume.value = value;
+    if (els.volumeValue) els.volumeValue.textContent = value;
+    try {
+      localStorage.setItem(PREF_VOLUME, String(value));
+    } catch (e) {}
+    var mod = state.module;
+    if (mod && typeof mod._mremu_web_set_volume === 'function') {
+      mod._mremu_web_set_volume(value);
+    }
+  }
+
   /* ---------------------------------------------------------------- panel */
 
   function showPanelView(name, focus) {
@@ -663,6 +677,7 @@
         els.canvas.focus();
         applyScale();
         applyMuted(els.muted.checked);
+        applyVolume(els.volume ? els.volume.value : 100);
         state.started = true;
         els.panelOpen.hidden = false;
         // The panel remembers whether it was open when the page was left.
@@ -704,10 +719,13 @@
     els.confirmAccept = $('confirm-accept');
     els.scale = $('scale');
     els.muted = $('muted');
+    els.volume = $('volume');
+    els.volumeValue = $('volume-value');
 
     try {
       state.scale = localStorage.getItem(PREF_SCALE) || 'fit';
       els.muted.checked = localStorage.getItem(PREF_MUTED) === '1';
+      if (els.volume) els.volume.value = localStorage.getItem(PREF_VOLUME) || '100';
     } catch (e) {}
 
     els.scale.value = state.scale;
@@ -749,6 +767,14 @@
     els.muted.addEventListener('change', function () {
       applyMuted(els.muted.checked);
     });
+    if (els.volume) {
+      els.volume.addEventListener('input', function () {
+        applyVolume(els.volume.value);
+      });
+      els.volume.addEventListener('change', function () {
+        applyVolume(els.volume.value);
+      });
+    }
     $('reload').addEventListener('click', function () {
       window.location.reload();
     });

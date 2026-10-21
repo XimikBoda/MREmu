@@ -136,13 +136,15 @@ VMINT vm_audio_stop(void (*f)(VMINT result)) {
 // from an app, and so vm_get_volume still reports what the guest asked for.
 static VMINT g_volume = 6;
 static bool g_muted = false;
+// Host-side volume (0..100) set from the web panel; scales the guest volume.
+static int g_host_volume = 100;
 
 static void apply_output_volume() {
 	// Force SFML AudioDevice initialization by creating a dummy object.
 	// This prevents AL_INVALID_OPERATION if this is the first audio call on this thread.
 	static sf::SoundBuffer dummy_buffer;
 
-	sf::Listener::setGlobalVolume(g_muted ? 0.f : (float)(g_volume * 100 / 6));
+	sf::Listener::setGlobalVolume(g_muted ? 0.f : (float)(g_host_volume * g_volume) / 6.f);
 }
 
 void vm_set_volume(VMINT volume) {
@@ -152,6 +154,13 @@ void vm_set_volume(VMINT volume) {
 		volume = 6;
 
 	g_volume = volume;
+	apply_output_volume();
+}
+
+void mremu_set_host_volume(int volume) {
+	if (volume < 0) volume = 0;
+	if (volume > 100) volume = 100;
+	g_host_volume = volume;
 	apply_output_volume();
 }
 
@@ -171,6 +180,9 @@ void mremu_set_muted(bool muted) {
 // Called from the web options panel (see web/mremu-web.js).
 extern "C" EMSCRIPTEN_KEEPALIVE void mremu_web_set_muted(int muted) {
 	mremu_set_muted(muted != 0);
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void mremu_web_set_volume(int volume) {
+	mremu_set_host_volume(volume);
 }
 #endif
 

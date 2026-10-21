@@ -139,7 +139,8 @@ open after a reload. It offers:
   app count, storage used, and notes about local persistence and drop importing.
   A back button returns to the apps view.
 - Display scale (Fit, 1x-4x) with an icon-only fullscreen button, host mute,
-  and a page reload button.
+  a host volume slider, and a page reload button. The scale select carries its
+  own chevron instead of the browser's default arrow.
 
 Checkbox options (currently just **Mute**) are list-like rows: the whole row is
 the hit target and a circle on its left carries the state. Switching one on

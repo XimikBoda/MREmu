@@ -371,19 +371,30 @@
       }
       .field-label {
         min-height: 16px;
-        font-size: 12px;
+        font-size: 16px;
         font-weight: 600;
         line-height: 16px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--fg);
+        margin-top: 8px;
       }
       .control-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
       }
-      .control-row select { width: 100%; }
+      .control-row select {
+        width: 100%;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        padding-right: 36px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' fill='none' stroke='%23a6a6b0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 12px 12px;
+      }
       .control-row .icon-button {
         width: 40px;
         height: 40px;
@@ -462,6 +473,64 @@
           border-color: var(--accent-hover);
         }
       }
+      /* Volume slider ------------------------------------------------------ */
+      .volume {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        min-height: 40px;
+        padding: 8px 12px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+      .volume .icon { flex: none; color: var(--muted); }
+      .volume input[type="range"] {
+        flex: 1 1 auto;
+        height: 4px;
+        margin: 0;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background: var(--line);
+        border-radius: 2px;
+        cursor: pointer;
+      }
+      .volume input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 2px var(--surface);
+        transition: transform 160ms ease-out;
+      }
+      .volume input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+      .volume input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 2px var(--surface);
+      }
+      .volume input[type="range"]::-moz-range-track {
+        height: 4px;
+        background: var(--line);
+        border-radius: 2px;
+      }
+      .volume-value {
+        flex: none;
+        min-width: 2ch;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        text-align: right;
+      }
+
       #uploads-wrap {
         max-height: 40vh;
         overflow-y: auto;
@@ -677,6 +746,11 @@
       <symbol id="icon-tick" viewBox="0 0 24 24">
         <path d="M5 14L8.5 17.5L19 6.5"/>
       </symbol>
+      <symbol id="icon-volume" viewBox="0 0 24 24">
+        <path d="M4 9h4l5-4v14l-5-4H4V9z"/>
+        <path d="M16 9.5a3 3 0 0 1 0 5"/>
+        <path d="M18 7.5a6 6 0 0 1 0 9"/>
+      </symbol>
       <symbol id="icon-filter" viewBox="0 0 24 24">
         <path d="M3 7H6"/>
         <path d="M3 17H9"/>
@@ -758,6 +832,12 @@
               </span>
               <span class="check-text">Mute</span>
             </label>
+            <div class="volume">
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-volume"/></svg>
+              <input id="volume" type="range" min="0" max="100" step="1" value="100"
+                     aria-label="Volume">
+              <span class="volume-value" id="volume-value">100</span>
+            </div>
           </div>
         </section>
 
