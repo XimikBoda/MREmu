@@ -14,7 +14,7 @@ add_library (MREngine
 						"IO.cpp" "IO.h"
 						"SIM.cpp" "SIM.h"
 						"Log.cpp" "Log.h"
-						"Sock.cpp" "Sock.h"
+						"Sock.cpp" "Sock.h" "SockImpl.h"
 						"Sensor.cpp" "Sensor.h"
 						"Audio.cpp" "Audio.h" "AudioBitstream.cpp" "AudioBitstreamRec.cpp"
 						"CharSet.cpp" "CharSet.h"

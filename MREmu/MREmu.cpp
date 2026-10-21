@@ -15,6 +15,7 @@
 #include "Bridge.h"
 #include "AppManager.h"
 #include "Log.h"
+#include "Network.h"
 
 #include "Device/Device.h"
 
@@ -25,6 +26,11 @@
 #include <cmdparser.hpp>
 
 #include "NativeApps/Menu/AppSelector.h"
+
+#ifdef WIN32
+#include <windows.h>
+#endif // WIN32
+
 
 sf::Clock global_clock;
 
@@ -102,12 +108,13 @@ int main(int argc, char** argv) {
 	Cpu::init();
 	Bridge::init();
 
+	Network network;
+
 	MREngine::SIM::init();
 	MREngine::System::init();
 	MREngine::CharSet::init();
 	MREngine::AppAudio::init();
 	MREngine::Graphic graphic;
-	MREngine::NetworkManager nm;
 
 #ifdef ANDROID
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu");

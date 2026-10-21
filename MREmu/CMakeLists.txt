@@ -16,6 +16,7 @@ set(SOURCES
 						"Disassembler.cpp" "Disassembler.h"
 						"ARModule.cpp" "ARModule.h"
 						"AppManager.cpp" "AppManager.h"
+						"Network.cpp" "Network.h"
 						"Log.cpp" "Log.h" 
 						"miniz.c" "miniz.h" "mutex_wrapper.h" "Queue.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
@@ -39,6 +40,7 @@ target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu ADLMIDI_static)
 target_link_libraries(MREmu libiconv)
 target_link_libraries(MREmu spdlog)
+target_link_libraries(MREmu asio::asio)
 
 target_link_libraries(MREmu MREngine)
 target_link_libraries(MREmu NativeApps)

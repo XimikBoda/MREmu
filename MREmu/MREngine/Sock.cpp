@@ -1,13 +1,9 @@
-#include "../Memory.h"
-#include "../Bridge.h"
-#include <cstring>
-//#include "../Cpu.h"
+#include "../Network.h"
 #include "Sock.h"
-#include <asio.hpp>
+#include "SockImpl.h"
+#include <cstring>
 
 #include "../AppManager.h"
-
-MREngine::NetworkManager* g_networkManager = 0;
 
 //// TCP
 
@@ -263,26 +259,6 @@ void MREngine::UdpSock::close() {
         });
 }
 
-MREngine::NetworkManager::NetworkManager() : work_guard(asio::make_work_guard(io_ctx)) {
-    asio_thread = std::thread([this]() {
-        io_ctx.run();
-        });
-
-    g_networkManager = this;
-}
-
-MREngine::NetworkManager::~NetworkManager() {
-    work_guard.reset();
-    io_ctx.stop();
-    if (asio_thread.joinable()) {
-        asio_thread.join();
-    }
-}
-
-asio::io_context& MREngine::NetworkManager::get_context() {
-    return io_ctx;
-}
-
 static void fill_dns_result(vm_soc_dns_result* result, const std::vector<asio::ip::address_v4>& ips, VMINT error_cause) {
     result->error_cause = error_cause;
 
@@ -329,7 +305,7 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
 
     int phandle = vm_pmng_get_current_handle();
     
-    auto resolver = std::make_shared<asio::ip::tcp::resolver>(g_networkManager->get_context());
+    auto resolver = std::make_shared<asio::ip::tcp::resolver>(Network::getPtr()->get_context());
 
     resolver->async_resolve(host_str, "",
         [phandle, callback, resolver](const asio::error_code& ec, asio::ip::tcp::resolver::results_type results) {
@@ -359,7 +335,7 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
 VMINT vm_tcp_connect(const char* host, const VMINT port, const VMINT apn,
     void (*callback)(VMINT handle, VMINT event)) 
 {
-    std::shared_ptr<MREngine::TcpSock> tcp = std::make_shared<MREngine::TcpSock>(g_networkManager->get_context(), callback, vm_pmng_get_current_handle());
+    std::shared_ptr<MREngine::TcpSock> tcp = std::make_shared<MREngine::TcpSock>(Network::getPtr()->get_context(), callback, vm_pmng_get_current_handle());
     
     MREngine::AppSock& app_sock = get_current_app_sock();
     int tcp_id = app_sock.tcps.push(tcp);
@@ -402,7 +378,7 @@ VMINT vm_tcp_write(VMINT handle, void* buf, VMINT len) {
 }
 
 VMINT vm_udp_create(VMINT port, VMINT apn, void (*callback)(VMINT hdl, VMINT event), VMINT loopback) {
-    std::shared_ptr<MREngine::UdpSock> udp = std::make_shared<MREngine::UdpSock>(g_networkManager->get_context(), callback, vm_pmng_get_current_handle());
+    std::shared_ptr<MREngine::UdpSock> udp = std::make_shared<MREngine::UdpSock>(Network::getPtr()->get_context(), callback, vm_pmng_get_current_handle());
 
     if (!udp->create(port, loopback)) {
         return -1;
