@@ -24,6 +24,7 @@
   var STORE = 'vxps';
   var PREF_SCALE = 'mremu.scale';
   var PREF_MUTED = 'mremu.muted';
+  var PREF_PANEL = 'mremu.panel';
 
   var els = {};
   var state = {
@@ -493,6 +494,9 @@
     els.panel.removeAttribute('hidden');
     els.panelOpen.setAttribute('aria-expanded', 'true');
     renderUploads();
+    try {
+      localStorage.setItem(PREF_PANEL, '1');
+    } catch (e) {}
   }
 
   function closePanel() {
@@ -500,11 +504,41 @@
     els.panel.setAttribute('hidden', '');
     els.panelOpen.setAttribute('aria-expanded', 'false');
     els.canvas.focus();
+    try {
+      localStorage.setItem(PREF_PANEL, '0');
+    } catch (e) {}
   }
 
   function togglePanel() {
     if (els.panel.classList.contains('open')) closePanel();
     else openPanel();
+  }
+
+  /* -------------------------------------------------------- confirm dialog */
+
+  function confirmOpen() {
+    return !els.confirm.hasAttribute('hidden');
+  }
+
+  function openConfirm() {
+    els.confirm.removeAttribute('hidden');
+    els.confirmCancel.focus();
+  }
+
+  function closeConfirm() {
+    els.confirm.setAttribute('hidden', '');
+    if (els.panel.classList.contains('open')) els.clearAll.focus();
+  }
+
+  /** Keep Tab inside the dialog; it runs from the keyboard trap below, which
+   *  is the first listener to see the key. */
+  function cycleConfirmFocus(event) {
+    var buttons = [els.confirmCancel, els.confirmAccept];
+    var index = buttons.indexOf(document.activeElement);
+    if (index === -1) return;
+    event.preventDefault();
+    var step = event.shiftKey ? buttons.length - 1 : 1;
+    buttons[(index + step) % buttons.length].focus();
   }
 
   /**
@@ -519,9 +553,13 @@
     function block(event) {
       var target = event.target;
       var typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
-      if (!els.panel.classList.contains('open') && !typing) return;
-      if (event.key === 'Escape' && els.panel.classList.contains('open')) {
-        closePanel();
+      var dialog = confirmOpen();
+      if (!els.panel.classList.contains('open') && !typing && !dialog) return;
+      if (event.key === 'Escape') {
+        if (dialog) closeConfirm();
+        else if (els.panel.classList.contains('open')) closePanel();
+      } else if (event.key === 'Tab' && dialog) {
+        cycleConfirmFocus(event);
       }
       event.stopImmediatePropagation();
     }
@@ -627,6 +665,10 @@
         applyMuted(els.muted.checked);
         state.started = true;
         els.panelOpen.hidden = false;
+        // The panel remembers whether it was open when the page was left.
+        try {
+          if (localStorage.getItem(PREF_PANEL) === '1') openPanel();
+        } catch (e) {}
       },
       onAbort: function (what) {
         fatal('The emulator stopped: ' + what);
@@ -657,6 +699,9 @@
     els.fileInput = $('file-input');
     els.addFiles = $('add-files');
     els.clearAll = $('uploads-clear');
+    els.confirm = $('confirm');
+    els.confirmCancel = $('confirm-cancel');
+    els.confirmAccept = $('confirm-accept');
     els.scale = $('scale');
     els.muted = $('muted');
 
@@ -687,7 +732,15 @@
         els.fileInput.value = '';
       });
     });
-    els.clearAll.addEventListener('click', deleteEverything);
+    els.clearAll.addEventListener('click', openConfirm);
+    els.confirmCancel.addEventListener('click', closeConfirm);
+    els.confirmAccept.addEventListener('click', function () {
+      closeConfirm();
+      deleteEverything();
+    });
+    els.confirm.addEventListener('click', function (event) {
+      if (event.target === els.confirm) closeConfirm();
+    });
 
     els.scale.addEventListener('change', function () {
       setScale(els.scale.value);

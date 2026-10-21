@@ -112,22 +112,38 @@ blocked or the page is offline, the fallback is used and the emulator still
 boots. Icons are Hugeicons Free (MIT), inlined as an SVG sprite, so they add no
 network request.
 
+Interaction feedback is deliberately flat: hovering a button changes only its
+fill, never its border colour, and the primary button's border is transparent
+so its outline never shifts. Pressing any button or the mute toggle scales it
+to 0.95 for 160ms and back, which is the only motion in the panel.
+
+Section headers in the panel ("DISPLAY", "AUDIO") are uppercase, brighter than
+the rest of the text, and sit a uniform 8px above their control.
+
 ## Apps panel and uploads
 
 The apps button (top-right of the page, once the runtime has started) opens the
 options panel. The web build ships no apps, so the panel and the emulator menu
-both start empty; this panel is how apps get into the web build. It offers:
+both start empty; this panel is how apps get into the web build. The panel
+remembers whether it was open (`mremu.panel` in `localStorage`) and comes back
+open after a reload. It offers:
 
-- **Add .vxp files** - a multi-file picker; only `.vxp` files are accepted.
+- **Import VXP** - a multi-file picker; only `.vxp` files are accepted.
   Dropping `.vxp` files anywhere on the page opens the panel and imports them
   too.
 - A conjoined list of uploaded apps (file icon, name, size) with an icon-only
-  **Remove** button per row, plus an icon-only **Remove all** button.
+  **Remove** button per row, plus an icon-only **Remove all** button. Removing
+  everything asks first: a centred dialog with two equal, conjoined buttons
+  (Cancel, Remove all) and the focus kept inside it.
 - An icon-only **Statistics** button opens a second panel view with the uploaded
   app count, storage used, and notes about local persistence and drop importing.
   A back button returns to the apps view.
 - Display scale (Fit, 1x-4x) with an icon-only fullscreen button, host mute,
   and a page reload button.
+
+Checkbox options (currently just **Mute**) are list-like rows: the whole row is
+the hit target and a circle on its left carries the state. Switching one on
+pops the circle and draws the tick along its path.
 
 Uploads are stored as `ArrayBuffer`s in IndexedDB (`mremu-web` database, `vxps`
 object store, keyed by file name) and `navigator.storage.persist()` is requested

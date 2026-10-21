@@ -58,12 +58,12 @@
         font-weight: 500;
         text-align: center;
         cursor: pointer;
-        transition: background-color 160ms ease-out, border-color 160ms ease-out;
+        transition: background-color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out;
       }
       @media (hover: hover) {
-        button:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+        button:hover { background: var(--surface-hover); }
       }
-      button:active { background: var(--surface-active); }
+      button:active { background: var(--surface-active); transform: scale(0.95); }
       button:focus-visible, select:focus-visible, input:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
@@ -71,14 +71,14 @@
       button:disabled { opacity: 0.45; cursor: not-allowed; }
       button.primary {
         background: var(--accent);
-        border-color: var(--accent);
+        border-color: transparent;
         color: var(--on-accent);
         font-weight: 600;
       }
       @media (hover: hover) {
-        button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+        button.primary:hover { background: var(--accent-hover); }
       }
-      button.primary:active { background: var(--accent-active); border-color: var(--accent-active); }
+      button.primary:active { background: var(--accent-active); }
       select {
         min-height: 40px;
         padding: 0 12px;
@@ -370,9 +370,13 @@
         gap: 8px;
       }
       .field-label {
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--muted);
+        min-height: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 16px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg);
       }
       .control-row {
         display: grid;
@@ -385,13 +389,28 @@
         height: 40px;
         min-height: 40px;
       }
+      /* A checkbox option is a list-like button: the whole row is the hit
+         target and the circle at its left carries the state. */
       .check {
         position: relative;
-        display: inline-flex;
+        display: flex;
         align-items: center;
-        gap: 8px;
-        min-height: 40px;
+        gap: 12px;
+        width: 100%;
+        min-height: 48px;
+        padding: 8px 12px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
         cursor: pointer;
+        transition: background-color 160ms ease-out, transform 160ms ease-out;
+      }
+      .check:active { transform: scale(0.95); }
+      .check-text {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 14px;
+        font-weight: 500;
       }
       .check input {
         position: absolute;
@@ -403,35 +422,41 @@
       }
       .checkbox {
         display: inline-flex;
+        flex: none;
         align-items: center;
         justify-content: center;
-        width: 20px;
-        height: 20px;
+        width: 22px;
+        height: 22px;
         border: 1px solid var(--line-strong);
-        border-radius: var(--radius-sm);
+        border-radius: 50%;
         background: var(--surface);
         color: var(--on-accent);
-        transition: background-color 160ms ease-out, border-color 160ms ease-out;
+        transition: background-color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out;
       }
       .checkbox .icon {
         opacity: 0;
-        transform: scale(0.75);
-        transition: opacity 160ms ease-out, transform 160ms ease-out;
+        transform: scale(0.5);
+        /* Inherited by the <use> shadow copy, so the tick can draw itself in. */
+        stroke-dasharray: 24;
+        stroke-dashoffset: 24;
+        transition: opacity 120ms ease-out, transform 160ms ease-out, stroke-dashoffset 240ms ease-out;
       }
       .check input:checked + .checkbox {
         background: var(--accent);
         border-color: var(--accent);
+        transform: scale(1.08);
       }
       .check input:checked + .checkbox .icon {
         opacity: 1;
         transform: scale(1);
+        stroke-dashoffset: 0;
       }
       .check input:focus-visible + .checkbox {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
       }
       @media (hover: hover) {
-        .check:hover .checkbox { border-color: var(--muted); }
+        .check:hover { background: var(--surface-hover); }
         .check:hover input:checked + .checkbox {
           background: var(--accent-hover);
           border-color: var(--accent-hover);
@@ -490,7 +515,7 @@
         border-radius: var(--radius-sm);
         background: transparent;
         color: var(--muted);
-        transition: background-color 160ms ease-out, color 160ms ease-out;
+        transition: background-color 160ms ease-out, color 160ms ease-out, transform 160ms ease-out;
       }
       .upload-remove .icon { width: 16px; height: 16px; }
       @media (hover: hover) {
@@ -537,6 +562,67 @@
         transition: opacity 180ms ease-out, transform 180ms ease-out;
       }
       #toast.visible { opacity: 1; transform: translate(-50%, 0); }
+      /* Confirmation dialog ------------------------------------------------ */
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(8, 8, 10, 0.72);
+        animation: modal-in 160ms ease-out;
+      }
+      @keyframes modal-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .modal-card {
+        width: min(360px, 100%);
+        padding: 24px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+        animation: modal-card-in 180ms ease-out;
+      }
+      @keyframes modal-card-in {
+        from { opacity: 0; transform: translateY(8px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .modal-card h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .modal-card p {
+        margin: 0 0 20px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      /* Two equal, conjoined buttons that read as one control. */
+      .modal-actions {
+        display: flex;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+      .modal-button {
+        flex: 1 1 0;
+        min-width: 0;
+        border: 0;
+        border-radius: 0;
+        background: var(--surface);
+      }
+      .modal-button + .modal-button { border-left: 1px solid var(--line); }
+      .modal-button.danger { color: var(--danger); }
+      @media (hover: hover) {
+        .modal-button:hover { background: var(--surface-hover); }
+        .modal-button.danger:hover { background: var(--danger-soft); }
+      }
+      .modal-button.danger:active { background: var(--danger-soft-strong); }
       @media (max-width: 640px) {
         #panel { width: 100vw; border-left: 0; }
         #overlay { padding: 24px; }
@@ -628,7 +714,7 @@
           <div class="button-row">
             <button id="add-files" type="button" class="primary">
               <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-file-add"/></svg>
-              <span>Add .vxp files</span>
+              <span>Import VXP</span>
             </button>
             <button id="uploads-clear" type="button" class="icon-button" hidden
                     aria-label="Remove all" title="Remove all">
@@ -670,7 +756,7 @@
               <span class="checkbox" aria-hidden="true">
                 <svg class="icon icon-sm" focusable="false"><use href="#icon-tick"/></svg>
               </span>
-              <span>Mute</span>
+              <span class="check-text">Mute</span>
             </label>
           </div>
         </section>
@@ -772,6 +858,18 @@
         </div>
       </div>
     </aside>
+
+    <div id="confirm" class="modal" hidden role="dialog" aria-modal="true"
+         aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <div class="modal-card">
+        <h3 id="confirm-title">Remove all apps?</h3>
+        <p id="confirm-text">Every uploaded app is deleted from this browser. This cannot be undone.</p>
+        <div class="modal-actions">
+          <button id="confirm-cancel" type="button" class="modal-button">Cancel</button>
+          <button id="confirm-accept" type="button" class="modal-button danger">Remove all</button>
+        </div>
+      </div>
+    </div>
 
     <div id="overlay">
       <p class="wordmark">MREmu</p>
