@@ -126,7 +126,16 @@ The apps button (top-right of the page, once the runtime has started) opens the
 options panel. The web build ships no apps, so the panel and the emulator menu
 both start empty; this panel is how apps get into the web build. The panel
 remembers whether it was open (`mremu.panel` in `localStorage`) and comes back
-open after a reload. It offers:
+open after a reload.
+
+On desktop the panel is a right-hand column that opens with a circular reveal
+from the toggle button. Below 640px it becomes a bottom sheet that slides up
+instead, with a drag handle: drag it down to dismiss, with a finger or with
+the mouse. Switching to the statistics view and back is an iOS-style push -
+the incoming view slides in from the edge while the outgoing one drifts the
+other way, on an ease-out curve, with no crossfade. It is triggered by the
+statistics button and by Backspace on the statistics page; opening the panel
+itself never slides. It offers:
 
 - **Import VXP** - a multi-file picker; only `.vxp` files are accepted.
   Dropping `.vxp` files anywhere on the page opens the panel and imports them

@@ -475,6 +475,50 @@
 
   /* ---------------------------------------------------------------- panel */
 
+  /* Drag-to-dismiss for the mobile bottom sheet. Works with both touch and
+     mouse via Pointer Events; only active in the mobile layout. */
+  function initSheetDrag() {
+    if (!els.sheetHandle) return;
+    var dragging = false;
+    var startY = 0;
+    var currentY = 0;
+    function isMobile() {
+      return window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+    }
+    function onDown(event) {
+      if (!isMobile() || !els.panel.classList.contains('open')) return;
+      dragging = true;
+      startY = event.clientY;
+      currentY = 0;
+      els.panel.style.transition = 'none';
+      try { els.sheetHandle.setPointerCapture(event.pointerId); } catch (e) {}
+    }
+    function onMove(event) {
+      if (!dragging) return;
+      var dy = event.clientY - startY;
+      if (dy < 0) dy = 0;
+      currentY = dy;
+      els.panel.style.transform = 'translateY(' + dy + 'px)';
+    }
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+      els.panel.style.transition = '';
+      if (currentY > 90) {
+        els.panel.style.transform = '';
+        closePanel();
+      } else {
+        void els.panel.offsetWidth;
+        els.panel.style.transform = '';
+      }
+      currentY = 0;
+    }
+    els.sheetHandle.addEventListener('pointerdown', onDown);
+    els.sheetHandle.addEventListener('pointermove', onMove);
+    els.sheetHandle.addEventListener('pointerup', onUp);
+    els.sheetHandle.addEventListener('pointercancel', onUp);
+  }
+
   // animate: whether the incoming view slides in. Opening the sidebar (the
   // toggle button) must NOT slide; the slide is reserved for the info-icon
   // button (apps -> stats) and for Backspace on the stats page (stats -> apps).
@@ -488,18 +532,48 @@
       return;
     }
 
-    state.view = name;
-    els.viewApps.hidden = stats;
-    els.viewStats.hidden = !stats;
-    els.panel.setAttribute('aria-label', stats ? 'Statistics' : 'Apps and options');
-    els.panel.scrollTop = 0;
+    var outgoing = stats ? els.viewApps : els.viewStats;
+    var incoming = stats ? els.viewStats : els.viewApps;
+    var dir = stats ? 'next' : 'prev';
 
-    var shown = stats ? els.viewStats : els.viewApps;
-    shown.classList.remove('view-enter-next', 'view-enter-prev');
-    if (animate) {
-      void shown.offsetWidth;
-      shown.classList.add(stats ? 'view-enter-next' : 'view-enter-prev');
+    state.view = name;
+    els.panel.setAttribute('aria-label', stats ? 'Statistics' : 'Apps and options');
+
+    if (!animate) {
+      outgoing.hidden = true;
+      incoming.hidden = false;
+      els.panel.scrollTop = 0;
+      if (focus) {
+        if (stats) els.statsBack.focus();
+        else els.panelInfo.focus();
+      }
+      return;
     }
+
+    var finished = false;
+    var timer = null;
+    function finish(event) {
+      if (event && event.target !== incoming && event.target !== outgoing) return;
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      incoming.removeEventListener('animationend', finish);
+      outgoing.removeEventListener('animationend', finish);
+      incoming.classList.remove('view-incoming', 'view-in-' + dir);
+      outgoing.classList.remove('view-outgoing', 'view-out-' + dir);
+      outgoing.hidden = true;
+      els.panel.classList.remove('view-moving');
+      els.panel.scrollTop = 0;
+    }
+
+    outgoing.hidden = false;
+    incoming.hidden = false;
+    els.panel.classList.add('view-moving');
+    incoming.classList.add('view-incoming', 'view-in-' + dir);
+    outgoing.classList.add('view-outgoing', 'view-out-' + dir);
+    incoming.addEventListener('animationend', finish);
+    outgoing.addEventListener('animationend', finish);
+    timer = setTimeout(finish, 600);
 
     if (focus) {
       if (stats) els.statsBack.focus();
@@ -531,6 +605,9 @@
     els.panel.classList.remove('open');
     els.panelOpen.setAttribute('aria-expanded', 'false');
     els.canvas.focus();
+    // Clear any drag transform so the close animation runs from the resting state.
+    els.panel.style.transform = '';
+    els.panel.style.transition = '';
     try {
       localStorage.setItem(PREF_PANEL, '0');
     } catch (e) {}
@@ -739,6 +816,8 @@
     els.fileInput = $('file-input');
     els.addFiles = $('add-files');
     els.clearAll = $('uploads-clear');
+    els.sheetHandle = document.querySelector('.sheet-handle');
+    initSheetDrag();
     els.confirm = $('confirm');
     els.confirmCancel = $('confirm-cancel');
     els.confirmAccept = $('confirm-accept');
