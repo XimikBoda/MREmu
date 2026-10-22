@@ -52,40 +52,40 @@ namespace Bridge {
 
 	ARModule armodule;
 
-	static unsigned int read_reg(uc_engine* uc, int reg) {
-		unsigned int r = 0;
+	static uint32_t read_reg(uc_engine* uc, int reg) {
+		uint32_t r = 0;
 		uc_reg_read(uc, reg, &r);
 		return r;
 	}
 
-	static void write_reg(uc_engine* uc, int reg, unsigned int val) {
+	static void write_reg(uc_engine* uc, int reg, uint32_t val) {
 		uc_reg_write(uc, reg, &val);
 	}
 
-	void put_to_reg(uc_engine* uc, unsigned int val) {
-		unsigned int sp = read_reg(uc, UC_ARM_REG_SP);
+	void put_to_reg(uc_engine* uc, uint32_t val) {
+		uint32_t sp = read_reg(uc, UC_ARM_REG_SP);
 		sp -= 4;
 		write_reg(uc, UC_ARM_REG_SP, sp);
 		uc_mem_write(uc, sp, &val, 4);
 	}
 
-	unsigned int top_sp(uc_engine* uc, int l) {
-		unsigned int el, sp = read_reg(uc, UC_ARM_REG_SP);
+	uint32_t top_sp(uc_engine* uc, int l) {
+		uint32_t el, sp = read_reg(uc, UC_ARM_REG_SP);
 		uc_mem_read(uc, sp + 4 * l, &el, 4);
 		return el;
 	}
 
-	unsigned int top_from_r(uc_engine* uc, unsigned int r, int l) {
-		unsigned int el;
+	uint32_t top_from_r(uc_engine* uc, uint32_t r, int l) {
+		uint32_t el;
 		uc_mem_read(uc, r + 4 * l, &el, 4);
 		return el;
 	}
 
-	static void write_ret(uc_engine* uc, unsigned int val) {
+	static void write_ret(uc_engine* uc, uint32_t val) {
 		write_reg(uc, UC_ARM_REG_R0, val);
 	}
 
-	unsigned int read_arg(uc_engine* uc, int ind) {
+	uint32_t read_arg(uc_engine* uc, int ind) {
 		if (ind < 4)
 			return read_reg(uc, UC_ARM_REG_R0 + ind);
 		else
@@ -98,672 +98,193 @@ namespace Bridge {
 		return (val2 << 32) | val1;
 	}
 
+	template <typename T>
+	T extract_arg(uc_engine* uc, int index) {
+		static_assert(std::is_pointer_v<T> || sizeof(T) <= 4,
+			"[BIND_FUNC ERROR]: Argument is > 32 bits (requires read_arg_64). Use a manual lambda!");
+
+		static_assert(!(std::is_pointer_v<T> && std::is_pointer_v<std::remove_pointer_t<T>>),
+			"[BIND_FUNC ERROR]: Double pointer (T**) detected. Needs manual out-param translation. Use a manual lambda!");
+
+		auto raw_val = read_arg(uc, index);
+
+		if constexpr (std::is_pointer_v<T>)
+			return reinterpret_cast<T>(ADDRESS_FROM_EMU(raw_val));
+		else
+			return static_cast<T>(raw_val);
+	}
+
+	template <typename T, T Func>
+	struct ApiWrapper;
+
+	template <typename Ret, typename... Args, Ret(*Func)(Args...)>
+	struct ApiWrapper<Ret(*)(Args...), Func> {
+		template <int... Is>
+		static void call_impl(uc_engine* uc, std::index_sequence<Is...>) {
+			if constexpr (!std::is_void_v<Ret>) {
+				static_assert(std::is_pointer_v<Ret> || sizeof(Ret) <= 4,
+					"[BIND_FUNC ERROR]: Return type > 32 bits. Use a manual lambda!");
+
+				static_assert(!(std::is_pointer_v<Ret> && std::is_pointer_v<std::remove_pointer_t<Ret>>),
+					"[BIND_FUNC ERROR]: Returning a double pointer. Use a manual lambda!");
+			}
+
+			if constexpr (std::is_void_v<Ret>)
+				Func(extract_arg<Args>(uc, Is)...);
+			else {
+				auto result = Func(extract_arg<Args>(uc, Is)...);
+
+				if constexpr (std::is_pointer_v<Ret>)
+					write_ret(uc, ADDRESS_TO_EMU(result));
+				else 
+					write_ret(uc, static_cast<uint32_t>(result));
+			}
+		}
+
+		static void call(uc_engine* uc) {
+			call_impl(uc, std::index_sequence_for<Args...>{});
+		}
+	};
+
+	template <auto Func>
+	constexpr auto wrap_api() {
+		return ApiWrapper<decltype(Func), Func>::call;
+	}
+
+#define BIND_FUNC(name) { #name, (void*)name, wrap_api<name>() }
+
+#define BIND_FUNC_FIX(name) { #name, (void*)name##_FIX, wrap_api<name##_FIX>() }
+
 #define FUNCN(name) #name, (void*)name
 #define FUNCN_FIX(name) #name, (void*)name##_FIX
 
 	std::vector<br_func> func_map =
 	{
-		{FUNCN(vm_get_sym_entry), [](uc_engine* uc) {
-			write_ret(uc, vm_get_sym_entry((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-
+		BIND_FUNC(vm_get_sym_entry),
 
 		// System
-		{FUNCN(vm_get_time), [](uc_engine* uc) {
-			write_ret(uc, vm_get_time((vm_time_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_get_curr_utc), [](uc_engine* uc) {
-			write_ret(uc, vm_get_curr_utc((VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_get_sys_time_zone), [](uc_engine* uc) {
-			write_ret(uc, vm_get_sys_time_zone());
-		}},
-		{FUNCN(vm_get_sys_scene), [](uc_engine* uc) {
-			write_ret(uc, vm_get_sys_scene());
-		}},
-		{FUNCN(vm_get_malloc_stat), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(vm_get_malloc_stat()));
-		}},
-		{FUNCN(vm_malloc), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(vm_malloc(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_calloc), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(vm_calloc(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_realloc), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(
-				vm_realloc((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_free), [](uc_engine* uc) {
-			vm_free((void*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_reg_sysevt_callback), [](uc_engine* uc) {
-			vm_reg_sysevt_callback((void (*)(VMINT message, VMINT param))ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_get_mre_total_mem_size), [](uc_engine* uc) {
-			write_ret(uc, vm_get_mre_total_mem_size());
-		}},
-		{FUNCN(vm_get_tick_count), [](uc_engine* uc) {
-			write_ret(uc, vm_get_tick_count());
-		}},
-		{FUNCN(vm_get_exec_filename), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(
-				vm_get_exec_filename(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)))));
-		}},
-		{FUNCN(vm_get_sys_property), [](uc_engine* uc) {
-			write_ret(uc, 
-				vm_get_sys_property(
-					read_arg(uc, 0),
-					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2)));
-		}},
-		{FUNCN(vm_get_vm_tag), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_get_vm_tag(
-					(short*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					(int*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
-		}},
-		{FUNCN(vm_switch_power_saving_mode), [](uc_engine* uc) {
-			write_ret(uc, vm_switch_power_saving_mode((power_saving_mode_enum)read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_appmgr_is_installed), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_appmgr_is_installed(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_appmgr_get_installed_list), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_appmgr_get_installed_list(
-					read_arg(uc, 0),
-					(vm_install_id*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
-		}},
-		{FUNCN(vm_open_wap_url), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_open_wap_url(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_app_log), [](uc_engine* uc) {
-			vm_app_log(
-				(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-
-
+		BIND_FUNC(vm_get_time),
+		BIND_FUNC(vm_get_curr_utc),
+		BIND_FUNC(vm_get_sys_time_zone),
+		BIND_FUNC(vm_get_sys_scene),
+		BIND_FUNC(vm_get_malloc_stat),
+		BIND_FUNC(vm_malloc),
+		BIND_FUNC(vm_calloc),
+		BIND_FUNC(vm_realloc),
+		BIND_FUNC(vm_free),
+		BIND_FUNC(vm_reg_sysevt_callback),
+		BIND_FUNC(vm_get_mre_total_mem_size),
+		BIND_FUNC(vm_get_tick_count),
+		BIND_FUNC(vm_get_exec_filename),
+		BIND_FUNC(vm_get_sys_property),
+		BIND_FUNC(vm_get_vm_tag),
+		BIND_FUNC(vm_switch_power_saving_mode),
+		BIND_FUNC(vm_appmgr_is_installed),
+		BIND_FUNC(vm_appmgr_get_installed_list),
+		BIND_FUNC(vm_open_wap_url),
+		BIND_FUNC(vm_app_log),
 
 		// Program manager
-		{FUNCN(vm_pmng_get_current_handle), [](uc_engine* uc) {
-			write_ret(uc, vm_pmng_get_current_handle());
-		}},
-		{FUNCN(vm_reg_msg_proc), [](uc_engine* uc) {
-			vm_reg_msg_proc((VM_MESSAGE_PROC)ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_post_msg), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_post_msg(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					read_arg(uc, 3)));
-		}},
-		{FUNCN(vm_start_app), [](uc_engine* uc) {
-			vm_start_app(
-				(const VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2)
-			);
-		}},
-		{FUNCN(vm_start_app_with_para), [](uc_engine* uc) {
-			vm_start_app_with_para(
-				(const VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(void*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4)
-			);
-		}},
-		{FUNCN(vm_exit_app), [](uc_engine* uc) {
-			vm_exit_app();
-		}},
-
-
+		BIND_FUNC(vm_pmng_get_current_handle),
+		BIND_FUNC(vm_reg_msg_proc),
+		BIND_FUNC(vm_post_msg),
+		BIND_FUNC(vm_start_app),
+		BIND_FUNC(vm_start_app_with_para),
+		BIND_FUNC(vm_exit_app),
 
 		// Timer
-		{FUNCN(vm_create_timer), [](uc_engine* uc) {
-			write_ret(uc, vm_create_timer(read_arg(uc, 0),
-				(VM_TIMERPROC_T)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_delete_timer), [](uc_engine* uc) {
-			write_ret(uc, vm_delete_timer(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_create_timer_ex), [](uc_engine* uc) {
-			write_ret(uc, vm_create_timer_ex(read_arg(uc, 0),
-				(VM_TIMERPROC_T)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_delete_timer_ex), [](uc_engine* uc) {
-			write_ret(uc, vm_delete_timer_ex(read_arg(uc, 0)));
-		}}, // done
-
-
+		BIND_FUNC(vm_create_timer),
+		BIND_FUNC(vm_delete_timer),
+		BIND_FUNC(vm_create_timer_ex),
+		BIND_FUNC(vm_delete_timer_ex),
 
 		// IO
-		{FUNCN(vm_reg_keyboard_callback), [](uc_engine* uc) {
-			vm_reg_keyboard_callback(
-				(vm_key_handler_t)ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_reg_pen_callback), [](uc_engine* uc) {
-			vm_reg_pen_callback(
-				(vm_pen_handler_t)ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_file_open), [](uc_engine* uc) {
-			write_ret(uc, vm_file_open(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2)));
-		}},
-		{FUNCN(vm_file_close), [](uc_engine* uc) {
-			vm_file_close(read_arg(uc, 0));
-		}},
-		{FUNCN(vm_file_read), [](uc_engine* uc) {
-			write_ret(uc, vm_file_read(
-				read_arg(uc, 0),
-				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				read_arg(uc, 2),
-				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
-		}},
-		{FUNCN(vm_file_write), [](uc_engine* uc) {
-			write_ret(uc, vm_file_write(
-				read_arg(uc, 0),
-				(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				read_arg(uc, 2),
-				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))));
-		}},
-		{FUNCN(vm_file_commit), [](uc_engine* uc) {
-			write_ret(uc, vm_file_commit(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_file_seek), [](uc_engine* uc) {
-			write_ret(uc, vm_file_seek(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2)));
-		}},
-		{FUNCN(vm_file_tell), [](uc_engine* uc) {
-			write_ret(uc, vm_file_tell(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_file_is_eof), [](uc_engine* uc) {
-			write_ret(uc, vm_file_is_eof(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_file_getfilesize), [](uc_engine* uc) {
-			write_ret(uc, vm_file_getfilesize(
-				read_arg(uc, 0),
-				(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_file_delete), [](uc_engine* uc) {
-			write_ret(uc, vm_file_delete(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_file_rename), [](uc_engine* uc) {
-			write_ret(uc, vm_file_rename(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_file_mkdir),  [](uc_engine* uc) {
-			write_ret(uc, vm_file_mkdir((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_file_set_attributes),  [](uc_engine* uc) {
-			write_ret(uc, vm_file_set_attributes(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)));
-		}},
-		{FUNCN(vm_file_get_attributes),  [](uc_engine* uc) {
-			write_ret(uc, vm_file_get_attributes((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_find_first),  [](uc_engine* uc) {
-			write_ret(uc, vm_find_first(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(vm_fileinfo_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_find_next),  [](uc_engine* uc) {
-			write_ret(uc, vm_find_next(
-				read_arg(uc, 0),
-				(vm_fileinfo_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_find_close),  [](uc_engine* uc) {
-			vm_find_close(read_arg(uc, 0));
-		}},
-		{FUNCN(vm_find_first_ext),  [](uc_engine* uc) {
-			write_ret(uc, vm_find_first_ext(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(vm_fileinfo_ext*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_find_next_ext),  [](uc_engine* uc) {
-			write_ret(uc, vm_find_next_ext(
-				read_arg(uc, 0),
-				(vm_fileinfo_ext*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_find_close_ext),  [](uc_engine* uc) {
-			vm_find_close_ext(read_arg(uc, 0));
-		}},
-		{FUNCN(vm_file_get_modify_time),  [](uc_engine* uc) {
-			write_ret(uc, vm_file_get_modify_time(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(vm_time_t*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_get_removeable_driver), [](uc_engine* uc) {
-			write_ret(uc, vm_get_removable_driver());
-		}},
-		{FUNCN(vm_get_system_driver), [](uc_engine* uc) {
-			write_ret(uc, vm_get_system_driver());
-		}},
-		{FUNCN(vm_get_disk_free_space), [](uc_engine* uc) {
-			write_ret(uc, vm_get_disk_free_space((VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_get_disk_info), [](uc_engine* uc) {
-			write_ret(uc, vm_get_disk_info(
-				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				(vm_fs_disk_info*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				(vm_fs_di_enum)read_arg(uc, 2)
-			));
-		}},
-		{FUNCN(vm_is_support_keyborad), [](uc_engine* uc) {
-			write_ret(uc, vm_is_support_keyborad());
-		}},
-		{FUNCN(vm_is_support_pen_touch), [](uc_engine* uc) {
-			write_ret(uc, vm_is_support_pen_touch());
-		}},
-
-
+		BIND_FUNC(vm_reg_keyboard_callback),
+		BIND_FUNC(vm_reg_pen_callback),
+		BIND_FUNC(vm_file_open),
+		BIND_FUNC(vm_file_close),
+		BIND_FUNC(vm_file_read),
+		BIND_FUNC(vm_file_write),
+		BIND_FUNC(vm_file_commit),
+		BIND_FUNC(vm_file_seek),
+		BIND_FUNC(vm_file_tell),
+		BIND_FUNC(vm_file_is_eof),
+		BIND_FUNC(vm_file_getfilesize),
+		BIND_FUNC(vm_file_delete),
+		BIND_FUNC(vm_file_rename),
+		BIND_FUNC(vm_file_mkdir),
+		BIND_FUNC(vm_file_set_attributes),
+		BIND_FUNC(vm_file_get_attributes),
+		BIND_FUNC(vm_find_first),
+		BIND_FUNC(vm_find_next),
+		BIND_FUNC(vm_find_close),
+		BIND_FUNC(vm_find_first_ext),
+		BIND_FUNC(vm_find_next_ext),
+		BIND_FUNC(vm_find_close_ext),
+		BIND_FUNC(vm_file_get_modify_time),
+		BIND_FUNC(vm_get_removeable_driver),
+		BIND_FUNC(vm_get_system_driver),
+		BIND_FUNC(vm_get_disk_free_space),
+		BIND_FUNC(vm_get_disk_info),
+		BIND_FUNC(vm_is_support_keyborad),
+		BIND_FUNC(vm_is_support_pen_touch),
 
 		// SIM
-		{FUNCN(vm_get_operator), [](uc_engine* uc) {
-			write_ret(uc, vm_get_operator());
-		}},
-		{FUNCN(vm_has_sim_card), [](uc_engine* uc) {
-			write_ret(uc, vm_has_sim_card());
-		}},
-		{FUNCN(vm_get_imei), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(vm_get_imei()));
-		}},
-		{FUNCN(vm_get_imsi), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(vm_get_imsi()));
-		}},
-		{FUNCN(vm_sim_card_count), [](uc_engine* uc) {
-			write_ret(uc, vm_sim_card_count());
-		}},
-		{FUNCN(vm_set_active_sim_card), [](uc_engine* uc) {
-			write_ret(uc, vm_set_active_sim_card(
-				read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_get_sim_card_status), [](uc_engine* uc) {
-			write_ret(uc, vm_get_sim_card_status(
-				read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_query_operator_code), [](uc_engine* uc) {
-			write_ret(uc, vm_query_operator_code(
-				(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)));
-		}},
-		{FUNCN(vm_sim_get_active_sim_card), [](uc_engine* uc) {
-			write_ret(uc, vm_sim_get_active_sim_card());
-		}},
-		{FUNCN(vm_sim_max_card_count), [](uc_engine* uc) {
-			write_ret(uc, vm_sim_max_card_count());
-		}},
-		{FUNCN(vm_sim_get_prefer_sim_card), [](uc_engine* uc) {
-			write_ret(uc, vm_sim_max_card_count());
-		}},
-
-
+		BIND_FUNC(vm_get_operator),
+		BIND_FUNC(vm_has_sim_card),
+		BIND_FUNC(vm_get_imei),
+		BIND_FUNC(vm_get_imsi),
+		BIND_FUNC(vm_sim_card_count),
+		BIND_FUNC(vm_set_active_sim_card),
+		BIND_FUNC(vm_get_sim_card_status),
+		BIND_FUNC(vm_query_operator_code),
+		BIND_FUNC(vm_sim_get_active_sim_card),
+		BIND_FUNC(vm_sim_max_card_count),
+		BIND_FUNC(vm_sim_get_prefer_sim_card),
 
 		// Graphic
-		{FUNCN(vm_graphic_get_screen_width), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_screen_width());
-		}},
-		{FUNCN(vm_graphic_get_screen_height), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_screen_height());
-		}},
-		{FUNCN(vm_graphic_create_layer), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_graphic_create_layer(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					read_arg(uc, 3),
-					read_arg(uc, 4)));
-		}},
-		{FUNCN(vm_graphic_delete_layer), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_delete_layer(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_graphic_active_layer), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_active_layer(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_graphic_get_layer_buffer), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(vm_graphic_get_layer_buffer(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_graphic_clear_layer_bg), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_clear_layer_bg(read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_graphic_flush_layer), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_flush_layer(
-				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)));
-		}},
-		{FUNCN(vm_graphic_flatten_layer), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_flatten_layer(
-				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)));
-		}},
-		{FUNCN(vm_graphic_translate_layer), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_graphic_translate_layer(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					read_arg(uc, 2)));
-		}},
-		{FUNCN(vm_graphic_get_bits_per_pixel), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_bits_per_pixel());
-		}},
-		{FUNCN_FIX(vm_graphic_create_canvas), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(
-					vm_graphic_create_canvas_FIX(
-						read_arg(uc, 0),
-						read_arg(uc, 1))));
-		}},
-		{FUNCN_FIX(vm_graphic_create_canvas_cf), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(
-					vm_graphic_create_canvas_cf_FIX(
-						read_arg(uc, 0),
-						read_arg(uc, 1),
-						read_arg(uc, 2))));
-		}},
-		{FUNCN_FIX(vm_graphic_release_canvas), [](uc_engine* uc) {
-			vm_graphic_release_canvas_FIX(
-				ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-		{FUNCN_FIX(vm_graphic_release_canvas_ex), [](uc_engine* uc) {
-			vm_graphic_release_canvas_ex_FIX(
-				ADDRESS_FROM_EMU(read_arg(uc, 0)));
-		}},
-		{FUNCN_FIX(vm_graphic_get_canvas_buffer), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(
-				vm_graphic_get_canvas_buffer_FIX(
-					ADDRESS_FROM_EMU(read_arg(uc, 0)))));
-		}},
-		{FUNCN_FIX(vm_graphic_get_canvas_buffer_size), [](uc_engine* uc) {
-			write_ret(uc, 
-				vm_graphic_get_canvas_buffer_size_FIX(
-					ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN_FIX(vm_graphic_get_img_buffer), [](uc_engine* uc) {
-			write_ret(uc,  ADDRESS_TO_EMU(
-				vm_graphic_get_img_buffer_FIX(
-					ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1)
-				)));
-		}},
-		{FUNCN_FIX(vm_graphic_get_frame_number), [](uc_engine* uc) {
-			write_ret(uc, 
-				vm_graphic_get_frame_number_FIX(
-					ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_graphic_create_layer_ex), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_create_layer_ex(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5),
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 6))));
-		}},
-		{FUNCN(vm_graphic_create_layer_cf), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_create_layer_cf(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				(vm_graphic_color_argb*)read_arg(uc, 5),
-				read_arg(uc, 6),
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 7)),
-				read_arg(uc, 8)));
-		}},
-		{FUNCN_FIX(vm_graphic_load_image), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(
-					vm_graphic_load_image_FIX(
-						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-						read_arg(uc, 1))));
-		}},
-		{FUNCN_FIX(vm_graphic_load_image_cf), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(
-					vm_graphic_load_image_cf_FIX(
-						read_arg(uc, 0),
-						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-						read_arg(uc, 2))));
-		}},
-		{FUNCN_FIX(vm_graphic_load_image_resized), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(
-					vm_graphic_load_image_resized_FIX(
-						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-						read_arg(uc, 1),
-						read_arg(uc, 2),
-						read_arg(uc, 3))));
-		}},
-		{FUNCN_FIX(vm_graphic_load_image_resized_cf), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(
-					vm_graphic_load_image_resized_cf_FIX(
-						read_arg(uc, 0),
-						(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-						read_arg(uc, 2),
-						read_arg(uc, 3),
-						read_arg(uc, 4))));
-		}},
-		{FUNCN_FIX(vm_graphic_get_img_property), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(
-				vm_graphic_get_img_property_FIX(
-					ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_graphic_get_img_property_ex), [](uc_engine* uc) {
-			write_ret(uc, 
-				vm_graphic_get_img_property_ex(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					(vm_graphic_imgprop*)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_graphic_blt), [](uc_engine* uc) {
-			vm_graphic_blt(
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4),
-				read_arg(uc, 5),
-				read_arg(uc, 6),
-				read_arg(uc, 7),
-				read_arg(uc, 8)
-			);
-		}},
-		{FUNCN(vm_graphic_blt_ex), [](uc_engine* uc) {
-			vm_graphic_blt_ex(
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4),
-				read_arg(uc, 5),
-				read_arg(uc, 6),
-				read_arg(uc, 7),
-				read_arg(uc, 8),
-				read_arg(uc, 9)
-			);
-		}},
-		{FUNCN(vm_graphic_rotate), [](uc_engine* uc) { //WRONG
-			vm_graphic_rotate(
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4),
-				read_arg(uc, 5)
-			);
-		}},
-		{FUNCN(vm_graphic_mirror), [](uc_engine* uc) {
-			vm_graphic_mirror(
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(VMBYTE*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4),
-				read_arg(uc, 5)
-			);
-		}},
-		{FUNCN(vm_graphic_get_pixel), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_graphic_get_pixel(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					read_arg(uc, 2)
-				));
-		}},
-		{FUNCN(vm_graphic_set_pixel), [](uc_engine* uc) {
-			vm_graphic_set_pixel(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3));
-		}},
-		{FUNCN(vm_graphic_set_pixel_ex), [](uc_engine* uc) {
-			vm_graphic_set_pixel_ex(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2));
-		}},
-		{FUNCN(vm_graphic_line), [](uc_engine* uc) {
-			vm_graphic_line(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5));
-		}},
-		{FUNCN(vm_graphic_line_ex), [](uc_engine* uc) {
-			vm_graphic_line_ex(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4));
-		}},
-		{FUNCN(vm_graphic_fill_rect), [](uc_engine* uc) {
-			vm_graphic_fill_rect(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5),
-				read_arg(uc, 6));
-		}},
-		{FUNCN(vm_graphic_fill_rect_ex), [](uc_engine* uc) {
-			vm_graphic_fill_rect_ex(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4));
-		}},
-		{FUNCN(vm_graphic_roundrect), [](uc_engine* uc) {
-			vm_graphic_roundrect(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5),
-				read_arg(uc, 6));
-		}},
-		{FUNCN(vm_graphic_roundrect_ex), [](uc_engine* uc) {
-			vm_graphic_roundrect_ex(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5));
-		}},
-		{FUNCN(vm_graphic_fill_roundrect), [](uc_engine* uc) {
-			vm_graphic_fill_roundrect(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5),
-				read_arg(uc, 6));
-		}},
-		{FUNCN(vm_graphic_fill_roundrect_ex), [](uc_engine* uc) {
-			vm_graphic_fill_roundrect_ex(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5));
-		}},
-		{FUNCN(vm_graphic_ellipse), [](uc_engine* uc) {
-			vm_graphic_ellipse(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5));
-		}},
-		{FUNCN(vm_graphic_fill_ellipse), [](uc_engine* uc) {
-			vm_graphic_fill_ellipse(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5));
-		}},
-		{FUNCN(vm_graphic_rect), [](uc_engine* uc) {
-			vm_graphic_rect(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4),
-				read_arg(uc, 5));
-		}},
-		{FUNCN(vm_graphic_rect_ex), [](uc_engine* uc) {
-			vm_graphic_rect_ex(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				read_arg(uc, 4));
-		}},
-		{FUNCN(vm_graphic_fill_polygon), [](uc_engine* uc) {
-			vm_graphic_fill_polygon(
-				read_arg(uc, 0),
-				(vm_graphic_point*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				read_arg(uc, 2));
-		}},
+		BIND_FUNC(vm_graphic_get_screen_width),
+		BIND_FUNC(vm_graphic_get_screen_height),
+		BIND_FUNC(vm_graphic_create_layer),
+		BIND_FUNC(vm_graphic_delete_layer),
+		BIND_FUNC(vm_graphic_active_layer),
+		BIND_FUNC(vm_graphic_get_layer_buffer),
+		BIND_FUNC(vm_graphic_clear_layer_bg),
+		BIND_FUNC(vm_graphic_flush_layer),
+		BIND_FUNC(vm_graphic_flatten_layer),
+		BIND_FUNC(vm_graphic_translate_layer),
+		BIND_FUNC(vm_graphic_get_bits_per_pixel),
+		BIND_FUNC(vm_graphic_create_layer_ex),
+		BIND_FUNC(vm_graphic_create_layer_cf),
+		BIND_FUNC(vm_graphic_get_img_property_ex),
+		BIND_FUNC(vm_graphic_blt),
+		BIND_FUNC(vm_graphic_blt_ex),
+		BIND_FUNC(vm_graphic_rotate),
+		BIND_FUNC(vm_graphic_mirror),
+		BIND_FUNC(vm_graphic_get_pixel),
+		BIND_FUNC(vm_graphic_set_pixel),
+		BIND_FUNC(vm_graphic_set_pixel_ex),
+		BIND_FUNC(vm_graphic_line),
+		BIND_FUNC(vm_graphic_line_ex),
+		BIND_FUNC(vm_graphic_fill_rect),
+		BIND_FUNC(vm_graphic_fill_rect_ex),
+		BIND_FUNC(vm_graphic_roundrect),
+		BIND_FUNC(vm_graphic_roundrect_ex),
+		BIND_FUNC(vm_graphic_fill_roundrect),
+		BIND_FUNC(vm_graphic_fill_roundrect_ex),
+		BIND_FUNC(vm_graphic_ellipse),
+		BIND_FUNC(vm_graphic_fill_ellipse),
+		BIND_FUNC(vm_graphic_rect),
+		BIND_FUNC(vm_graphic_rect_ex),
+		BIND_FUNC(vm_graphic_fill_polygon),
+		BIND_FUNC(vm_graphic_get_layer_clip),
+		BIND_FUNC(vm_graphic_set_layer_clip),
+		BIND_FUNC(vm_graphic_set_clip),
+		BIND_FUNC(vm_graphic_reset_clip),
+		BIND_FUNC(vm_graphic_flush_screen),
+		BIND_FUNC(vm_graphic_get_blt_layer_count),
+		BIND_FUNC(vm_graphic_is_r2l_state),
+		BIND_FUNC(vm_graphic_setcolor),
 		{FUNCN(vm_graphic_gradient_paint_rect), [](uc_engine* uc) {
 			vm_graphic_gradient_paint_rect(
 				read_arg(uc, 0),
@@ -771,618 +292,134 @@ namespace Bridge {
 				read_arg(uc, 2),
 				read_arg(uc, 3),
 				read_arg(uc, 4),
-				(vm_graphic_color)read_arg_64(uc, 5, 6),
+				(vm_graphic_color)read_arg_64(uc, 5, 6), // it makes all more difficult
 				(vm_graphic_color)read_arg_64(uc, 7, 8),
 				(vm_graphic_gp_style)read_arg(uc, 9));
 		}},
-		{FUNCN(vm_graphic_get_layer_clip), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_graphic_get_layer_clip(
-					read_arg(uc, 0),
-					(clip_rect*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_graphic_set_layer_clip), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_graphic_set_layer_clip(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					read_arg(uc, 3),
-					read_arg(uc, 4)));
-		}},
-		{FUNCN(vm_graphic_set_clip), [](uc_engine* uc) {
-			vm_graphic_set_clip(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3));
-		}},
-		{FUNCN(vm_graphic_reset_clip), [](uc_engine* uc) {
-			vm_graphic_reset_clip();
-		}},
-		{FUNCN(vm_graphic_flush_screen), [](uc_engine* uc) {
-			vm_graphic_flush_screen();
-		}},
-		{FUNCN(vm_graphic_get_blt_layer_count), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_blt_layer_count());
-		}},
-		{FUNCN(vm_graphic_is_r2l_state), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_is_r2l_state());
-		}},
-		{FUNCN(vm_graphic_setcolor), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_setcolor(
-				(vm_graphic_color*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN_FIX(vm_graphic_canvas_set_trans_color), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_canvas_set_trans_color_FIX(
-				ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)));
-		}},
+
+		// Canvas
+		BIND_FUNC_FIX(vm_graphic_create_canvas),
+		BIND_FUNC_FIX(vm_graphic_create_canvas_cf),
+		BIND_FUNC_FIX(vm_graphic_release_canvas),
+		BIND_FUNC_FIX(vm_graphic_release_canvas_ex),
+		BIND_FUNC_FIX(vm_graphic_get_canvas_buffer),
+		BIND_FUNC_FIX(vm_graphic_get_canvas_buffer_size),
+		BIND_FUNC_FIX(vm_graphic_get_img_buffer),
+		BIND_FUNC_FIX(vm_graphic_get_frame_number),
+		BIND_FUNC_FIX(vm_graphic_canvas_set_trans_color),
+
+		// Image
+		BIND_FUNC_FIX(vm_graphic_load_image),
+		BIND_FUNC_FIX(vm_graphic_load_image_cf),
+		BIND_FUNC_FIX(vm_graphic_load_image_resized),
+		BIND_FUNC_FIX(vm_graphic_load_image_resized_cf),
+		BIND_FUNC_FIX(vm_graphic_get_img_property),
 
 		// Graphic Old
-		{FUNCN(vm_graphic_lock), [](uc_engine* uc) {
-			vm_graphic_lock();
-		}},
-		{FUNCN(vm_graphic_unlock), [](uc_engine* uc) {
-			vm_graphic_unlock();
-		}},
-		{FUNCN(vm_graphic_get_buffer), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_graphic_get_buffer()));
-		}},
-		{FUNCN(vm_graphic_flush_buffer), [](uc_engine* uc) {
-			vm_graphic_flush_buffer();
-		}},
-		{FUNCN(vm_initialize_screen_buffer), [](uc_engine* uc) {
-			vm_initialize_screen_buffer();
-		}},
-		{FUNCN(vm_finalize_screen_buffer), [](uc_engine* uc) {
-			vm_finalize_screen_buffer();
-		}},
-		{FUNCN(vm_graphic_drawtext), [](uc_engine* uc) {
-			vm_graphic_drawtext(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-				read_arg(uc, 3),
-				read_arg(uc, 4));
-		}},
-		{FUNCN(vm_dd_initialize_clip_rect), [](uc_engine* uc) {
-			vm_dd_initialize_clip_rect();
-		}},
-		{FUNCN(vm_dd_set_clip), [](uc_engine* uc) {
-			vm_dd_set_clip(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3));
-		}},
-		{FUNCN(vm_dd_reset_clip), [](uc_engine* uc) {
-			vm_dd_reset_clip();
-		}},
-		{FUNCN(vm_dd_load_image), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_dd_load_image(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1)
-				)));
-		}},
-		{FUNCN(vm_dd_get_img_property), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_dd_get_img_property(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1)
-				)));
-		}},
-		{FUNCN(vm_dd_get_frame_number), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_dd_get_frame_number(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0))
-				));
-		}},
-		{FUNCN(vm_dd_clean), [](uc_engine* uc) {
-			vm_dd_clean(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)
-			);
-		}},
-
-
+		BIND_FUNC(vm_graphic_lock),
+		BIND_FUNC(vm_graphic_unlock),
+		BIND_FUNC(vm_graphic_get_buffer),
+		BIND_FUNC(vm_graphic_flush_buffer),
+		BIND_FUNC(vm_initialize_screen_buffer),
+		BIND_FUNC(vm_finalize_screen_buffer),
+		BIND_FUNC(vm_graphic_drawtext),
+		BIND_FUNC(vm_dd_initialize_clip_rect),
+		BIND_FUNC(vm_dd_set_clip),
+		BIND_FUNC(vm_dd_reset_clip),
+		BIND_FUNC(vm_dd_load_image),
+		BIND_FUNC(vm_dd_get_img_property),
+		BIND_FUNC(vm_dd_get_frame_number),
+		BIND_FUNC(vm_dd_clean),
 
 		// Textout
-		{FUNCN(vm_graphic_get_character_height), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_character_height());
-		}},
-		{FUNCN(vm_graphic_get_character_width), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_character_width(
-				read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_graphic_get_string_width), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_string_width(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_graphic_get_string_height), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_string_height(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_graphic_measure_character), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_measure_character(
-				read_arg(uc, 0),
-				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-				(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 2))));
-		}},
-		{FUNCN(vm_graphic_get_character_info), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_character_info(
-				read_arg(uc, 0),
-				(vm_graphic_char_info*)ADDRESS_FROM_EMU(read_arg(uc, 1))));
-		}},
-		{FUNCN(vm_graphic_set_font), [](uc_engine* uc) {
-			vm_graphic_set_font(
-				(font_size_t)read_arg(uc, 0));
-		}},
-		{FUNCN(vm_graphic_textout), [](uc_engine* uc) {
-			vm_graphic_textout(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4),
-				read_arg(uc, 5));
-		}},
-		{FUNCN(vm_graphic_textout_by_baseline), [](uc_engine* uc) {
-			vm_graphic_textout_by_baseline(
-				(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4),
-				read_arg(uc, 5),
-				read_arg(uc, 6));
-		}},
-		{FUNCN(vm_font_set_font_size), [](uc_engine* uc) {
-			write_ret(uc, vm_font_set_font_size(
-				read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_font_set_font_style), [](uc_engine* uc) {
-			write_ret(uc, vm_font_set_font_style(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2)));
-		}},
-		{FUNCN(vm_graphic_textout_to_layer), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_textout_to_layer(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-				read_arg(uc, 4)));
-		}},
-		{FUNCN(vm_graphic_get_string_baseline), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_string_baseline(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_graphic_is_use_vector_font), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_is_use_vector_font());
-		}},
-		{FUNCN(vm_graphic_get_char_num_in_width), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_char_num_in_width(
-				(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3)));
-		}},
-		{FUNCN(vm_graphic_show_truncated_text), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_show_truncated_text(
-				read_arg(uc, 0),
-				read_arg(uc, 1),
-				read_arg(uc, 2),
-				read_arg(uc, 3),
-				(VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 4)),
-				(VMWCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 5)),
-				read_arg(uc, 6),
-				read_arg(uc, 7)
-			));
-		}},
-		{FUNCN(vm_graphic_get_char_baseline_alllang), [](uc_engine* uc) {
-			write_ret(uc, vm_graphic_get_char_baseline_alllang(
-				read_arg(uc, 0)));
-		}},
-
-
+		BIND_FUNC(vm_graphic_get_character_height),
+		BIND_FUNC(vm_graphic_get_character_width),
+		BIND_FUNC(vm_graphic_get_string_width),
+		BIND_FUNC(vm_graphic_get_string_height),
+		BIND_FUNC(vm_graphic_measure_character),
+		BIND_FUNC(vm_graphic_get_character_info),
+		BIND_FUNC(vm_graphic_set_font),
+		BIND_FUNC(vm_graphic_textout),
+		BIND_FUNC(vm_graphic_textout_by_baseline),
+		BIND_FUNC(vm_font_set_font_size),
+		BIND_FUNC(vm_font_set_font_style),
+		BIND_FUNC(vm_graphic_textout_to_layer),
+		BIND_FUNC(vm_graphic_get_string_baseline),
+		BIND_FUNC(vm_graphic_is_use_vector_font),
+		BIND_FUNC(vm_graphic_get_char_num_in_width),
+		BIND_FUNC(vm_graphic_show_truncated_text),
+		BIND_FUNC(vm_graphic_get_char_baseline_alllang),
 
 		// Resources
-		{FUNCN(vm_load_resource), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_load_resource(
-					(char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				)));
-		}},
-		{FUNCN(vm_resource_get_data), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_resource_get_data(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					read_arg(uc, 2)
-				)));
-		}},
-		{FUNCN(vm_get_resource_offset), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_get_resource_offset(
-					(char*)ADDRESS_FROM_EMU(read_arg(uc, 0))
-				));
-		}},
-		{FUNCN(vm_get_resource_offset_from_file), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_get_resource_offset_from_file(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(char*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-		{FUNCN(vm_get_res_header), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_get_res_header());
-		}},
-		{FUNCN(vm_res_init), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_res_init());
-		}},
-		{FUNCN(vm_res_init_with_language), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_res_init_with_language(
-					read_arg(uc, 0)
-				));
-		}},
-		{FUNCN(vm_res_deinit), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_res_deinit());
-		}},
-		{FUNCN(vm_res_get_string), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_res_get_string(
-					read_arg(uc, 0)
-				)));
-		}},
-		{FUNCN(vm_res_get_image), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_res_get_image(
-					read_arg(uc, 0)
-				)));
-		}},
-		{FUNCN(vm_res_get_audio), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_res_get_audio(
-					read_arg(uc, 0)
-				)));
-		}},
-		{FUNCN(vm_res_get_image_and_size), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_res_get_image_and_size(
-					read_arg(uc, 0),
-					(VMUINT32*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				)));
-		}},
-		{FUNCN(vm_res_delete), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_res_delete(
-					read_arg(uc, 0)
-				));
-		}},
-		{FUNCN(vm_reg_res_provider), [](uc_engine* uc) {
-			vm_reg_res_provider(
-				(res_provider_t)ADDRESS_FROM_EMU(read_arg(uc, 0))
-			);
-		}},
-
-
+		BIND_FUNC(vm_load_resource),
+		BIND_FUNC(vm_resource_get_data),
+		BIND_FUNC(vm_get_resource_offset),
+		BIND_FUNC(vm_get_resource_offset_from_file),
+		BIND_FUNC(vm_get_res_header),
+		BIND_FUNC(vm_res_init),
+		BIND_FUNC(vm_res_init_with_language),
+		BIND_FUNC(vm_res_deinit),
+		BIND_FUNC(vm_res_get_string),
+		BIND_FUNC(vm_res_get_image),
+		BIND_FUNC(vm_res_get_audio),
+		BIND_FUNC(vm_res_get_image_and_size),
+		BIND_FUNC(vm_res_delete),
+		BIND_FUNC(vm_reg_res_provider),
 
 		// CharSet
-		{FUNCN(vm_ucs2_to_gb2312), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_ucs2_to_ascii(
-					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_gb2312_to_ucs2), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_gb2312_to_ucs2(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_ucs2_to_ascii), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_ucs2_to_ascii(
-					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_ascii_to_ucs2), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_ascii_to_ucs2(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_chset_convert), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_chset_convert(
-					(vm_chset_enum)read_arg(uc, 0),
-					(vm_chset_enum)read_arg(uc, 1),
-					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					(VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 3)),
-					read_arg(uc, 4)
-				));
-		}},
-		{FUNCN(vm_get_language), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_get_language());
-		}},
-		{FUNCN(vm_get_language_ssc), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_get_language_ssc(
-					(VMINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_ucs2_string), [](uc_engine* uc) {
-			write_ret(uc, ADDRESS_TO_EMU(
-				vm_ucs2_string(
-					(VMSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)))));
-		}},
-
-
+		BIND_FUNC(vm_ucs2_to_gb2312),
+		BIND_FUNC(vm_gb2312_to_ucs2),
+		BIND_FUNC(vm_ucs2_to_ascii),
+		BIND_FUNC(vm_ascii_to_ucs2),
+		BIND_FUNC(vm_chset_convert),
+		BIND_FUNC(vm_get_language),
+		BIND_FUNC(vm_get_language_ssc),
+		BIND_FUNC(vm_ucs2_string),
 
 		// STDLib
-		{FUNCN(vm_create_dyn_array), [](uc_engine* uc) {
-			write_ret(uc,
-				ADDRESS_TO_EMU(vm_create_dyn_array(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					read_arg(uc, 2)
-				)));
-		}},
-		{FUNCN(vm_dyn_array_add), [](uc_engine* uc) {
-			write_ret(uc, 
-				vm_dyn_array_add(
-					(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-		{FUNCN(vm_dyn_array_del), [](uc_engine* uc) {
-			write_ret(uc, 
-				vm_dyn_array_del(
-					(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1)
-				));
-		}},
-		{FUNCN(vm_dyn_array_del_all), [](uc_engine* uc) {
-			write_ret(uc, 
-				vm_dyn_array_del_all(
-					(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))
-				));
-		}},
-		{FUNCN(vm_free_dyn_array), [](uc_engine* uc) {
-			vm_free_dyn_array(
-				(vm_dyn_array_t*)ADDRESS_FROM_EMU(read_arg(uc, 0))
-			);
-		}},
-		{FUNCN(vm_safe_wstrcpy), [](uc_engine* uc) {
-			write_ret(uc,vm_safe_wstrcpy(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_wstrlen), [](uc_engine* uc) {
-			write_ret(uc,vm_wstrlen(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-		{FUNCN(vm_wstrcpy), [](uc_engine* uc) {
-			write_ret(uc,vm_wstrcpy(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-		{FUNCN(vm_wstrcat), [](uc_engine* uc) {
-			write_ret(uc,vm_wstrcat(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-		{FUNCN(vm_wstrncpy), [](uc_engine* uc) {
-			write_ret(uc,vm_wstrncpy(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2)
-				));
-		}},
-		{FUNCN(vm_wstrcmp), [](uc_engine* uc) {
-			write_ret(uc,vm_wstrcmp(
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(VMWSTR)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-
-
+		BIND_FUNC(vm_create_dyn_array),
+		BIND_FUNC(vm_dyn_array_add),
+		BIND_FUNC(vm_dyn_array_del),
+		BIND_FUNC(vm_dyn_array_del_all),
+		BIND_FUNC(vm_free_dyn_array),
+		BIND_FUNC(vm_safe_wstrcpy),
+		BIND_FUNC(vm_wstrlen),
+		BIND_FUNC(vm_wstrcpy),
+		BIND_FUNC(vm_wstrcat),
+		BIND_FUNC(vm_wstrncpy),
+		BIND_FUNC(vm_wstrcmp),
 
 		// Audio
-		{FUNCN(vm_audio_play_bytes), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_audio_play_bytes(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					read_arg(uc, 3),
-					read_arg(uc, 4),
-					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 5))
-				));
-		}},
-		{FUNCN(vm_audio_pause), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_audio_pause(
-					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 0))
-				));
-		}},
-		{FUNCN(vm_audio_resume), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_audio_resume(
-					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 0))
-				));
-		}},
-		{FUNCN(vm_audio_stop), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_audio_stop(
-					(void(*)(VMINT))ADDRESS_FROM_EMU(read_arg(uc, 0))
-				));
-		}},
-		{FUNCN(vm_set_volume), [](uc_engine* uc) {
-			vm_set_volume(read_arg(uc, 0));
-		}},
-		{FUNCN(vm_get_volume), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_get_volume());
-		}},
-		{FUNCN(vm_midi_play), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_midi_play(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_midi_play_ex), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_midi_play_ex(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					read_arg(uc, 3),
-					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 4))
-				));
-		}},
-		{FUNCN(vm_midi_play_by_bytes), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_midi_play_by_bytes(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 3))
-				));
-		}},
-		{FUNCN(vm_midi_play_by_bytes_ex), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_midi_play_by_bytes_ex(
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					read_arg(uc, 3),
-					read_arg(uc, 4),
-					(void(*)(VMINT, VMINT))ADDRESS_FROM_EMU(read_arg(uc, 5))
-				));
-		}},
-		{FUNCN(vm_midi_pause), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_midi_pause(
-					read_arg(uc, 0)));
-		}},
-		{FUNCN(vm_midi_get_time), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_midi_get_time(
-					read_arg(uc, 0),
-					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-		{FUNCN(vm_midi_stop), [](uc_engine* uc) {
-			vm_midi_stop(read_arg(uc, 0));
-		}},
-		{FUNCN(vm_midi_stop_all), [](uc_engine* uc) {
-			vm_midi_stop_all();
-		}},
-		{FUNCN(vm_audio_resume_bg_play), [](uc_engine* uc) {
-			vm_audio_resume_bg_play();
-		}},
-		{FUNCN(vm_audio_suspend_bg_play), [](uc_engine* uc) {
-			vm_audio_suspend_bg_play();
-		}},
-
+		BIND_FUNC(vm_audio_play_bytes),
+		BIND_FUNC(vm_audio_pause),
+		BIND_FUNC(vm_audio_resume),
+		BIND_FUNC(vm_audio_stop),
+		BIND_FUNC(vm_set_volume),
+		BIND_FUNC(vm_get_volume),
+		BIND_FUNC(vm_midi_play),
+		BIND_FUNC(vm_midi_play_ex),
+		BIND_FUNC(vm_midi_play_by_bytes),
+		BIND_FUNC(vm_midi_play_by_bytes_ex),
+		BIND_FUNC(vm_midi_pause),
+		BIND_FUNC(vm_midi_get_time),
+		BIND_FUNC(vm_midi_stop),
+		BIND_FUNC(vm_midi_stop_all),
+		BIND_FUNC(vm_audio_resume_bg_play),
+		BIND_FUNC(vm_audio_suspend_bg_play),
 
 		// Bitstream
-		{FUNCN(vm_bitstream_audio_open), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_open(
-					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(vm_bitstream_audio_cfg_struct*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(vm_bitstream_audio_result_callback)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_open_pcm), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_open_pcm(
-					(VMINT*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					(vm_bitstream_pcm_audio_cfg_struct*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(vm_bitstream_audio_result_callback)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_finished), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_finished(
-					read_arg(uc, 0)
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_close), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_close(
-					read_arg(uc, 0)
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_get_buffer_status), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_get_buffer_status(
-					read_arg(uc, 0),
-					(vm_bitstream_audio_buffer_status*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_put_data), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_put_data(
-					read_arg(uc, 0),
-					(VMUINT8*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2),
-					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 3))
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_start), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_start(
-					read_arg(uc, 0),
-					(vm_bitstream_audio_start_param*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_stop), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_stop(
-					read_arg(uc, 0)
-				));
-		}},
-		{FUNCN(vm_bitstream_audio_get_play_time), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_bitstream_audio_get_play_time(
-					read_arg(uc, 0),
-					(VMUINT*)ADDRESS_FROM_EMU(read_arg(uc, 1))
-				));
-		}},
+		BIND_FUNC(vm_bitstream_audio_open),
+		BIND_FUNC(vm_bitstream_audio_open_pcm),
+		BIND_FUNC(vm_bitstream_audio_finished),
+		BIND_FUNC(vm_bitstream_audio_close),
+		BIND_FUNC(vm_bitstream_audio_get_buffer_status),
+		BIND_FUNC(vm_bitstream_audio_put_data),
+		BIND_FUNC(vm_bitstream_audio_start),
+		BIND_FUNC(vm_bitstream_audio_stop),
+		BIND_FUNC(vm_bitstream_audio_get_play_time),
 
 		// Bitstream Record
-		{FUNCN(mremu_media_setbufer), [](uc_engine* uc) {
-			mremu_media_setbufer(
-				(VMUINT16*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-				read_arg(uc, 1)
-			);
-		}},
+		BIND_FUNC(mremu_media_setbufer),
 		{FUNCN(mremu_media_getreadbuffer), [](uc_engine* uc) {
 			VMUINT16** buffer = (VMUINT16**)ADDRESS_FROM_EMU(read_arg(uc, 0));
 			VMUINT16* host_buf = 0;
@@ -1395,117 +432,30 @@ namespace Bridge {
 			if (host_buf && buffer)
 				*buffer = (VMUINT16*)ADDRESS_TO_EMU(host_buf);
 		}},
-		{FUNCN(mremu_media_record), [](uc_engine* uc) {
-			write_ret(uc,
-				mremu_media_record(
-					(Media_Format)read_arg(uc, 0),
-					(mremu_media_handler)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 2))
-				));
-		}},
-		{FUNCN(mremu_media_readdatadone), [](uc_engine* uc) {
-			mremu_media_readdatadone(
-				read_arg(uc, 0)
-			);
-		}},
-		{FUNCN(mremu_media_stop), [](uc_engine* uc) {
-			mremu_media_stop();
-		}},
-
+		BIND_FUNC(mremu_media_record),
+		BIND_FUNC(mremu_media_readdatadone),
+		BIND_FUNC(mremu_media_stop),
 
 		// Sock
-		{FUNCN(vm_is_support_wifi), [](uc_engine* uc) {
-			write_ret(uc, vm_is_support_wifi());
-		}},
-		{FUNCN(vm_wifi_is_connected), [](uc_engine* uc) {
-			write_ret(uc, vm_wifi_is_connected());
-		}},
-		{FUNCN(vm_soc_get_host_by_name), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_soc_get_host_by_name(
-					read_arg(uc, 0),
-					(const VMCHAR*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					(vm_soc_dns_result*)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					(vm_dns_callback_t)ADDRESS_FROM_EMU(read_arg(uc, 3))
-				));
-		}},
-		{FUNCN(vm_tcp_connect), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_tcp_connect(
-					(const char*)ADDRESS_FROM_EMU(read_arg(uc, 0)),
-					read_arg(uc, 1),
-					read_arg(uc, 2),
-					(vm_sock_callback_t)ADDRESS_FROM_EMU(read_arg(uc, 3))
-				));
-		}},
-		{FUNCN(vm_tcp_close), [](uc_engine* uc) {
-			vm_tcp_close(read_arg(uc, 0));
-		}},
-		{FUNCN(vm_tcp_read), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_tcp_read(
-					read_arg(uc, 0),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2)
-				));
-		}},
-		{FUNCN(vm_tcp_write), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_tcp_write(
-					read_arg(uc, 0),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2)
-				));
-		}},
-		{FUNCN(vm_udp_create), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_udp_create(
-					read_arg(uc, 0),
-					read_arg(uc, 1),
-					(vm_sock_callback_t)ADDRESS_FROM_EMU(read_arg(uc, 2)),
-					read_arg(uc, 3)
-				));
-		}},
-		{FUNCN(vm_udp_sendto), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_udp_sendto(
-					read_arg(uc, 0),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2),
-					(vm_sockaddr_struct*)ADDRESS_FROM_EMU(read_arg(uc, 3))
-				));
-		}},
-		{FUNCN(vm_udp_recvfrom), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_udp_recvfrom(
-					read_arg(uc, 0),
-					(void*)ADDRESS_FROM_EMU(read_arg(uc, 1)),
-					read_arg(uc, 2),
-					(vm_sockaddr_struct*)ADDRESS_FROM_EMU(read_arg(uc, 3))
-				));
-		}},
-		{FUNCN(vm_udp_close), [](uc_engine* uc) {
-			write_ret(uc,
-				vm_udp_close(read_arg(uc, 0)));
-		}},
+		BIND_FUNC(vm_is_support_wifi),
+		BIND_FUNC(vm_wifi_is_connected),
+		BIND_FUNC(vm_soc_get_host_by_name),
+		BIND_FUNC(vm_tcp_connect),
+		BIND_FUNC(vm_tcp_close),
+		BIND_FUNC(vm_tcp_read),
+		BIND_FUNC(vm_tcp_write),
+		BIND_FUNC(vm_udp_create),
+		BIND_FUNC(vm_udp_sendto),
+		BIND_FUNC(vm_udp_recvfrom),
+		BIND_FUNC(vm_udp_close),
 
 		// Sensor
-		{FUNCN(vm_srv_sensor_is_available), [](uc_engine* uc) {
-			vm_srv_sensor_is_available((vm_srv_sensor_type_enum)read_arg(uc, 0));
-		}},
+		BIND_FUNC(vm_srv_sensor_is_available),
 
 		// Some
-		{FUNCN(srand), [](uc_engine* uc) {
-			srand(read_arg(uc, 0));
-		}},
-		{FUNCN(rand), [](uc_engine* uc) {
-			write_ret(uc, rand());
-		}},
-		{FUNCN(strtoi), [](uc_engine* uc) {
-			write_ret(uc, strtoi((char*)ADDRESS_FROM_EMU(read_arg(uc, 0))));
-		}},
-
-
+		BIND_FUNC(srand),
+		BIND_FUNC(rand),
+		BIND_FUNC(strtoi),
 
 		// ARModule
 		{"armodule_malloc", NULL, [](uc_engine* uc) {
