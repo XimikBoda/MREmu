@@ -61,3 +61,10 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Published web bundle (web-dist): store the bytes exactly as the build emits
+# them, and treat the minified output as opaque so rebuilds do not produce
+# giant line-level diffs.
+###############################################################################
+web-dist/** -text -diff
