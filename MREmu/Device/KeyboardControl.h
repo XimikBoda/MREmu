@@ -1,6 +1,7 @@
 #pragma once
 #include <vmio.h>
 #include <vector>
+#include <cstdint>
 #include <SFML/System/Clock.hpp>
 
 #ifdef ANDROID
