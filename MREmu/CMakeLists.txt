@@ -1,6 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.8)
-
-set(CMAKE_FOLDER "MREmu")
+﻿set(CMAKE_FOLDER "MREmu")
 
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
@@ -20,7 +18,7 @@ set(SOURCES
 						"Network.cpp" "Network.h"
 						"Graphic.cpp" "Graphic.h"
 						"Log.cpp" "Log.h" 
-						"miniz.c" "miniz.h" "mutex_wrapper.h" "Queue.h"
+						"mutex_wrapper.h" "Queue.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
 						"jni/ScreenCorner.cpp" "jni/ScreenCorner.h"
 )
@@ -42,6 +40,7 @@ target_link_libraries(MREmu ADLMIDI_static)
 target_link_libraries(MREmu libiconv)
 target_link_libraries(MREmu spdlog)
 target_link_libraries(MREmu asio::asio)
+target_link_libraries(MREmu miniz)
 
 target_link_libraries(MREmu MREngine)
 target_link_libraries(MREmu NativeApps)

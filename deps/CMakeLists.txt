@@ -50,6 +50,8 @@ add_subdirectory(spdlog)
 
 add_subdirectory(asio.cmake) 
 
+add_subdirectory(miniz) 
+
 add_subdirectory(mresdk) 
 
 unset(CMAKE_FOLDER)
