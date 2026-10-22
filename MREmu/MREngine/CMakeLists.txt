@@ -1,8 +1,7 @@
 add_library (MREngine 
 						"Graphic.cpp" "Graphic.h"
 						"GraphicOld.cpp" "GraphicOld.h"
-						"Canvas.cpp" "Canvas.h"
-						"Image.cpp" "Image.h"
+						"Canvas.cpp" "Canvas.h" "Image.cpp"
 						"Blt.cpp" "Blt.h"
 
 						"System.cpp" "System.h" 

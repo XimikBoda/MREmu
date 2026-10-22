@@ -1,11 +1,10 @@
 #include "Graphic.h"
-#include "Image.h"
 #include "Blt.h"
 #include "Canvas.h"
 #include "../Memory.h"
 #include "../AppContext.h"
 #include <SFML/Graphics/Image.hpp>
-#include <vmgraph.h>
+#include <vmgraph_fix.h>
 #include <cstring>
 #include <vector>
 

@@ -3,11 +3,7 @@
 #include "ARModule.h"
 #include "Log.h"
 
-//#include "MREngine/Sock.h"
 #include "MREngine/Audio.h"
-#include "MREngine/Graphic.h"
-#include "MREngine/Canvas.h"
-#include "MREngine/Image.h"
 #include "MREngine/Resources.h"
 #include "MREngine/Log.h"
 
@@ -19,7 +15,7 @@
 #include <chrono>
 #include <unicorn/unicorn.h>
 
-#include <vmgraph.h>
+#include <vmgraph_fix.h>
 #include <vmgfxold.h>
 #include <vmres.h>
 #include <vm4res.h>

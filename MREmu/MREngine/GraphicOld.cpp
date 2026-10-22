@@ -1,7 +1,6 @@
 #include "Graphic.h"
-#include "Image.h"
 #include "../AppContext.h"
-#include <vmgraph.h>
+#include <vmgraph_fix.h>
 #include <vmgfxold.h>
 
 void vm_graphic_lock(void) {

@@ -1,8 +1,7 @@
 #include "AppSelector.h"
-#include "../../MREngine/Image.h"
 #include <vector>
 #include <string>
-#include <vmgraph.h>
+#include <vmgraph_fix.h>
 #include <vmio.h>
 #include <vmpromng.h>
 #include <vmstdlib.h>
