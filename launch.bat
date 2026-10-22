@@ -708,6 +708,8 @@ for %%F in (index.html index.js index.wasm index.data index.worker.js mremu-web.
   )
 )
 echo Web artifacts copied to: %OUT_DIR%
+rem Keep the GitHub Pages folder (web-dist) in step with the Release bundle.
+if /i "%~1"=="Release" python "%ROOT%tools\web_dist.py"
 exit /b 0
 
 :web_launch

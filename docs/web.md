@@ -225,6 +225,37 @@ Useful when changing the shell or the loader:
    canvas, applies the stored scale/mute preferences, and reveals the panel
    button - all before the first menu scan draws.
 
+## Deploying to GitHub Pages
+
+`web-dist/` is the published site: it holds nothing but the built bundle, so it
+can be served as-is. A Release web build refreshes it automatically -
+`launch.bat 8 1` copies the artifacts to `bin/Release` and then calls
+`tools/web_dist.py`, which mirrors the same files into `web-dist/` (and drops
+stale ones, such as an `index.data` left by an older preloaded bundle). To
+refresh it from a different build, run the script directly:
+
+```
+python tools/web_dist.py --source build\em
+```
+
+The folder contains `index.html`, `index.js`, `index.wasm`,
+`index.worker.js`, `mremu-web.js`, `coi-serviceworker.js` and `.nojekyll`.
+Every asset is referenced by a relative path and the service worker registers
+with scope `./`, so a project page (`https://<user>.github.io/MREmu/`) works
+without any path configuration, as does a custom domain at the site root. The
+worker also supplies the COOP/COEP headers that the wasm build needs, so Pages
+requires no special configuration beyond publishing the folder.
+
+Publishing is handled by `.github/workflows/pages.yml`, which uploads
+`web-dist` and deploys it whenever a push touches that folder (or when run
+manually from the Actions tab). Enable it once per repository: **Settings ->
+Pages -> Build and deployment -> Source: GitHub Actions**.
+
+`index.wasm` is around 6.5 MB, so each deploy that rebuilds the engine adds a
+fresh copy of it to the repository history. That is acceptable at this size;
+if it ever becomes a problem, publish from a `gh-pages` branch instead of
+tracking `web-dist/` on `master`.
+
 ## Troubleshooting
 
 | Symptom | Cause |
