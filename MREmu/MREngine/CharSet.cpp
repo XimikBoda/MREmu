@@ -1,5 +1,6 @@
 #include <vmchset.h>
 #include <vmstdlib.h>
+#include <vmmissing.h>
 #include <string>
 #include <cstring>
 #include <locale>

@@ -8,6 +8,7 @@
 #include <vmres.h>
 #include <vm4res.h>
 #include <vmgraph.h>
+#include <vmmissing.h>
 #include <ranges>
 #include <algorithm>
 

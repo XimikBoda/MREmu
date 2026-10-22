@@ -5,7 +5,6 @@
 
 #include "MREngine/Audio.h"
 #include "MREngine/Resources.h"
-#include "MREngine/Log.h"
 
 #include "Cpu.h"
 #include "GDB.h"
@@ -29,11 +28,8 @@
 #include <vmbitstream.h>
 #include <vmsensor.h>
 #include <vmtel.h>
-
 #include <vmsock_fix.h>
-
-VMINT vm_get_res_header();//tmp
-VMWSTR vm_ucs2_string(VMSTR s);
+#include <vmmissing.h>
 
 namespace Cpu {
 	void printREG(uc_engine* uc);

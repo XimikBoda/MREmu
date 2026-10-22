@@ -5,8 +5,7 @@
 #include <vmio.h>
 #include <vmpromng.h>
 #include <vmstdlib.h>
-
-VMWSTR vm_ucs2_string(VMSTR s);
+#include <vmmissing.h>
 
 namespace NativeApps::Menu::AppSelector {
 	int layer_h = 0;
