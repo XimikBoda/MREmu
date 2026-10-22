@@ -1,4 +1,5 @@
 #include "Graphic.h"
+#include "../Graphic.h"
 #include "Canvas.h"
 #include "Blt.h"
 #include "../AppContext.h"
@@ -8,8 +9,6 @@
 #include <SFML/System/Sleep.hpp>
 
 extern sf::Clock global_clock;
-
-extern MREngine::Graphic* graphic;
 
 ColorRGBA read_16_color(const void* buf, int idx, int trans_color) {
 	uint16_t c = ((const uint16_t*)buf)[idx];
@@ -169,6 +168,8 @@ void master_blt(
 }
 
 VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
+	auto graphic = Graphic::getPtr();
+
 	if (layer_handles == 0)
 		return -1;
 
@@ -210,6 +211,8 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 }
 
 VM_GDI_RESULT vm_graphic_flatten_layer(VMINT* hhandle, VMINT count) {
+	auto graphic = Graphic::getPtr();
+
 	if (hhandle == 0)
 		return -1;
 

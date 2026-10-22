@@ -1,4 +1,5 @@
 #include "Graphic.h"
+#include "../Graphic.h"
 #include "Canvas.h"
 #include "System.h"
 #include "../Memory.h"
@@ -13,8 +14,6 @@
 #include <imgui.h>
 #include <imgui-SFML.h>
 #endif
-
-MREngine::Graphic* graphic = 0; // Do I really need this?
 
 MREngine::RenderBox::RenderBox(int st_x, int st_y, int end_x, int end_y) {
 	this->st_x = st_x;
@@ -119,95 +118,6 @@ void buf_to_texture(void* buf, int w, int h, sf::Texture& tex) {
 	tex.loadFromImage(im);
 }
 
-MREngine::Graphic::Graphic()
-{
-	activate();
-	screen_tex.create(width, height);
-	screen.resize(width * height);
-	{
-		int image_size = width * height * 2;
-		void* canvas_buf = Memory::shared_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-		if (canvas_buf == 0) abort();
-
-		MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-		*cs = MREngine::canvas_signature();
-		memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-		MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-		*cfp = MREngine::canvas_frame_property();
-		cfp->width = width;
-		cfp->height = height;
-		base_buf1 = (cfp + 1);
-	}
-	{
-		int image_size = width * height * 2;
-		void* canvas_buf = Memory::shared_malloc(VM_CANVAS_DATA_OFFSET + image_size);
-
-		if (canvas_buf == 0) abort();
-
-		MREngine::canvas_signature* cs = (MREngine::canvas_signature*)canvas_buf;
-
-		*cs = MREngine::canvas_signature();
-		memcpy(cs->magic, CANVAS_MAGIC, 9);
-
-		MREngine::canvas_frame_property* cfp = (MREngine::canvas_frame_property*)(cs + 1);
-
-		*cfp = MREngine::canvas_frame_property();
-		cfp->width = width;
-		cfp->height = height;
-		base_buf2 = (cfp + 1);
-	}
-	graphic = this;
-}
-
-void MREngine::Graphic::activate()
-{
-	graphic = this;
-}
-
-void MREngine::Graphic::update_screen() {
-	if (screen_changed) {
-		buf_to_texture(screen.data(), width, height, screen_tex);
-		screen_changed = false;
-	}
-}
-
-#ifdef DEBUG_WINDOW
-void MREngine::Graphic::imgui_screen() {
-	if (ImGui::Begin("Screen")) {
-		ImGui::Image(screen_tex);
-		if (ImGui::Button("Paint"))
-			vm_graphic_flush_screen();
-	}
-	ImGui::End();
-}
-#endif
-
-std::string get_screenshots_path();
-
-void MREngine::Graphic::screenshot(std::u8string name) {
-	vm_time_t time;
-	vm_get_time(&time);
-
-	int ms = vm_get_tick_count();
-
-	std::string file_name = std::format("{:04}_{:02}_{:02}_{:02}_{:02}_{:02}_{:03}_{}.png",
-		time.year, time.mon, time.day, time.hour, time.min, time.sec, ms % 1000, (char*)name.c_str());
-
-	auto im = screen_tex.copyToImage();
-	im.saveToFile(get_screenshots_path() + file_name);
-}
-
-MREngine::Graphic::~Graphic()
-{
-	if (graphic == this)
-		graphic = 0;
-}
-
-
 MREngine::layer* MREngine::AppGraphic::find_layer_by_buf(void* buf)
 {
 	for (auto& layer : layers)
@@ -226,8 +136,7 @@ clip_rect MREngine::AppGraphic::clip_by_buf(void* buf) {
 }
 
 int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_color) {
-	if (!graphic)
-		return -1;
+	auto graphic = Graphic::getPtr();
 
 	if (layers.size() == 0) {
 		if (x != 0 || y != 0 || w != graphic->width || h != graphic->height)
@@ -254,8 +163,7 @@ int MREngine::AppGraphic::create_layer(int x, int y, int w, int h, int trans_col
 }
 
 int MREngine::AppGraphic::create_layer_ex(int x, int y, int w, int h, int trans_color, int mode, void* buf) {
-	if (!graphic)
-		return -1;
+	auto graphic = Graphic::getPtr();
 
 	if (mode != VM_BUF)//todo
 		abort();
@@ -311,6 +219,8 @@ void MREngine::AppGraphic::imgui_layers() {
 
 VMINT vm_graphic_get_screen_width(void)
 {
+	auto graphic = Graphic::getPtr();
+
 	if (graphic)
 		return graphic->width;
 	else
@@ -319,6 +229,8 @@ VMINT vm_graphic_get_screen_width(void)
 
 VMINT vm_graphic_get_screen_height(void)
 {
+	auto graphic = Graphic::getPtr();
+
 	if (graphic)
 		return graphic->height;
 	else
@@ -954,7 +866,6 @@ VM_GDI_RESULT vm_graphic_set_layer_clip(VMINT handle, VMINT16 x1, VMINT16 y1, VM
 	return VM_GDI_SUCCEED;
 }
 
-
 void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 	auto& clip = AppContext::get_executing_app_graphic().clip;
 
@@ -962,6 +873,7 @@ void vm_graphic_set_clip(VMINT x1, VMINT y1, VMINT x2, VMINT y2) {
 }
 
 void vm_graphic_reset_clip(void) {
+	auto graphic = Graphic::getPtr();
 	auto& clip = AppContext::get_executing_app_graphic().clip;
 
 	clip = { 0, 0, (short)graphic->width, (short)graphic->height, 0 };

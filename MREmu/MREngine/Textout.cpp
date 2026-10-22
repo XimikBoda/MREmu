@@ -11,8 +11,6 @@
 #include <SFML/Graphics/Texture.hpp>
 #include <SFML/Graphics/Image.hpp>
 
-extern MREngine::Graphic* graphic;
-
 static bool is_skip_symbol(VMWCHAR c) {
 	return c < 0x20 || c == 0x7F;
 }

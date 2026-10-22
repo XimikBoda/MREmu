@@ -18,6 +18,7 @@ set(SOURCES
 						"AppManager.cpp" "AppManager.h" 
 						"AppContext.cpp" "AppContext.h"
 						"Network.cpp" "Network.h"
+						"Graphic.cpp" "Graphic.h"
 						"Log.cpp" "Log.h" 
 						"miniz.c" "miniz.h" "mutex_wrapper.h" "Queue.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"

@@ -16,10 +16,10 @@
 #include "AppManager.h"
 #include "Log.h"
 #include "Network.h"
+#include "Graphic.h"
 
 #include "Device/Device.h"
 
-#include "MREngine/Graphic.h"
 #include "MREngine/IO.h"
 #include "MREngine/SIM.h"
 #include "MREngine/CharSet.h"
@@ -110,12 +110,12 @@ int main(int argc, char** argv) {
 	Bridge::init();
 
 	Network network;
+	Graphic graphic;
 
 	MREngine::SIM::init();
 	MREngine::System::init();
 	MREngine::CharSet::init();
 	MREngine::AppAudio::init();
-	MREngine::Graphic graphic;
 
 #ifdef ANDROID
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu");
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
 
 	appManager.start();
 
-	Device device(win_device, graphic);
+	Device device(win_device);
 
 	if (app_path.size()) {
 		if (fs::exists(app_path) || path_is_local) {

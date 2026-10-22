@@ -116,8 +116,6 @@ unsigned char* MREngine::Resources::get_file_context()
 	return file_context->data();
 }
 
-extern AppManager* g_appManager;
-
 uint8_t* MREngine::Resources::call_res_provider(int resid, int* len)
 {
 	auto app = AppContext::get_executing_app();
