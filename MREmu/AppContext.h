@@ -5,12 +5,11 @@
 class App;
 class AppManager;
 
-class MreTags;
-
 namespace MREngine {
 	class AppSock;
 	class SystemCallbacks;
 	class Resources;
+	class Tags;
 	class AppGraphic;
 	class Timer;
 	class AppIO;
@@ -48,7 +47,7 @@ namespace AppContext {
 	bool						is_executing_app_native();
 
 
-	MreTags* get_tags_by_mem_adr(size_t offset_mem);
+	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem);
 
 	void push_event(const Event::network& ev);
 	void push_event(const Event::input& ev);

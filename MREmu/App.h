@@ -1,8 +1,8 @@
 #pragma once
-#include "MreTags.h"
 #include "Memory.h"
 #include "MREngine/System.h"
 #include "MREngine/Resources.h"
+#include "MREngine/Tags.h"
 #include "MREngine/Graphic.h"
 #include "MREngine/Timer.h"
 #include "MREngine/IO.h"
@@ -41,11 +41,10 @@ public:
 
 	std::u8string app_name;
 
-	MreTags tags;
-
 	Memory::MemoryManager app_memory;
 	MREngine::SystemCallbacks system_callbacks;
 	MREngine::Resources resources;
+	MREngine::Tags tags;
 	MREngine::AppGraphic graphic;
 	MREngine::Timer timer;
 	MREngine::AppIO io;

@@ -6,6 +6,7 @@ add_library (MREngine
 
 						"System.cpp" "System.h" 
 						"Resources.cpp" "Resources.h"
+						"Tags.cpp" "Tags.h"
 						"Timer.cpp" "Timer.h"
 						"ProgramManager.cpp" "ProgramManager.h"
 						"IO.cpp" "IO.h"

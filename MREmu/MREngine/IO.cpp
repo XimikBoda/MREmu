@@ -1,12 +1,10 @@
 #include "IO.h"
 #include "CharSet.h"
 #include "../Memory.h"
-#include "../MreTags.h"
 #include "../Log.h"
 #include "../AppContext.h"
 #include "../Path.h"
 #include <vmio.h>
-#include <vmgettag.h>
 #include <iostream>
 #include <cstring>
 #include <regex>
@@ -485,90 +483,4 @@ VMINT vm_is_support_keyborad(void) {
 
 VMINT vm_is_support_pen_touch(void) {
 	return 1;
-}
-
-
-VMINT vm_get_vm_tag(short* filename, int tag_num, void* buf, int* buf_size) { // TODO
-	if (filename[0] == '@') {
-		fs::path vpath = Path::UCS2_to_path((VMWSTR)filename);
-		uint32_t adr;
-		sscanf(vpath.stem().string().c_str(), "%d", &adr);
-		return vm_get_vm_tag_from_rom((VMUINT8*)ADDRESS_FROM_EMU(adr), tag_num, buf, buf_size);
-	}
-
-	fs::path path = Path::path_from_emu(filename);
-
-	std::fstream f(path, std::ios::in | std::ios::binary | std::ios::ate);
-
-	if (!f.good())
-		return GET_TAG_FILE_ERROR;
-
-	size_t file_size = f.tellg();
-
-	if (file_size < 4 * 3)
-		return GET_TAG_FILE_ERROR;
-
-	f.seekg(file_size - 4 * 3, std::ios::beg);
-
-	uint32_t tags_offset = 0;
-	f.read((char*)&tags_offset, 4);
-
-	if (tags_offset >= file_size - 4 * 3)
-		return GET_TAG_FILE_ERROR;
-
-	uint32_t id, tag_size, pos = tags_offset;
-
-	do {
-		if (pos + 8 >= file_size)
-			return GET_TAG_ERROR;
-
-		f.seekg(pos, std::ios::beg);
-
-		f.read((char*)&id, 4);
-		f.read((char*)&tag_size, 4);
-
-		pos += 8;
-
-		if (pos + tag_size >= file_size)
-			return GET_TAG_ERROR;
-
-		if (id == tag_num)
-			break;
-
-		pos += tag_size;
-	} while (id);
-
-	if (id != tag_num)
-		return GET_TAG_NOT_FOUND;
-
-	if (*buf_size < tag_size)
-		return GET_TAG_INSUFFICIENT_BUF;
-
-	f.read((char*)buf, tag_size);
-
-	*buf_size = tag_size;
-
-	return GET_TAG_TRUE;
-}
-
-VMINT vm_get_vm_tag_from_rom(VMUINT8* rom, int tag_num, void* buf, int* buf_size) {
-	MreTags* tags = AppContext::get_tags_by_mem_adr(ADDRESS_TO_EMU(rom));
-	if (!tags)
-		return GET_TAG_ERROR;
-
-	auto tag_data = tags->get_raw_tag(tag_num);
-
-	int tag_size = tag_data.size();
-
-	if (tag_size == 0)
-		return GET_TAG_NOT_FOUND;
-
-	if (*buf_size < tag_size)
-		return GET_TAG_INSUFFICIENT_BUF;
-
-	memcpy(buf, tag_data.data(), tag_size);
-
-	*buf_size = tag_size;
-
-	return GET_TAG_TRUE;
 }

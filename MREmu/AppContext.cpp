@@ -67,7 +67,7 @@ namespace AppContext {
 		return get_executing_app()->is_native();
 	}
 
-	MreTags* get_tags_by_mem_adr(size_t offset_mem) {
+	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem) {
 		App* app = get_app_manager()->get_app_by_mem_adr(offset_mem);
 		if (app)
 			return &app->tags;
