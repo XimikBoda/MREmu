@@ -8,11 +8,11 @@ namespace AppContext {
 	}
 
 	App* get_foreground_app() {
-		return get_app_manager()->get_active_app();
+		return get_app_manager()->get_foreground_app();
 	}
 
 	App* get_executing_app() {
-		return get_app_manager()->get_current_work_app_id();
+		return get_app_manager()->get_executing_app();
 	}
 
 	std::u8string_view get_foreground_app_name() {

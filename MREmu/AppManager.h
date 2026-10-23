@@ -1,8 +1,10 @@
 #pragma once
 #include "App.h"
 #include <mutex>
+#include <map>
 #include <filesystem>
 #include "Queue.h"
+#include "History.h"
 #include "NativeApps/Menu/AppSelector.h"
 
 namespace fs = std::filesystem;
@@ -29,17 +31,21 @@ class AppManager {
 	bool running = false;
 	std::thread loop_thread;
 
-	friend MreTags* get_tags_by_mem_adr(size_t offset_mem); //TODO: remove this
+	std::map<int, std::shared_ptr<App>> apps;
+	std::mutex foreground_app_mutex;
+	History foreground_app_history;
+	int foreground_app = -1; // can be acces from another theard
+	int executing_app = -1; // only for app theard 
+	int phandle_counter = 0;
 
-	std::vector<std::shared_ptr<App>> apps;
-	int active_app_id = -1; // can be acces from another theard
-	int current_work_app_id = -1; // only for app theard 
+	void fix_mtone_wireless(App* app);
 
-	void fix_mtone_wireless();
+	void run_sys_event(App* app, int event, int param);
+
+	App* push_foreground_app(int phandle, bool fist_time = false);
+	App* pop_foreground_app(int phandle);
 
 	void process_launch_app(launch_el launch_data);
-
-	int find_app_id_by_phandle(int phandle);
 
 	void process_event(const Event::system& ev);
 	void process_event(const Event::input& ev);
@@ -56,21 +62,23 @@ public:
 	void start();
 	void stop();
 
-	std::mutex active_app_mutex;
-
 	void add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf = 0);
 
-	void close_app(int id, bool soft);
+	void close_app(int phandle, bool soft);
 	void close_apps();
 
 	void push_event(const Event::system& ev);
 	void push_event(const Event::input& ev);
 	void push_event(const Event::network& ev);
 
-	App* get_active_app(); // TODO: rename it
-	App* get_current_work_app_id();
+	std::unique_lock<std::mutex> get_foreground_app_guard();
+
+	App* get_foreground_app();
+	App* get_executing_app();
+
 	App* get_app_by_phandle(int phandle);
 	App* get_app_by_mem_adr(size_t offset_mem);
+
 	App* set_executing_app_by_phandle(int phandle);
 	App* set_foreground_as_executing();
 };

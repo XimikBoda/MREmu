@@ -27,9 +27,7 @@ AppManager* AppManager::getPtr() {
 	return ptr;
 }
 
-void AppManager::fix_mtone_wireless() {
-	auto app = get_active_app();
-
+void AppManager::fix_mtone_wireless(App* app) {
 	if (app->tags.get_dev_name() == u8"Mtone Wireless") {
 #ifdef _WIN32
 		auto f = fopen("NUL", "rb");
@@ -38,6 +36,45 @@ void AppManager::fix_mtone_wireless() {
 #endif
 		app->io.files.push(f);
 	}
+}
+
+void AppManager::run_sys_event(App* app, int event, int param) { // TODO
+	if (auto handler = app->system_callbacks.sysevt)
+		app->run(handler, event, param);
+}
+
+App* AppManager::push_foreground_app(int phandle, bool fist_time) {
+	auto lock = get_foreground_app_guard();
+
+	if (foreground_app != -1) {
+		App* app = get_foreground_app();
+		run_sys_event(app, VM_MSG_INACTIVE, 0); // TODO baground apps
+		app->timer.set_active(false);
+	}
+
+	App* app = get_app_by_phandle(phandle);
+	if (app) {
+		foreground_app = foreground_app_history.push(phandle);
+		if (!fist_time) {
+			run_sys_event(app, VM_MSG_ACTIVE, 0);
+			app->timer.set_active(true);
+			push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
+		}
+	}
+	return app;
+}
+
+App* AppManager::pop_foreground_app(int phandle) {
+	auto lock = get_foreground_app_guard();
+
+	foreground_app = foreground_app_history.pop(phandle);
+	App* app = get_foreground_app();
+	if (app) {
+		run_sys_event(app, VM_MSG_ACTIVE, 0);
+		app->timer.set_active(true);
+		push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
+	}
+	return app;
 }
 
 void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
@@ -85,59 +122,43 @@ void AppManager::process_launch_app(launch_el launch_data)
 		}
 	}
 
-	apps.push_back(app);
+	fix_mtone_wireless(app.get()); // file handle 0 fix
 
-	{
-		std::lock_guard lock(active_app_mutex);
+	int app_phandle = ++phandle_counter;
 
-		active_app_id = apps.size() - 1;
-		current_work_app_id = apps.size() - 1;
+	app->phandle = app_phandle;
+	apps[app_phandle] = app;
 
-		apps[current_work_app_id]->resources.file_context = &(apps[current_work_app_id]->file_context); //todo
+	set_executing_app_by_phandle(app_phandle);
+	push_foreground_app(app_phandle, true);
+	app->start();
+
+	run_sys_event(app.get(), VM_MSG_CREATE, 0); // now
+	push_event(Event::system{ app_phandle, Event::system_msg{ VM_MSG_PAINT, 0} }); // later
+}
+
+void AppManager::close_app(int phandle, bool soft) {
+	App* app = get_app_by_phandle(phandle);
+	if (app) {
+		auto& state = app->state;
+
+		App::State close_state = soft ? App::SoftClosing : App::HardClosing;
+		if (state < close_state)
+			state = close_state;
 	}
-
-	static int phandle = 0;
-	phandle++;
-
-	apps[current_work_app_id]->phandle = phandle;
-
-	fix_mtone_wireless(); // file handle 0 fix
-
-	apps[current_work_app_id]->start();
-
-	push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_CREATE, 0} });
-	push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
 }
 
-void AppManager::close_app(int id, bool soft)
-{
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->phandle == id) {
-			auto& state = apps[i]->state;
-			
-			App::State close_state = soft ? App::SoftClosing : App::HardClosing;
-			if (state < close_state)
-				state = close_state;
-		}
-}
-
-void AppManager::close_apps()
-{
-	for (int i = 0; i < apps.size(); ++i){
-		auto& state = apps[i]->state;
+void AppManager::close_apps() {
+	for (auto it = apps.begin(); it != apps.end();) {
+		auto& state = it->second->state;
 
 		if (state == App::HardClosing) {
-			std::lock_guard lock(active_app_mutex);
-
-			apps.erase(apps.begin() + i);
-
-			if (active_app_id > i)
-				active_app_id--;
-			else if (active_app_id == i)
-				active_app_id = apps.size() - 1;
-
-			--i;
+			pop_foreground_app(it->first);
+			
+			it = apps.erase(it);
 		}
+		else
+			++it;
 	}
 }
 
@@ -154,6 +175,10 @@ void AppManager::push_event(const Event::input& ev) {
 void AppManager::push_event(const Event::network& ev) {
 	network_events_queue.push(events_mutex, ev);
 	events_cv.notify_one();
+}
+
+std::unique_lock<std::mutex> AppManager::get_foreground_app_guard() {
+	return std::unique_lock<std::mutex>(foreground_app_mutex);
 }
 
 void AppManager::process_event(const Event::system& ev) {
@@ -217,8 +242,8 @@ sf::Time AppManager::get_time_for_nearest_timer()
 {
 	sf::Time nearst = sf::milliseconds(INT32_MAX);
 
-	for (int i = 0; i < apps.size(); ++i) {
-		sf::Time nearst_for_app = apps[i]->timer.get_time_for_nearest();
+	for (const auto& it : apps) {
+		sf::Time nearst_for_app = it.second->timer.get_time_for_nearest();
 
 		if (nearst > nearst_for_app)
 			nearst = nearst_for_app;
@@ -269,15 +294,11 @@ void AppManager::loop() {
 		
 		lock.unlock();
 
-		for (int i = 0; i < apps.size(); ++i) {
-			current_work_app_id = i;
-			bool active = active_app_id == current_work_app_id;
-			App* cur_app = apps[current_work_app_id].get();
+		for (const auto& it : apps) {
+			executing_app = it.first;
+			App* app = it.second.get();
 
-			if (!cur_app)
-				continue;
-
-			apps[i]->timer.update(cur_app);
+			app->timer.update(app);
 		}
 
 		close_apps();
@@ -295,57 +316,40 @@ void AppManager::stop() {
 	loop_thread.join();
 }
 
-App* AppManager::get_active_app()
-{
-	if (active_app_id < 0 || active_app_id >= apps.size())
-		return 0;
-	else
-		return apps[active_app_id].get();
+App* AppManager::get_foreground_app() {
+	return get_app_by_phandle(foreground_app);
 }
 
-App* AppManager::get_current_work_app_id()
-{
-	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
-		return 0;
-	else
-		return apps[current_work_app_id].get();
+App* AppManager::get_executing_app() {
+	return get_app_by_phandle(executing_app);
 }
 
-App* AppManager::get_app_by_phandle(int phandle)
-{
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->phandle == phandle)
-			return apps[i].get();
+App* AppManager::get_app_by_phandle(int phandle) {
+	if (phandle == -1)
+		return nullptr;
+
+	auto it = apps.find(phandle);
+	if (it != apps.end())
+		return it->second.get();
+	return nullptr;
+}
+
+App* AppManager::get_app_by_mem_adr(size_t offset_mem) {
+	for (const auto& it : apps)
+		if (it.second->offset_mem == offset_mem)
+			return it.second.get();
 
 	return 0;
 }
 
-App* AppManager::get_app_by_mem_adr(size_t offset_mem) 
-{
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->offset_mem == offset_mem)
-			return apps[i].get();
+App* AppManager::set_executing_app_by_phandle(int phandle) {
+	executing_app = phandle;
 
-	return 0;
+	return get_executing_app();
 }
 
-App* AppManager::set_executing_app_by_phandle(int phandle)
-{
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->phandle == phandle) {
-			current_work_app_id = i;
-			return apps[i].get();
-		}
+App* AppManager::set_foreground_as_executing() {
+	executing_app = foreground_app;
 
-	return 0;
-}
-
-App* AppManager::set_foreground_as_executing()
-{
-	if (active_app_id < 0 || active_app_id >= apps.size())
-		return 0;
-	else {
-		current_work_app_id = active_app_id;
-		return apps[active_app_id].get();
-	}
+	return get_executing_app();
 }

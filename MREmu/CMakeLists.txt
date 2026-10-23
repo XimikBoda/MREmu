@@ -18,7 +18,7 @@ set(SOURCES
 						"Network.cpp" "Network.h"
 						"Graphic.cpp" "Graphic.h"
 						"Log.cpp" "Log.h" 
-						"mutex_wrapper.h" "Queue.h"
+						"mutex_wrapper.h" "Queue.h" "History.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
 						"jni/ScreenCorner.cpp" "jni/ScreenCorner.h"
 )

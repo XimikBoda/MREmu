@@ -231,31 +231,32 @@ int main(int argc, char** argv) {
 		device.imgui();
 		graphic.imgui_screen();
 
-		std::lock_guard lock(appManager.active_app_mutex);
-		App* active_app = appManager.get_active_app();
-		if (active_app) {
-			active_app->graphic.imgui_layers();
-			active_app->graphic.imgui_canvases();
+		{
+			auto lock = appManager.get_foreground_app_guard();
+			App* foreground_app = appManager.get_foreground_app();
+			if (foreground_app) {
+				foreground_app->graphic.imgui_layers();
+				foreground_app->graphic.imgui_canvases();
+
+				if (ImGui::Begin("Memory")) { // Todo, move to Memory.h
+					float size = foreground_app->app_memory.get_memory_size();
+					float free_size = foreground_app->app_memory.get_free_memory_size();
+					float used_size = size - free_size;
+					ImGui::Text("All:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
+						size, size / 1024.f, size / 1024.f / 1024.f);
+					ImGui::Text("Free:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
+						free_size, free_size / 1024.f, free_size / 1024.f / 1024.f);
+					ImGui::Text("Used:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
+						used_size, used_size / 1024.f, used_size / 1024.f / 1024.f);
+					ImGui::Text("Used: %1.2f%%%", 100.f * used_size / size);
+				}
+				ImGui::End();
+			}
+
+			ImGui::SFML::Render(win_debug);
+			win_debug.display();
+			win_debug.clear();
 		}
-
-		if (ImGui::Begin("Memory") && active_app) {
-			float size = active_app->app_memory.get_memory_size();
-			float free_size = active_app->app_memory.get_free_memory_size();
-			float used_size = size - free_size;
-			ImGui::Text("All:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
-				size, size / 1024.f, size / 1024.f / 1024.f);
-			ImGui::Text("Free:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
-				free_size, free_size / 1024.f, free_size / 1024.f / 1024.f);
-			ImGui::Text("Used:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
-				used_size, used_size / 1024.f, used_size / 1024.f / 1024.f);
-			ImGui::Text("Used: %1.2f%%%", 100.f*used_size / size);
-		}
-		ImGui::End();
-
-
-		ImGui::SFML::Render(win_debug);
-		win_debug.display();
-		win_debug.clear();
 #endif
 
 		win_device.display();
