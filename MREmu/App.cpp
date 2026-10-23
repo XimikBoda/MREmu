@@ -1,6 +1,7 @@
 #include "App.h"
 #include "Memory.h"
 #include "Bridge.h"
+#include "Path.h"
 #include "miniz.h"
 #include <fstream>
 #include <sstream>
@@ -11,7 +12,7 @@ bool App::load_from_file(fs::path path, bool local)
 	path_is_local = local;
 
 	if (path_is_local) {
-		real_path = path_from_emu(path);
+		real_path = Path::path_from_emu(path);
 		this->path = path;
 	}
 	else

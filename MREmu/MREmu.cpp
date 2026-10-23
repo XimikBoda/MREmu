@@ -17,10 +17,10 @@
 #include "Log.h"
 #include "Network.h"
 #include "Graphic.h"
+#include "Path.h"
 
 #include "Device/Device.h"
 
-#include "MREngine/IO.h"
 #include "MREngine/SIM.h"
 #include "MREngine/CharSet.h"
 #include <cmdparser.hpp>
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
 	win_device.setFramerateLimit(60);
 #endif
 
-	MREngine::IO::init();
+	Path::init();
 
 #ifdef BUILTIN_GDB
 	if (GDB::gdb_mode)

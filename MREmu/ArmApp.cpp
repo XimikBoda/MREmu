@@ -1,6 +1,7 @@
 #include "ArmApp.h"
 #include "Memory.h"
 #include "Bridge.h"
+#include "Path.h"
 #include "miniz.h"
 #include <fstream>
 #include <sstream>
@@ -28,7 +29,7 @@ typedef struct
 
 bool ArmApp::check_format(fs::path path, bool local) {
 	if (local) {
-		path = path_from_emu(path);
+		path = Path::path_from_emu(path);
 	}
 
 	unsigned char buf[4];

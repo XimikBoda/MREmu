@@ -11,10 +11,6 @@
 namespace fs = std::filesystem;
 
 namespace MREngine {
-	namespace IO {
-		void init();
-	};
-
 	struct find_el{
 		fs::directory_iterator di;
 		std::regex find_reg;
@@ -57,5 +53,3 @@ namespace Event {
 		std::variant<keyboard, pen> data;
 	};
 }
-
-fs::path path_from_emu(fs::path path);

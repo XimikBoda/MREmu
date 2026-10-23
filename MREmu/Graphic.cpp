@@ -2,6 +2,7 @@
 #include "MREngine/Canvas.h"
 #include "AppContext.h"
 #include "Memory.h"
+#include "Path.h"
 #include <vmgraph.h>
 #include <vmpromng.h>
 #include <format>
@@ -95,8 +96,6 @@ void Graphic::imgui_screen() {
 }
 #endif
 
-std::string get_screenshots_path(); //TODO: remove this
-
 void Graphic::screenshot() {
 	vm_time_t time;
 	vm_get_time(&time);
@@ -109,7 +108,7 @@ void Graphic::screenshot() {
 		time.year, time.mon, time.day, time.hour, time.min, time.sec, ms % 1000, (char*)name.c_str());
 
 	auto im = screen_tex.copyToImage();
-	im.saveToFile(get_screenshots_path() + file_name);
+	im.saveToFile((Path::get_screenshots_path() / file_name).string());
 }
 
 Graphic::~Graphic() {
