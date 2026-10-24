@@ -4,9 +4,7 @@
 
 namespace fs = std::filesystem;
 
-class ArmApp : public App
-{
-public:
+class ArmApp : public App {
 	uint32_t entry_point;
 
 	bool is_ads;
@@ -15,7 +13,10 @@ public:
 	uint32_t rw_size = 0;
 	uint32_t zi_size = 0;
 
-	static bool check_format(fs::path path, bool local);
+public:
+	ArmApp(App* app);
+
+	static bool check_format(App* app);
 
 	bool preparation() override;
 	void start() override;

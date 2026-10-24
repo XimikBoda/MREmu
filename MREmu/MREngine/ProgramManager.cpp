@@ -2,7 +2,7 @@
 #include "System.h"
 #include "CharSet.h"
 #include "../Memory.h"
-#include "../AppManager.h"
+#include "../AppManagerEvents.h"
 #include "../AppContext.h"
 #include <vmpromng.h>
 
@@ -25,13 +25,13 @@ VMINT vm_post_msg(VM_P_HANDLE phandle, VMUINT msg_id, VMINT wparam, VMINT lparam
 void vm_start_app(const VMWCHAR* filepath, VMINT parent_app_handle, VMINT is_parent_exit) {
 	auto u8str = ucs2_to_utf8((VMWSTR)filepath);
 
-	AppManager::getPtr()->add_app_for_launch(u8str, true); //tmp
+	AppContext::push_event(Event::launch{ Event::path_app{u8str, true}, parent_app_handle, (bool)is_parent_exit });
 }
 
 void vm_start_app_with_para(const VMWCHAR* filepath, VMINT parent_app_handle, VMINT is_parent_exit, void* parameter, VMINT parameter_size) {
-	
+	//TODO
 }
 
 void vm_exit_app(void) {
-	AppManager::getPtr()->close_app(vm_pmng_get_current_handle(), false);
+	AppContext::close_executing_app();
 }

@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 
 class App
 {
-public:
+public: // TODO make private
 	enum State{
 		Runned,
 		SoftClosing,
@@ -51,9 +51,14 @@ public:
 	MREngine::AppSock sock;
 	MREngine::AppAudio audio;
 
+	bool load(std::ifstream& in);
+	bool load(fs::path path, bool local);
+	bool load(int fd, fs::path path);
+
+	void init_from(App* app);
+
 	virtual bool preparation() { return false; };
 	virtual void start() {};
-	bool load_from_file(fs::path path, bool local);//tmp
 
 	virtual bool is_native() { return true; }
 

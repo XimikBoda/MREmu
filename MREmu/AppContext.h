@@ -17,6 +17,7 @@ namespace MREngine {
 }
 
 namespace Event {
+	struct launch;
 	struct network;
 	struct input;
 	struct system;
@@ -46,9 +47,11 @@ namespace AppContext {
 	std::filesystem::path		get_executing_app_path();
 	bool						is_executing_app_native();
 
+	void close_executing_app();
 
 	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem);
 
+	void push_event(const Event::launch& ev);
 	void push_event(const Event::network& ev);
 	void push_event(const Event::input& ev);
 	void push_event(const Event::system& ev);

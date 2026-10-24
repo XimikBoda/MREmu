@@ -27,23 +27,17 @@ typedef struct
 	uint32_t res_size;
 } compress_ads_elf_info;
 
-bool ArmApp::check_format(fs::path path, bool local) {
-	if (local) {
-		path = Path::path_from_emu(path);
-	}
+ArmApp::ArmApp(App* app) {
+	init_from(app);
+}
 
-	unsigned char buf[4];
-	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
-	if (!in.is_open())
-		return false;
-	size_t file_size = (size_t)in.tellg();
-	if (file_size < 4)
-		return false;
-	in.seekg(0, std::ios::beg);
-	in.read((char*)buf, 4);
-	in.close();
+bool ArmApp::check_format(App* app) {
+	auto& buf = app->file_context;
 
-	if (!memcmp(buf + 1, "ELF", 3))
+	if (buf.size() < 10)
+		return false;
+
+	if (!memcmp(buf.data() + 1, "ELF", 3))
 		return true;
 
 	if (buf[0] == 0x78) // Zlib 

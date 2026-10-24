@@ -12,7 +12,7 @@ set(SOURCES
 						"NativeApp.cpp" "NativeApp.h"
 						"Disassembler.cpp" "Disassembler.h"
 						"ARModule.cpp" "ARModule.h"
-						"AppManager.cpp" "AppManager.h" 
+						"AppManager.cpp" "AppManager.h" "AppManagerEvents.h"
 						"AppContext.cpp" "AppContext.h"
 						"Network.cpp" "Network.h"
 						"Graphic.cpp" "Graphic.h"

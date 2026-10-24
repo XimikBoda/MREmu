@@ -77,66 +77,6 @@ App* AppManager::pop_foreground_app(int phandle) {
 	return app;
 }
 
-void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
-{
-	launch_queue.push(events_mutex, { path, local, conf });
-	events_cv.notify_one();
-}
-
-void AppManager::process_launch_app(launch_el launch_data)
-{
-	std::shared_ptr<App> app;
-
-	if (launch_data.conf) {
-		app = std::make_shared<NativeApp>();
-
-		((NativeApp*)app.get())->conf = *launch_data.conf;
-
-		app->preparation();
-	}
-	else {
-		if (ArmApp::check_format(launch_data.path, launch_data.local))
-			app = std::make_shared<ArmApp>();
-
-#ifdef WIN32
-		if (DLLApp::check_format(launch_data.path, launch_data.local))
-			app = std::make_shared<DLLApp>();
-#endif // WIN32
-
-		if (!app) {
-			error_message = "VXP file format not recognized or unsupported:\n" + launch_data.path.string();
-			show_error = true;
-			return;
-		}
-
-		if (!app->load_from_file(launch_data.path, launch_data.local)) {
-			error_message = "Failed to load VXP file (file not found or access denied):\n" + launch_data.path.string();
-			show_error = true;
-			return;
-		}
-
-		if (!app->preparation()) {
-			error_message = "VXP preparation failed (corrupt file or invalid ELF):\n" + launch_data.path.string();
-			show_error = true;
-			return;
-		}
-	}
-
-	fix_mtone_wireless(app.get()); // file handle 0 fix
-
-	int app_phandle = ++phandle_counter;
-
-	app->phandle = app_phandle;
-	apps[app_phandle] = app;
-
-	set_executing_app_by_phandle(app_phandle);
-	push_foreground_app(app_phandle, true);
-	app->start();
-
-	run_sys_event(app.get(), VM_MSG_CREATE, 0); // now
-	push_event(Event::system{ app_phandle, Event::system_msg{ VM_MSG_PAINT, 0} }); // later
-}
-
 void AppManager::close_app(int phandle, bool soft) {
 	App* app = get_app_by_phandle(phandle);
 	if (app) {
@@ -162,6 +102,11 @@ void AppManager::close_apps() {
 	}
 }
 
+void AppManager::push_event(const Event::launch& ev) {
+	launch_events_queue.push(events_mutex, ev);
+	events_cv.notify_one();
+}
+
 void AppManager::push_event(const Event::system& ev) {
 	system_events_queue.push(events_mutex, ev);
 	events_cv.notify_one();
@@ -179,6 +124,69 @@ void AppManager::push_event(const Event::network& ev) {
 
 std::unique_lock<std::mutex> AppManager::get_foreground_app_guard() {
 	return std::unique_lock<std::mutex>(foreground_app_mutex);
+}
+
+void AppManager::process_event(const Event::launch& ev) {
+	std::shared_ptr<App> app;
+
+	if (const auto* native_app = std::get_if<Event::native_app>(&ev.data)) {
+		app = std::make_shared<NativeApp>();
+
+		((NativeApp*)app.get())->conf = *native_app;
+
+		app->preparation();
+	}
+	else{ 
+		app = std::make_shared<App>();
+
+		bool ok = false;
+
+		if (const auto* path_app = std::get_if<Event::path_app>(&ev.data))
+			ok = app->load(path_app->path, path_app->local);
+		else if (const auto* fd_app = std::get_if<Event::fd_app>(&ev.data))
+			ok = app->load(fd_app->fd, fd_app->path);
+
+		if (!ok) {
+			error_message = "Failed to load VXP file (file not found or access denied):\n" + app->real_path.string();
+			show_error = true;
+			return;
+		}
+
+		if (ArmApp::check_format(app.get()))
+			app = std::make_shared<ArmApp>(app.get());
+
+#ifdef WIN32
+		if (DLLApp::check_format(app.get()))
+			app = std::make_shared<DLLApp>(app.get());
+#endif // WIN32
+
+		if (!app) {
+			error_message = "VXP file format not recognized or unsupported:\n" + app->real_path.string();
+			show_error = true;
+			return;
+		}
+
+		if (!app->preparation()) {
+			error_message = "VXP preparation failed (corrupt file or invalid ELF):\n" + app->real_path.string();
+			show_error = true;
+			return;
+		}
+	}
+
+	fix_mtone_wireless(app.get()); // file handle 0 fix
+
+	int app_phandle = ++phandle_counter;
+
+	app->phandle = app_phandle;
+	apps[app_phandle] = app;
+
+	set_executing_app_by_phandle(app_phandle);
+	push_foreground_app(app_phandle, true);
+	app->start();
+
+	run_sys_event(app.get(), VM_MSG_CREATE, 0); // now
+	push_event(Event::system{ app_phandle, Event::system_msg{ VM_MSG_PAINT, 0} }); // later
+
 }
 
 void AppManager::process_event(const Event::system& ev) {
@@ -253,7 +261,7 @@ sf::Time AppManager::get_time_for_nearest_timer()
 }
 
 bool AppManager::is_all_events_empty() {
-	return launch_queue.empty()
+	return launch_events_queue.empty()
 		&& input_events_queue.empty()
 		&& system_events_queue.empty()
 		&& network_events_queue.empty();
@@ -287,7 +295,7 @@ void AppManager::loop() {
 		if(wait_time_ms > 0)
 			event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
 
-		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
+		run_queue(launch_events_queue, lock, [this](Event::launch data) { process_event(data); });
 		run_queue(system_events_queue, lock, [this](Event::system data) { process_event(data); });
 		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
 		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });

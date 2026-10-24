@@ -1,12 +1,11 @@
 #pragma once
 #include "App.h"
-
-#include "NativeApps/Menu/AppSelector.h"
+#include "AppManagerEvents.h"
 
 class NativeApp : public App
 {
 public:
-	nativeapp_conf conf;
+	Event::native_app conf; // TODO
 
 	bool preparation() override;
 	void start() override;

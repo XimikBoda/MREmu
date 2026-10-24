@@ -165,14 +165,14 @@ int main(int argc, char** argv) {
 
 	if (app_path.size()) {
 		if (fs::exists(app_path) || path_is_local) {
-			appManager.add_app_for_launch(app_path, path_is_local);
+			appManager.push_event(Event::launch{ Event::path_app{app_path, false} });
 		} else {
 			error_message = "VXP file does not exist:\n" + app_path;
 			show_error = true;
 		}
 	}
 	else
-		appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
+		appManager.push_event(Event::launch{ Event::native_app{NativeApps::Menu::AppSelector::Conf.entry, u8"TODO: fix it"}});
 
 	sf::Clock fps;
 
