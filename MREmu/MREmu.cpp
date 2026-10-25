@@ -31,34 +31,16 @@
 #include <windows.h>
 #endif // WIN32
 
+#ifdef ANDROID
+#include "Android.h"
+#include <spdlog/sinks/android_sink.h>
+#endif
+
 
 sf::Clock global_clock;
 
 std::string error_message = "";
 bool show_error = false;
-
-#ifdef ANDROID
-#include <spdlog/sinks/android_sink.h>
-
-std::atomic<int> storage_permission_state{0};
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_ximikboda_mremu_MainActivity_notifyPermissionState(JNIEnv *env, jobject thiz, jboolean granted) {
-    storage_permission_state = granted ? 1 : -1;
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thiz, jint fd, jstring j_path) {
-    const char *path_cstr = env->GetStringUTFChars(j_path, nullptr);
-
-    while(!AppManager::getPtr())
-        sf::sleep(sf::seconds(0.2));
-
-    AppManager::getPtr()->push_event(Event::launch{Event::fd_app{fd, path_cstr}});
-
-    env->ReleaseStringUTFChars(j_path, path_cstr);
-}
-#endif
 
 int main(int argc, char** argv) {
     std::string app_path = "";
@@ -121,25 +103,7 @@ int main(int argc, char** argv) {
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu");
 	win_device.setFramerateLimit(60);
 
-	while (win_device.isOpen()) {
-		sf::Event event;
-		while (win_device.pollEvent(event)) {
-			if (event.type == sf::Event::Closed) {
-				win_device.close();
-			}
-		}
-
-		int perm_state = storage_permission_state.load();
-
-		if (perm_state == 1)
-			break;
-		else if (perm_state == 0)
-			win_device.clear(sf::Color::Black);
-		else if (perm_state == -1)
-			win_device.clear(sf::Color::Red);
-
-		win_device.display();
-	}
+	Android::wait_storage_permission(win_device);
 #else // Not ANDROID
 
 #ifdef DEBUG_WINDOW

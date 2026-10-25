@@ -2,6 +2,7 @@
 
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
+						"Android.cpp" "Android.h" 
 						"Memory.cpp" "Memory.h" 
 						"Cpu.cpp" "Cpu.h" 
 						"GDB.cpp" "GDB.h" 
