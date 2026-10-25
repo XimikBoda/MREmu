@@ -11,8 +11,8 @@ namespace Event {
 	};
 
 	struct fd_app {
-		fs::path path;
 		int fd;
+        fs::path path;
 	};
 
 	struct native_app {

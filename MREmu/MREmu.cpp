@@ -48,13 +48,13 @@ Java_com_ximikboda_mremu_MainActivity_notifyPermissionState(JNIEnv *env, jobject
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thiz, jstring j_path) {
+Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thiz, jint fd, jstring j_path) {
     const char *path_cstr = env->GetStringUTFChars(j_path, nullptr);
 
     while(!AppManager::getPtr())
         sf::sleep(sf::seconds(0.2));
 
-    AppManager::getPtr()->push_event(Event::launch{Event::path_app{path_cstr, false}});
+    AppManager::getPtr()->push_event(Event::launch{Event::fd_app{fd, path_cstr}});
 
     env->ReleaseStringUTFChars(j_path, path_cstr);
 }
