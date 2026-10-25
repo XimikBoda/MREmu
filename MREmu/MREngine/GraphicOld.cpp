@@ -1,10 +1,10 @@
 #include "Graphic.h"
-#include "Image.h"
-#include <vmgraph.h>
+#include "../AppContext.h"
+#include <vmgraph_fix.h>
 #include <vmgfxold.h>
 
 void vm_graphic_lock(void) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 	
 	if (gr.old_layer == -1 && !gr.old_layer_inited) {
 		int w = vm_graphic_get_screen_width();
@@ -17,7 +17,7 @@ void vm_graphic_lock(void) {
 }
 
 void vm_graphic_unlock(void) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	if (gr.old_layer != -1) {
 		vm_graphic_flush_layer(&gr.old_layer, 1);
@@ -30,7 +30,7 @@ void vm_graphic_unlock(void) {
 }
 
 VMUINT8* vm_graphic_get_buffer(void) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	if (gr.old_layer != -1)
 		return vm_graphic_get_layer_buffer(gr.old_layer);
@@ -39,7 +39,7 @@ VMUINT8* vm_graphic_get_buffer(void) {
 }
 
 void vm_graphic_flush_buffer(void) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	if (gr.old_layer != -1) {
 		vm_graphic_flush_layer(&gr.old_layer, 1);
@@ -47,7 +47,7 @@ void vm_graphic_flush_buffer(void) {
 }
 
 void vm_initialize_screen_buffer(void) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	int w = vm_graphic_get_screen_width();
 	int h = vm_graphic_get_screen_height();
@@ -63,7 +63,7 @@ void vm_initialize_screen_buffer(void) {
 }
 
 void vm_finalize_screen_buffer(void) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	if (gr.old_layer_inited) {
 		if (gr.old_layer != -1) {
@@ -76,7 +76,7 @@ void vm_finalize_screen_buffer(void) {
 }
 
 void vm_graphic_drawtext(VMINT x, VMINT y, VMWSTR s, VMINT32 length, VMINT color) {
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	VMUINT8* disp_buf = 0;
 

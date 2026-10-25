@@ -2,6 +2,13 @@ set(BUILD_SHARED_LIBS FALSE)
 
 set(CMAKE_FOLDER "Deps")
 
+
+if(BUILTIN_GDB)
+    set(SFML_BUILD_NETWORK TRUE)
+else()
+    set(SFML_BUILD_NETWORK FALSE)
+endif()
+
 set(UNICORN_ARCH "arm" CACHE STRING "Supported architectures") 
 if(NOT EMSCRIPTEN)
     add_subdirectory(SFML)
@@ -42,6 +49,8 @@ add_subdirectory(libADLMIDI)
 add_subdirectory(spdlog) 
 
 add_subdirectory(asio.cmake) 
+
+add_subdirectory(miniz) 
 
 add_subdirectory(mresdk) 
 

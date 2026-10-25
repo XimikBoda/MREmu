@@ -10,11 +10,24 @@
 extern std::string error_message;
 extern bool show_error;
 
-extern AppManager* g_appManager;
+AppManager* AppManager::ptr = nullptr;
 
-void AppManager::fix_mtone_wireless() {
-	auto app = get_active_app();
+AppManager::AppManager() {
+	if (ptr != nullptr)
+		throw std::runtime_error("Network already exists!");
 
+	ptr = this;
+}
+
+AppManager::~AppManager() {
+	ptr = nullptr;
+}
+
+AppManager* AppManager::getPtr() {
+	return ptr;
+}
+
+void AppManager::fix_mtone_wireless(App* app) {
 	if (app->tags.get_dev_name() == u8"Mtone Wireless") {
 #ifdef _WIN32
 		auto f = fopen("NUL", "rb");
@@ -25,238 +38,220 @@ void AppManager::fix_mtone_wireless() {
 	}
 }
 
-void AppManager::add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf)
-{
-	launch_queue.push(events_mutex, { path, local, conf });
+void AppManager::run_sys_event(App* app, int event, int param) { // TODO
+	if (auto handler = app->system_callbacks.sysevt)
+		app->run(handler, event, param);
+}
+
+App* AppManager::push_foreground_app(int phandle, bool fist_time) {
+	auto lock = get_foreground_app_guard();
+
+	if (foreground_app != -1) {
+		App* app = get_foreground_app();
+		run_sys_event(app, VM_MSG_INACTIVE, 0); // TODO baground apps
+		app->timer.set_active(false);
+	}
+
+	App* app = get_app_by_phandle(phandle);
+	if (app) {
+		foreground_app = foreground_app_history.push(phandle);
+		if (!fist_time) {
+			run_sys_event(app, VM_MSG_ACTIVE, 0);
+			app->timer.set_active(true);
+			push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
+		}
+	}
+	return app;
+}
+
+App* AppManager::pop_foreground_app(int phandle) {
+	auto lock = get_foreground_app_guard();
+
+	foreground_app = foreground_app_history.pop(phandle);
+	App* app = get_foreground_app();
+	if (app) {
+		run_sys_event(app, VM_MSG_ACTIVE, 0);
+		app->timer.set_active(true);
+		push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
+	}
+	return app;
+}
+
+void AppManager::close_app(int phandle, bool soft) {
+	App* app = get_app_by_phandle(phandle);
+	if (app) {
+		auto& state = app->state;
+
+		App::State close_state = soft ? App::SoftClosing : App::HardClosing;
+		if (state < close_state)
+			state = close_state;
+	}
+}
+
+void AppManager::close_apps() {
+	for (auto it = apps.begin(); it != apps.end();) {
+		auto& state = it->second->state;
+
+		if (state == App::HardClosing) {
+			pop_foreground_app(it->first);
+			
+			it = apps.erase(it);
+		}
+		else
+			++it;
+	}
+}
+
+void AppManager::push_event(const Event::launch& ev) {
+	launch_events_queue.push(events_mutex, ev);
 	events_cv.notify_one();
 }
 
-void AppManager::process_launch_app(launch_el launch_data)
-{
+void AppManager::push_event(const Event::system& ev) {
+	system_events_queue.push(events_mutex, ev);
+	events_cv.notify_one();
+}
+
+void AppManager::push_event(const Event::input& ev) {
+	input_events_queue.push(events_mutex, ev);
+	events_cv.notify_one();
+}
+
+void AppManager::push_event(const Event::network& ev) {
+	network_events_queue.push(events_mutex, ev);
+	events_cv.notify_one();
+}
+
+std::unique_lock<std::mutex> AppManager::get_foreground_app_guard() {
+	return std::unique_lock<std::mutex>(foreground_app_mutex);
+}
+
+void AppManager::process_event(const Event::launch& ev) {
 	std::shared_ptr<App> app;
 
-	if (launch_data.conf) {
+	if (const auto* native_app = std::get_if<Event::native_app>(&ev.data)) {
 		app = std::make_shared<NativeApp>();
 
-		((NativeApp*)app.get())->conf = *launch_data.conf;
+		((NativeApp*)app.get())->conf = *native_app;
 
 		app->preparation();
 	}
-	else {
-		if (ArmApp::check_format(launch_data.path, launch_data.local))
-			app = std::make_shared<ArmApp>();
+	else{ 
+		app = std::make_shared<App>();
 
-#ifdef WIN32
-		if (DLLApp::check_format(launch_data.path, launch_data.local))
-			app = std::make_shared<DLLApp>();
-#endif // WIN32
+		bool ok = false;
 
-		if (!app) {
-			error_message = "VXP file format not recognized or unsupported:\n" + launch_data.path.string();
+		if (const auto* path_app = std::get_if<Event::path_app>(&ev.data))
+			ok = app->load(path_app->path, path_app->local);
+		else if (const auto* fd_app = std::get_if<Event::fd_app>(&ev.data))
+			ok = app->load(fd_app->fd, fd_app->path);
+
+		if (!ok) {
+			error_message = "Failed to load VXP file (file not found or access denied):\n" + app->real_path.string();
 			show_error = true;
 			return;
 		}
 
-		if (!app->load_from_file(launch_data.path, launch_data.local)) {
-			error_message = "Failed to load VXP file (file not found or access denied):\n" + launch_data.path.string();
+		if (ArmApp::check_format(app.get()))
+			app = std::make_shared<ArmApp>(app.get());
+
+#ifdef WIN32
+		if (DLLApp::check_format(app.get()))
+			app = std::make_shared<DLLApp>(app.get());
+#endif // WIN32
+
+		if (!app) {
+			error_message = "VXP file format not recognized or unsupported:\n" + app->real_path.string();
 			show_error = true;
 			return;
 		}
 
 		if (!app->preparation()) {
-			error_message = "VXP preparation failed (corrupt file or invalid ELF):\n" + launch_data.path.string();
+			error_message = "VXP preparation failed (corrupt file or invalid ELF):\n" + app->real_path.string();
 			show_error = true;
 			return;
 		}
 	}
 
-	apps.push_back(app);
+	fix_mtone_wireless(app.get()); // file handle 0 fix
 
-	{
-		std::lock_guard lock(active_app_mutex);
+	int app_phandle = ++phandle_counter;
 
-		active_app_id = apps.size() - 1;
-		current_work_app_id = apps.size() - 1;
+	app->phandle = app_phandle;
+	apps[app_phandle] = app;
 
-		apps[current_work_app_id]->resources.file_context = &(apps[current_work_app_id]->file_context); //todo
-	}
+	set_executing_app_by_phandle(app_phandle);
+	push_foreground_app(app_phandle, true);
+	app->start();
 
-	static int ph_app_id = 0;
-	ph_app_id++;
+	run_sys_event(app.get(), VM_MSG_CREATE, 0); // now
+	push_event(Event::system{ app_phandle, Event::system_msg{ VM_MSG_PAINT, 0} }); // later
 
-	apps[current_work_app_id]->system_callbacks.ph_app_id = ph_app_id;
-
-	fix_mtone_wireless(); // file handle 0 fix
-
-	apps[current_work_app_id]->start();
-
-	add_system_event(ph_app_id, VM_MSG_CREATE, 0);
-	add_system_event(ph_app_id, VM_MSG_PAINT, 0);
 }
 
-void AppManager::close_app(int id, bool soft)
-{
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == id) {
-			auto& state = apps[i]->state;
-			
-			App::State close_state = soft ? App::SoftClosing : App::HardClosing;
-			if (state < close_state)
-				state = close_state;
+void AppManager::process_event(const Event::system& ev) {
+	App* app = set_executing_app_by_phandle(ev.phandle);
+
+	if (app)
+		std::visit([app](auto&& arg) {
+		using T = std::decay_t<decltype(arg)>;
+
+		if constexpr (std::is_same_v<T, Event::system_msg>) {
+			if (auto handler = app->system_callbacks.sysevt)
+				app->run(handler, arg.message, arg.param);
 		}
-}
-
-void AppManager::close_apps()
-{
-	for (int i = 0; i < apps.size(); ++i){
-		auto& state = apps[i]->state;
-
-		if (state == App::HardClosing) {
-			std::lock_guard lock(active_app_mutex);
-
-			apps.erase(apps.begin() + i);
-
-			if (active_app_id > i)
-				active_app_id--;
-			else if (active_app_id == i)
-				active_app_id = apps.size() - 1;
-
-			--i;
+		else if constexpr (std::is_same_v<T, Event::message>) {
+			if (auto handler = app->system_callbacks.msg_proc)
+				app->run(handler, arg.phandle_sender, arg.msg_id, arg.wparam, arg.lparam);
 		}
-	}
+			}, ev.data);
 }
 
-void AppManager::add_keyboard_event(int event, int keycode)
-{
-	keyboard_events_queue.push(events_mutex, { event, keycode });
-	events_cv.notify_one();
-}
+void AppManager::process_event(const Event::input& ev) {
+	App* app = set_foreground_as_executing();
 
-void AppManager::process_keyboard_event(keyboard_event_el ke)
-{
-	current_work_app_id = active_app_id;
+	if (app)
+		std::visit([app](auto&& arg) {
+		using T = std::decay_t<decltype(arg)>;
 
-	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
-		return;
-
-	App& cur_app = *apps[current_work_app_id];
-	if (cur_app.io.key_handler)
-		cur_app.run(cur_app.io.key_handler, ke.event, ke.keycode);
-}
-
-void AppManager::add_pen_event(int event, int x, int y)
-{
-	pen_events_queue.push(events_mutex, { event, x, y });
-	events_cv.notify_one();
-}
-
-void AppManager::process_pen_event(pen_event_el pe)
-{
-	current_work_app_id = active_app_id;
-
-	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
-		return;
-
-	App& cur_app = *apps[current_work_app_id];
-	if (cur_app.io.pen_handler)
-		cur_app.run(cur_app.io.pen_handler, pe.event, pe.x, pe.y);
-}
-
-void AppManager::add_message_event(int phandle, unsigned int msg_id,
-	int wparam, int lparam, int phandle_sender)
-{
-	message_events_queue.push(events_mutex, { phandle, msg_id, wparam, lparam, phandle_sender });
-	events_cv.notify_one(); // TODO: Do I need it here
-}
-
-int AppManager::find_app_id_by_phandle(int phandle) {
-	int app_id = -1;
-
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->system_callbacks.ph_app_id == phandle) {
-			app_id = i;
-			break;
+		if constexpr (std::is_same_v<T, Event::keyboard>) {
+			if (auto handler = app->io.key_handler)
+				app->run(handler, arg.event, arg.keycode);
 		}
-
-	return app_id;
+		else if constexpr (std::is_same_v<T, Event::pen>) {
+			if (auto handler = app->io.pen_handler)
+				app->run(handler, arg.event, arg.x, arg.y);
+		}
+			}, ev.data);
 }
 
-void AppManager::process_message_event(message_event_el me)
-{
-	current_work_app_id = find_app_id_by_phandle(me.phandle);
-	if (current_work_app_id == -1)
-		return;
+void AppManager::process_event(const Event::network& ev) {
+	App* app = set_executing_app_by_phandle(ev.phandle);
 
-	App *cur_app = apps[current_work_app_id].get();
-	if (cur_app && cur_app->system_callbacks.msg_proc)
-		cur_app->run(cur_app->system_callbacks.msg_proc,
-			me.phandle_sender, me.msg_id, me.wparam, me.lparam);
-}
+	if (app)
+		std::visit([app](auto&& arg) {
+			using T = std::decay_t<decltype(arg)>;
 
-void AppManager::add_system_event(int phandle, int message, int param)
-{
-	system_events_queue.push(events_mutex, { phandle, message, param });
-	events_cv.notify_one(); // TODO: here too
-}
+			if constexpr (std::is_same_v<T, Event::sock>) {
+				if (arg.callback) 
+					app->run(arg.callback, arg.handle, arg.event);
+			}
+			else if constexpr (std::is_same_v<T, Event::dns>) {
+				static vm_soc_dns_result* g_result = (vm_soc_dns_result*)Memory::shared_malloc(sizeof(vm_soc_dns_result));
+				*g_result = arg.result;
 
-void AppManager::process_system_event(system_event_el se)
-{
-	current_work_app_id = find_app_id_by_phandle(se.phandle);
-	if (current_work_app_id == -1)
-		return;
-
-	App& cur_app = *apps[current_work_app_id];
-	if (cur_app.system_callbacks.sysevt)
-		cur_app.run(cur_app.system_callbacks.sysevt, se.message, se.param);
-}
-
-void AppManager::add_sock_event(sock_event se)
-{
-	if (g_appManager) {
-		g_appManager->sock_events_queue.push(g_appManager->events_mutex, { se });
-		g_appManager->events_cv.notify_one();
-	}
-}
-
-void AppManager::process_sock_event(sock_event se)
-{
-	current_work_app_id = find_app_id_by_phandle(se.phandle);
-	if (current_work_app_id == -1)
-		return;
-
-	App& cur_app = *apps[current_work_app_id];
-	if (se.callback)
-		cur_app.run(se.callback, se.handle, se.event);
-}
-
-void AppManager::add_dns_event(dns_event de)
-{
-	if (g_appManager) {
-		g_appManager->dns_events_queue.push(g_appManager->events_mutex, { de });
-		g_appManager->events_cv.notify_one();
-	}
-}
-
-void AppManager::process_dns_event(dns_event de)
-{
-	current_work_app_id = find_app_id_by_phandle(de.phandle);
-	if (current_work_app_id == -1)
-		return;
-
-	static vm_soc_dns_result* g_result = (vm_soc_dns_result*)Memory::shared_malloc(sizeof(vm_soc_dns_result));
-	*g_result = de.result;
-
-	App& cur_app = *apps[current_work_app_id];
-	if (de.callback)
-		cur_app.run(de.callback, g_result);
+				if (arg.callback)
+					app->run(arg.callback, g_result);
+			}
+			}, ev.data);
 }
 
 sf::Time AppManager::get_time_for_nearest_timer()
 {
 	sf::Time nearst = sf::milliseconds(INT32_MAX);
 
-	for (int i = 0; i < apps.size(); ++i) {
-		sf::Time nearst_for_app = apps[i]->timer.get_time_for_nearest();
+	for (const auto& it : apps) {
+		sf::Time nearst_for_app = it.second->timer.get_time_for_nearest();
 
 		if (nearst > nearst_for_app)
 			nearst = nearst_for_app;
@@ -266,10 +261,10 @@ sf::Time AppManager::get_time_for_nearest_timer()
 }
 
 bool AppManager::is_all_events_empty() {
-	return launch_queue.empty() &&
-		keyboard_events_queue.empty() && pen_events_queue.empty() &&
-		message_events_queue.empty() && system_events_queue.empty() &&
-		sock_events_queue.empty() && dns_events_queue.empty();
+	return launch_events_queue.empty()
+		&& input_events_queue.empty()
+		&& system_events_queue.empty()
+		&& network_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -288,7 +283,9 @@ static void run_queue(Queue<T>& q, std::unique_lock<std::mutex>& lock, F f) {
 
 void AppManager::loop() {
 	while (running) {
+#ifdef BUILTIN_GDB
 		GDB::update(); //TODO
+#endif
 		bool event = false;
 
 		auto wait_time_ms = get_time_for_nearest_timer().asMicroseconds();
@@ -298,25 +295,18 @@ void AppManager::loop() {
 		if(wait_time_ms > 0)
 			event = events_cv.wait_for(lock, wait_time, [this] { return !is_all_events_empty() || !running; });
 
-		run_queue(launch_queue, lock, [this](launch_el data) { process_launch_app(data); });
-		run_queue(system_events_queue, lock, [this](system_event_el data) { process_system_event(data); });
-		run_queue(message_events_queue, lock, [this](message_event_el data) { process_message_event(data); });
-		run_queue(keyboard_events_queue, lock, [this](keyboard_event_el data) { process_keyboard_event(data); });
-		run_queue(pen_events_queue, lock, [this](pen_event_el data) { process_pen_event(data); });
-		run_queue(sock_events_queue, lock, [this](sock_event data) { process_sock_event(data); });
-		run_queue(dns_events_queue, lock, [this](dns_event data) { process_dns_event(data); });
-
+		run_queue(launch_events_queue, lock, [this](Event::launch data) { process_event(data); });
+		run_queue(system_events_queue, lock, [this](Event::system data) { process_event(data); });
+		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
+		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
+		
 		lock.unlock();
 
-		for (int i = 0; i < apps.size(); ++i) {
-			current_work_app_id = i;
-			bool active = active_app_id == current_work_app_id;
-			App* cur_app = apps[current_work_app_id].get();
+		for (const auto& it : apps) {
+			executing_app = it.first;
+			App* app = it.second.get();
 
-			if (!cur_app)
-				continue;
-
-			apps[i]->timer.update(cur_app);
+			app->timer.update(app);
 		}
 
 		close_apps();
@@ -334,108 +324,40 @@ void AppManager::stop() {
 	loop_thread.join();
 }
 
-App* AppManager::get_active_app()
-{
-	if (active_app_id < 0 || active_app_id >= apps.size())
-		return 0;
-	else
-		return &*apps[active_app_id];
+App* AppManager::get_foreground_app() {
+	return get_app_by_phandle(foreground_app);
 }
 
-App* AppManager::get_current_work_app_id()
-{
-	if (current_work_app_id < 0 || current_work_app_id >= apps.size())
-		return 0;
-	else
-		return &*apps[current_work_app_id];
+App* AppManager::get_executing_app() {
+	return get_app_by_phandle(executing_app);
 }
 
-App* get_active_app() {
-	if (g_appManager)
-		return g_appManager->get_active_app();
-	return 0;
+App* AppManager::get_app_by_phandle(int phandle) {
+	if (phandle == -1)
+		return nullptr;
+
+	auto it = apps.find(phandle);
+	if (it != apps.end())
+		return it->second.get();
+	return nullptr;
 }
 
-App* get_cur_app() {
-	App* curr_app = 0;
-	if (g_appManager && (curr_app = g_appManager->get_current_work_app_id()))
-		return curr_app;
-	else
-		abort();
-}
-
-bool cur_app_is_native() {
-	return get_cur_app()->is_native();
-}
-
-Memory::MemoryManager& get_current_app_memory() { 
-	return get_cur_app()->app_memory;
-}
-
-MREngine::SystemCallbacks& get_current_app_system_callbacks() {
-	return get_cur_app()->system_callbacks;
-}
-
-MREngine::Resources& get_current_app_resources() {
-	return get_cur_app()->resources;
-}
-
-MREngine::AppGraphic& get_current_app_graphic() {
-	return get_cur_app()->graphic;
-}
-
-MREngine::Timer& get_current_app_timer() {
-	return get_cur_app()->timer;
-}
-
-MREngine::AppIO& get_current_app_io() {
-	return get_cur_app()->io;
-}
-
-MREngine::AppSock& get_current_app_sock() {
-	return get_cur_app()->sock;
-}
-
-MREngine::AppAudio& get_current_app_audio() {
-	return get_cur_app()->audio;
-}
-
-fs::path get_current_app_path() {
-	return get_cur_app()->path;
-}
-
-MreTags* get_tags_by_mem_adr(size_t offset_mem) {
-	if (!g_appManager)
-		return 0;
-
-	auto &apps = g_appManager->apps;
-	for (int i = 0; i < apps.size(); ++i)
-		if (apps[i]->offset_mem == offset_mem)
-			return &apps[i]->tags;
+App* AppManager::get_app_by_mem_adr(size_t offset_mem) {
+	for (const auto& it : apps)
+		if (it.second->offset_mem == offset_mem)
+			return it.second.get();
 
 	return 0;
 }
 
-void add_keyboard_event(int event, int keycode) {
-	if (g_appManager)
-		g_appManager->add_keyboard_event(event, keycode);
+App* AppManager::set_executing_app_by_phandle(int phandle) {
+	executing_app = phandle;
+
+	return get_executing_app();
 }
 
-void add_pen_event(int event, int x, int y) {
-	if (g_appManager)
-		g_appManager->add_pen_event(event, x, y);
-}
+App* AppManager::set_foreground_as_executing() {
+	executing_app = foreground_app;
 
-void add_message_event(int phandle, unsigned int msg_id,
-	int wparam, int lparam, int phandle_sender) 
-{
-	if (g_appManager)
-		g_appManager->add_message_event(phandle, msg_id, wparam, 
-			lparam, phandle_sender);
-}
-
-void add_system_event(int phandle, int message, int param)
-{
-	if (g_appManager)
-		g_appManager->add_system_event(phandle, message, param);
+	return get_executing_app();
 }

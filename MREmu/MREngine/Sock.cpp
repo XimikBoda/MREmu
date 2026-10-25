@@ -1,18 +1,15 @@
-#include "../Memory.h"
-#include "../Bridge.h"
-#include <cstring>
-//#include "../Cpu.h"
+#include "../Network.h"
+#include "../AppContext.h"
 #include "Sock.h"
-#include <asio.hpp>
-
-#include "../AppManager.h"
-
-MREngine::NetworkManager* g_networkManager = 0;
+#include "SockImpl.h"
+#include <cstring>
+#include <asio/connect.hpp>
 
 //// TCP
 
 void MREngine::TcpSock::push_event(int event) {
-    AppManager::add_sock_event({ callback, phandle, handle, event});
+    using namespace Event;
+    AppContext::push_event(network{ phandle, sock{callback, handle, event} });
 }
 
 MREngine::TcpSock::TcpSock(asio::io_context& ctx, void (*c)(int, int), int app_handle) 
@@ -146,7 +143,8 @@ static void asio_to_mre_endpoint(const asio::ip::udp::endpoint& asio_ep, vm_sock
 }
 
 void MREngine::UdpSock::push_event(int event) {
-    AppManager::add_sock_event({ callback, phandle, handle, event });
+    using namespace Event;
+    AppContext::push_event(network{ phandle, sock{callback, handle, event} });
 }
 
 MREngine::UdpSock::UdpSock(asio::io_context& ctx, void (*c)(int, int), int app_handle)
@@ -263,26 +261,6 @@ void MREngine::UdpSock::close() {
         });
 }
 
-MREngine::NetworkManager::NetworkManager() : work_guard(asio::make_work_guard(io_ctx)) {
-    asio_thread = std::thread([this]() {
-        io_ctx.run();
-        });
-
-    g_networkManager = this;
-}
-
-MREngine::NetworkManager::~NetworkManager() {
-    work_guard.reset();
-    io_ctx.stop();
-    if (asio_thread.joinable()) {
-        asio_thread.join();
-    }
-}
-
-asio::io_context& MREngine::NetworkManager::get_context() {
-    return io_ctx;
-}
-
 static void fill_dns_result(vm_soc_dns_result* result, const std::vector<asio::ip::address_v4>& ips, VMINT error_cause) {
     result->error_cause = error_cause;
 
@@ -327,17 +305,16 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
         return VM_E_SOC_SUCCESS;
     }
 
-    int phandle = vm_pmng_get_current_handle();
+    int phandle = AppContext::get_executing_app_phandle();
     
-    auto resolver = std::make_shared<asio::ip::tcp::resolver>(g_networkManager->get_context());
+    auto resolver = std::make_shared<asio::ip::tcp::resolver>(Network::getPtr()->get_context());
 
     resolver->async_resolve(host_str, "",
         [phandle, callback, resolver](const asio::error_code& ec, asio::ip::tcp::resolver::results_type results) {
             if (ec == asio::error::operation_aborted) return;
 
-            dns_event event_data;
+            Event::dns event_data;
             event_data.callback = callback;
-            event_data.phandle = phandle;
 
             if (!ec) {
                 std::vector<asio::ip::address_v4> ips;
@@ -350,7 +327,8 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
             else
                 fill_dns_result(&event_data.result, {}, VM_E_SOC_ERROR);
 
-            AppManager::add_dns_event(event_data);
+            using namespace Event;
+            AppContext::push_event(network{ phandle, event_data });
         });
 
     return VM_E_SOC_WOULDBLOCK;
@@ -359,9 +337,9 @@ VMINT vm_soc_get_host_by_name(VMINT apn,
 VMINT vm_tcp_connect(const char* host, const VMINT port, const VMINT apn,
     void (*callback)(VMINT handle, VMINT event)) 
 {
-    std::shared_ptr<MREngine::TcpSock> tcp = std::make_shared<MREngine::TcpSock>(g_networkManager->get_context(), callback, vm_pmng_get_current_handle());
+    std::shared_ptr<MREngine::TcpSock> tcp = std::make_shared<MREngine::TcpSock>(Network::getPtr()->get_context(), callback, AppContext::get_executing_app_phandle());
     
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
     int tcp_id = app_sock.tcps.push(tcp);
     
     tcp->handle = tcp_id;
@@ -371,7 +349,7 @@ VMINT vm_tcp_connect(const char* host, const VMINT port, const VMINT apn,
 }
 
 void vm_tcp_close(VMINT handle) {
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
 
     if (app_sock.tcps.is_active(handle))
         app_sock.tcps[handle]->close();
@@ -380,7 +358,7 @@ void vm_tcp_close(VMINT handle) {
 }
 
 VMINT vm_tcp_read(VMINT handle, void* buf, VMINT len) {
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
 
     if (!app_sock.tcps.is_active(handle))
         return -1;
@@ -391,7 +369,7 @@ VMINT vm_tcp_read(VMINT handle, void* buf, VMINT len) {
 }
 
 VMINT vm_tcp_write(VMINT handle, void* buf, VMINT len) {
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
 
     if (!app_sock.tcps.is_active(handle))
         return -1;
@@ -402,13 +380,13 @@ VMINT vm_tcp_write(VMINT handle, void* buf, VMINT len) {
 }
 
 VMINT vm_udp_create(VMINT port, VMINT apn, void (*callback)(VMINT hdl, VMINT event), VMINT loopback) {
-    std::shared_ptr<MREngine::UdpSock> udp = std::make_shared<MREngine::UdpSock>(g_networkManager->get_context(), callback, vm_pmng_get_current_handle());
+    std::shared_ptr<MREngine::UdpSock> udp = std::make_shared<MREngine::UdpSock>(Network::getPtr()->get_context(), callback, AppContext::get_executing_app_phandle());
 
     if (!udp->create(port, loopback)) {
         return -1;
     }
 
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
     int udp_id = app_sock.udps.push(udp);
 
     udp->handle = udp_id;
@@ -417,7 +395,7 @@ VMINT vm_udp_create(VMINT port, VMINT apn, void (*callback)(VMINT hdl, VMINT eve
 }
 
 VMINT vm_udp_sendto(VMINT hdl, const void* buf, VMINT32 len, const vm_sockaddr_struct* addr) {
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
 
     if (!app_sock.udps.is_active(hdl))
         return -1;
@@ -428,7 +406,7 @@ VMINT vm_udp_sendto(VMINT hdl, const void* buf, VMINT32 len, const vm_sockaddr_s
 }
 
 VMINT vm_udp_recvfrom(VMINT hdl, void* buf, VMINT32 len, vm_sockaddr_struct* addr) {
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
 
     if (!app_sock.udps.is_active(hdl))
         return -1;
@@ -439,7 +417,7 @@ VMINT vm_udp_recvfrom(VMINT hdl, void* buf, VMINT32 len, vm_sockaddr_struct* add
 }
 
 VMINT vm_udp_close(VMINT hdl) {
-    MREngine::AppSock& app_sock = get_current_app_sock();
+    MREngine::AppSock& app_sock = AppContext::get_executing_app_sock();
 
     if (app_sock.udps.is_active(hdl))
         app_sock.udps[hdl]->close();

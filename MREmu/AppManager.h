@@ -1,105 +1,79 @@
 #pragma once
 #include "App.h"
 #include <mutex>
+#include <map>
 #include <filesystem>
 #include "Queue.h"
-#include "NativeApps/Menu/AppSelector.h"
+#include "History.h"
+#include "AppManagerEvents.h"
 
 namespace fs = std::filesystem;
 
-struct launch_el {
-	fs::path path;
-	bool local;
-	const nativeapp_conf* conf = 0;
-};
-
-struct keyboard_event_el {
-	int event;
-	int keycode;
-};
-
-struct pen_event_el {
-	int event;
-	int x, y;
-};
-
-struct message_event_el {
-	int phandle;
-	unsigned int msg_id;
-	int wparam;
-	int lparam;
-	int phandle_sender;
-};
-
-struct system_event_el {
-	int phandle;
-	int message;
-	int param;
-};
-
 class AppManager {
-	Queue<launch_el> launch_queue;
-	Queue<keyboard_event_el> keyboard_events_queue;
-	Queue<pen_event_el> pen_events_queue;
-	Queue<message_event_el> message_events_queue;
-	Queue<system_event_el> system_events_queue;
-	Queue<sock_event> sock_events_queue;
-	Queue<dns_event> dns_events_queue;
+	static AppManager* ptr;
+
+	// Events
+	Queue<Event::launch> launch_events_queue;
+	Queue<Event::input> input_events_queue;
+	Queue<Event::system> system_events_queue;
+	Queue<Event::network> network_events_queue;
 
 	std::mutex events_mutex;
 	std::condition_variable events_cv;
 
-	bool is_all_events_empty();
+	void process_event(const Event::launch& ev);
+	void process_event(const Event::system& ev);
+	void process_event(const Event::input& ev);
+	void process_event(const Event::network& ev);
 
+	void run_sys_event(App* app, int event, int param);
+
+	bool is_all_events_empty();
+	sf::Time get_time_for_nearest_timer();
+
+	// Loop
 	bool running = false;
 	std::thread loop_thread;
 
-	friend MreTags* get_tags_by_mem_adr(size_t offset_mem); //TODO: remove this
-
-	std::vector<std::shared_ptr<App>> apps;
-	int active_app_id = -1; // can be acces from another theard
-	int current_work_app_id = -1; // only for app theard 
-
-	void fix_mtone_wireless();
-
-	void process_launch_app(launch_el launch_data);
-
-	void process_keyboard_event(keyboard_event_el ke);
-	void process_pen_event(pen_event_el pe);
-
-	int find_app_id_by_phandle(int phandle);
-
-	void process_message_event(message_event_el me);
-	void process_system_event(system_event_el se);
-
-	void process_sock_event(sock_event se);
-	void process_dns_event(dns_event de);
-
-	sf::Time get_time_for_nearest_timer();
-
 	void loop();
+
+	// Apps
+	std::map<int, std::shared_ptr<App>> apps;
+	std::mutex foreground_app_mutex;
+	History foreground_app_history;
+	int foreground_app = -1; // can be acces from another theard
+	int executing_app = -1; // only for app theard 
+	int phandle_counter = 1;
+
+	void fix_mtone_wireless(App* app);
+
+	App* push_foreground_app(int phandle, bool fist_time = false);
+	App* pop_foreground_app(int phandle);
+
 public:
+	AppManager();
+	~AppManager();
+	static AppManager* getPtr();
+
 	void start();
 	void stop();
 
-	std::mutex active_app_mutex;
-
-	void add_app_for_launch(fs::path path, bool local, const nativeapp_conf* conf = 0);
-
-	void close_app(int id, bool soft);
+	void close_app(int phandle, bool soft);
 	void close_apps();
 
-	void add_keyboard_event(int event, int keycode);
-	void add_pen_event(int event, int x, int y);
+	void push_event(const Event::launch& ev);
+	void push_event(const Event::system& ev);
+	void push_event(const Event::input& ev);
+	void push_event(const Event::network& ev);
 
-	void add_message_event(int phandle, unsigned int msg_id,
-		int wparam, int lparam, int phandle_sender);
+	std::unique_lock<std::mutex> get_foreground_app_guard();
 
-	void add_system_event(int phandle, int message, int param);
+	App* get_foreground_app();
+	App* get_executing_app();
 
-	static void add_sock_event(sock_event se);
-	static void add_dns_event(dns_event de);
+	App* get_app_by_phandle(int phandle);
+	App* get_app_by_mem_adr(size_t offset_mem);
 
-	App* get_active_app();
-	App* get_current_work_app_id();
+	App* set_executing_app_by_phandle(int phandle);
+	App* set_foreground_as_executing();
 };

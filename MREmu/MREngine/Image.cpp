@@ -1,10 +1,10 @@
 #include "Graphic.h"
-#include "Image.h"
 #include "Blt.h"
 #include "Canvas.h"
 #include "../Memory.h"
+#include "../AppContext.h"
 #include <SFML/Graphics/Image.hpp>
-#include <vmgraph.h>
+#include <vmgraph_fix.h>
 #include <cstring>
 #include <vector>
 
@@ -278,8 +278,8 @@ VMINT_CANVAS vm_graphic_load_image_cf_FIX(vm_graphic_color_famat cf, VMUINT8* im
 	}
 
 #ifndef ANDROID
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
+	std::lock_guard lock(AppContext::get_executing_app_graphic().canvases_list_mutex);
+	AppContext::get_executing_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 #endif // !ANDROID
 
 	return (VMINT_CANVAS)canvas_buf;
@@ -338,8 +338,8 @@ VMINT_CANVAS vm_graphic_load_image_resized_cf_FIX(vm_graphic_color_famat cf, VMU
 	}
 
 #ifndef ANDROID
-	std::lock_guard lock(get_current_app_graphic().canvases_list_mutex);
-	get_current_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
+	std::lock_guard lock(AppContext::get_executing_app_graphic().canvases_list_mutex);
+	AppContext::get_executing_app_graphic().canvases_list.push_back({ canvas_buf, sf::Texture() });
 #endif // !ANDROID
 
 	return (VMINT_CANVAS)canvas_buf;

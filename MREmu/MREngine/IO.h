@@ -4,16 +4,13 @@
 #include <fstream>
 #include <regex>
 #include <filesystem>
+#include <variant>
 
 #include <vmio.h>
 
 namespace fs = std::filesystem;
 
 namespace MREngine {
-	namespace IO {
-		void init();
-	};
-
 	struct find_el{
 		fs::directory_iterator di;
 		std::regex find_reg;
@@ -41,9 +38,18 @@ namespace MREngine {
 	};
 };
 
+namespace Event {
+	struct keyboard {
+		int event;
+		int keycode;
+	};
 
-MREngine::AppIO& get_current_app_io();
-fs::path get_current_app_path();
+	struct pen {
+		int event;
+		int x, y;
+	};
 
-void add_keyboard_event(int event, int keycode);
-fs::path path_from_emu(fs::path path);
+	struct input {
+		std::variant<keyboard, pen> data;
+	};
+}

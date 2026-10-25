@@ -1,7 +1,8 @@
 #include "Device.h"
+#include "../Graphic.h"
 
-Device::Device(sf::RenderWindow& win_device, MREngine::Graphic& graphic_) 
-	: win(win_device), graphic(graphic_), keyboard(keyboardControl), menubar(keyboardControl)
+Device::Device(sf::RenderWindow& win_device) 
+	: win(win_device), keyboard(keyboardControl), menubar(keyboardControl)
 {
 	update_size();
 }
@@ -25,6 +26,7 @@ void Device::process_events() {
 }
 
 void Device::update_size() {
+	auto& graphic = *Graphic::getPtr();
 	screen_sp = sf::Sprite(graphic.screen_tex);
 
 	touch.screen = &screen_sp;
@@ -58,7 +60,7 @@ void Device::draw() {
 	keyboard.draw(&win);
 	menubar.draw(&win);
 
-	screen_sp.setTexture(graphic.screen_tex, true);
+	screen_sp.setTexture(Graphic::getPtr()->screen_tex, true);
 	win.draw(screen_sp);
 }
 

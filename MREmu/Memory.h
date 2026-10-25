@@ -54,5 +54,3 @@ namespace Memory {
 	void* app_realloc(void* p, int size);
 	void app_free(void* addr);
 }
-
-Memory::MemoryManager& get_current_app_memory();

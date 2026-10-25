@@ -1,6 +1,6 @@
-#include "Log.h"
 #include "../Log.h"
 #include <vmlog.h>
+#include <vmmissing.h>
 
 spdlog::level::level_enum map_vm_level(int vm_level) {
     switch (vm_level) {

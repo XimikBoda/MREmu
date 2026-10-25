@@ -3,6 +3,7 @@
 #include "CharSet.h"
 #include "../Memory.h"
 #include "../Log.h"
+#include "../AppContext.h"
 #include <vmsys.h>
 #include <vmtel.h>
 #include <string>
@@ -67,7 +68,7 @@ VMINT vm_get_sys_scene(void) {
 
 malloc_stat_t* vm_get_malloc_stat(void) {
 	malloc_stat_t* stat = (malloc_stat_t*)malloc_stat_ptr;
-	Memory::MemoryManager& mm = get_current_app_memory();
+	Memory::MemoryManager& mm = AppContext::get_executing_app_memory();
 
 	stat->avail_heap_size = mm.get_free_memory_size();
 	stat->current = mm.get_memory_size() - mm.get_free_memory_size();
@@ -108,7 +109,7 @@ void vm_free(void* ptr) {
 }
 
 void vm_reg_sysevt_callback(void (*f)(VMINT message, VMINT param)) {
-	MREngine::SystemCallbacks& sc = get_current_app_system_callbacks();
+	MREngine::SystemCallbacks& sc = AppContext::get_executing_app_system_callbacks();
 	sc.sysevt = f;
 }
 
@@ -123,7 +124,7 @@ VMINT vm_get_tick_count(void) {
 }
 
 VMINT vm_get_exec_filename(VMWSTR filename) {//TODO
-	fs::path path = get_current_app_path();
+	fs::path path = AppContext::get_executing_app_path();
 	utf8_to_ucs2(path.u8string(), filename, 260);
 	return 0;
 }

@@ -1,20 +1,18 @@
-cmake_minimum_required (VERSION 3.8)
-
 add_library (MREngine 
 						"Graphic.cpp" "Graphic.h"
 						"GraphicOld.cpp" "GraphicOld.h"
-						"Canvas.cpp" "Canvas.h"
-						"Image.cpp" "Image.h"
+						"Canvas.cpp" "Canvas.h" "Image.cpp"
 						"Blt.cpp" "Blt.h"
 
 						"System.cpp" "System.h" 
 						"Resources.cpp" "Resources.h"
+						"Tags.cpp" "Tags.h"
 						"Timer.cpp" "Timer.h"
 						"ProgramManager.cpp" "ProgramManager.h"
 						"IO.cpp" "IO.h"
 						"SIM.cpp" "SIM.h"
-						"Log.cpp" "Log.h"
-						"Sock.cpp" "Sock.h"
+						"Log.cpp"
+						"Sock.cpp" "Sock.h" "SockImpl.h"
 						"Sensor.cpp" "Sensor.h"
 						"Audio.cpp" "Audio.h" "AudioBitstream.cpp" "AudioBitstreamRec.cpp"
 						"CharSet.cpp" "CharSet.h"

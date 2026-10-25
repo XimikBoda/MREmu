@@ -1,9 +1,8 @@
-﻿cmake_minimum_required (VERSION 3.8)
-
-set(CMAKE_FOLDER "MREmu")
+﻿set(CMAKE_FOLDER "MREmu")
 
 set(SOURCES 
 						"MREmu.cpp" "MREmu.h" 
+						"Android.cpp" "Android.h" 
 						"Memory.cpp" "Memory.h" 
 						"Cpu.cpp" "Cpu.h" 
 						"GDB.cpp" "GDB.h" 
@@ -11,13 +10,16 @@ set(SOURCES
 						"App.cpp" "App.h" 
 						"ArmApp.cpp" "ArmApp.h" 
 						"DLLApp.cpp" "DLLApp.h" 
-						"NativeApp.cpp" "NativeApp.h" 
-						"MreTags.cpp" "MreTags.h" 
+						"NativeApp.cpp" "NativeApp.h"
 						"Disassembler.cpp" "Disassembler.h"
 						"ARModule.cpp" "ARModule.h"
-						"AppManager.cpp" "AppManager.h"
+						"AppManager.cpp" "AppManager.h" "AppManagerEvents.h"
+						"AppContext.cpp" "AppContext.h"
+						"Network.cpp" "Network.h"
+						"Graphic.cpp" "Graphic.h"
 						"Log.cpp" "Log.h" 
-						"miniz.c" "miniz.h" "mutex_wrapper.h" "Queue.h"
+						"Path.cpp" "Path.h" 
+						"mutex_wrapper.h" "Queue.h" "History.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
 						"jni/ScreenCorner.cpp" "jni/ScreenCorner.h"
 )
@@ -33,16 +35,22 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
 endif()
 
 target_link_libraries(MREmu sfml-graphics)
-target_link_libraries(MREmu sfml-network)
 target_link_libraries(MREmu sfml-audio)
 target_link_libraries(MREmu unicorn)
 target_link_libraries(MREmu ADLMIDI_static)
 target_link_libraries(MREmu libiconv)
 target_link_libraries(MREmu spdlog)
+target_link_libraries(MREmu asio::asio)
+target_link_libraries(MREmu miniz)
 
 target_link_libraries(MREmu MREngine)
 target_link_libraries(MREmu NativeApps)
 target_link_libraries(MREmu Device)
+
+if(BUILTIN_GDB)
+    target_link_libraries(MREmu sfml-network)
+    target_compile_definitions(MREmu PRIVATE BUILTIN_GDB)
+endif()
 
 if(DEBUG_WINDOW)
     target_link_libraries(MREmu imgui)
@@ -50,7 +58,7 @@ if(DEBUG_WINDOW)
 endif()
 
 if(CAPSTONE)
-	target_link_libraries(MREmu capstone)
+    target_link_libraries(MREmu capstone)
     target_compile_definitions(MREmu PRIVATE CAPSTONE)
 endif()
 

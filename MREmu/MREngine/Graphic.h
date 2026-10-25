@@ -6,29 +6,6 @@
 #include "../mutex_wrapper.h"
 
 namespace MREngine {
-	class Graphic {
-	public:
-		int width = 240, height = 320;
-		bool screen_changed = true;
-
-		sf::Texture screen_tex;
-
-		std::vector<uint16_t> screen;
-		void* base_buf1 = 0; // wrong, need to change to canvas
-		void* base_buf2 = 0;
-
-		Graphic();
-
-		void activate();
-		void update_screen();
-
-		void imgui_screen();
-
-		void screenshot(std::u8string name);
-
-		~Graphic();
-	};
-
 	struct layer {
 		void* buf = 0;
 		int x = 0, y = 0, w = 0, h = 0;
@@ -86,5 +63,3 @@ namespace MREngine {
 		void imgui_canvases();
 	};
 }
-
-MREngine::AppGraphic& get_current_app_graphic();

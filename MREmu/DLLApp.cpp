@@ -1,6 +1,7 @@
 #include "DLLApp.h"
 #include "Memory.h"
 #include "Bridge.h"
+#include "Path.h"
 #include "miniz.h"
 #include <fstream>
 #include <sstream>
@@ -10,23 +11,17 @@ using namespace std::string_literals;
 
 #ifdef  WIN32
 
-bool DLLApp::check_format(fs::path path, bool local) {
-	if (local) {
-		path = path_from_emu(path);
-	}
+DLLApp::DLLApp(App* app) {
+	init_from(app);
+}
 
-	unsigned char buf[4];
-	std::ifstream in(path, std::ios::in | std::ios::binary | std::ios::ate);
-	if (!in.is_open())
-		return false;
-	size_t file_size = (size_t)in.tellg();
-	if (file_size < 4)
-		return false;
-	in.seekg(0, std::ios::beg);
-	in.read((char*)buf, 4);
-	in.close();
+bool DLLApp::check_format(App* app) {
+	auto& buf = app->file_context;
 
-	if (!memcmp(buf, "MZ", 2))
+	if (buf.size() < 10)
+		return false;
+
+	if (!memcmp(buf.data(), "MZ", 2))
 		return true;
 
 	return false;

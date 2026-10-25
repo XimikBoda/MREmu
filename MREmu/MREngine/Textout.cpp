@@ -1,6 +1,7 @@
 #include "Graphic.h"
 #include "Canvas.h"
 #include "../Memory.h"
+#include "../AppContext.h"
 #include <vmgraph.h>
 #include <vmstdlib.h>
 #include "unifont.h"
@@ -9,8 +10,6 @@
 #include <string>
 #include <SFML/Graphics/Texture.hpp>
 #include <SFML/Graphics/Image.hpp>
-
-extern MREngine::Graphic* graphic;
 
 static bool is_skip_symbol(VMWCHAR c) {
 	return c < 0x20 || c == 0x7F;
@@ -140,6 +139,8 @@ void vm_graphic_set_font(font_size_t size) {
 }
 
 void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT length, VMUINT16 color) {
+	auto& gr = AppContext::get_executing_app_graphic();
+
 	if (disp_buf == 0 || !s)
 		return;
 
@@ -154,7 +155,7 @@ void vm_graphic_textout(VMUINT8* disp_buf, VMINT x, VMINT y, VMWSTR s, VMINT len
 	int right = cfp_dst->width;
 	int bottom = cfp_dst->height;
 
-	auto& clip = get_current_app_graphic().clip;
+	auto& clip = gr.clip;
 	if (clip.flag) {
 		if (left < clip.left)
 			left = clip.left;
@@ -225,14 +226,16 @@ VM_GDI_RESULT vm_font_set_font_style(VMINT bold, VMINT italic, VMINT underline) 
 }
 
 VM_GDI_RESULT vm_graphic_textout_to_layer(VMINT handle, VMINT x, VMINT y, VMWSTR s, VMINT length) {
-	auto& layers = get_current_app_graphic().layers;
+	auto& gr = AppContext::get_executing_app_graphic();
+
+	auto& layers = gr.layers;
 
 	if (handle < 0 || handle >= layers.size())
 		return VM_GDI_FAILED;
 
 	auto& layer = layers[handle];
 
-	vm_graphic_textout((VMUINT8*)layer.buf, x, y, s, length, get_current_app_graphic().global_color.vm_color_565);
+	vm_graphic_textout((VMUINT8*)layer.buf, x, y, s, length, gr.global_color.vm_color_565);
 
 	return VM_GDI_SUCCEED;
 }
@@ -288,8 +291,8 @@ vm_font_engine_error_message_enum vm_graphic_show_truncated_text(VM_GDI_HANDLE d
 	VMWCHAR* truncated_symbol,
 	VMINT bordered,
 	VMUINT16 color) {
-
-	auto& layers = get_current_app_graphic().layers;
+	auto& gr = AppContext::get_executing_app_graphic();
+	auto& layers = gr.layers;
 
 	if (dest_layer_handle < 0 || dest_layer_handle >= layers.size())
 		return VM_FONT_ENGINE_ERROR;

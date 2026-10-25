@@ -32,7 +32,7 @@ class MainActivity : NativeActivity() {
     }
 
     private external fun notifyPermissionState(granted: Boolean)
-    private external fun nativeLoadVxpFile(path: String)
+    private external fun nativeLoadVxpFile(fd: Int, path: String)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -140,26 +140,21 @@ class MainActivity : NativeActivity() {
             if (uri != null) {
                 Thread {
                     try {
-                        val tempVxpFile = File(cacheDir, "opened_app.vxp")
+                        val pfd = contentResolver.openFileDescriptor(uri, "r")
+                        if (pfd != null) {
+                            val fd = pfd.detachFd()
+                            val pathString = uri.toString()
 
-                        val inputStream = contentResolver.openInputStream(uri)
-                        val outputStream = FileOutputStream(tempVxpFile)
+                            Log.d("MREmu", "Opened FD: $fd for URI: $pathString")
 
-                        inputStream?.use { input ->
-                            outputStream.use { output ->
-                                input.copyTo(output)
+                            runOnUiThread {
+                                nativeLoadVxpFile(fd, pathString)
                             }
+                        } else {
+                            Log.e("MREmu", "Cannot open FileDescriptor for $uri")
                         }
-
-                        val realPosixPath = tempVxpFile.absolutePath
-                        Log.d("MREmu", "File copied to cache: $realPosixPath")
-
-                        runOnUiThread {
-                            nativeLoadVxpFile(realPosixPath)
-                        }
-
                     } catch (e: Exception) {
-                        Log.e("MREmu", "Coping to cache error", e)
+                        Log.e("MREmu", "Error opening file descriptor", e)
                     }
                 }.start()
             }

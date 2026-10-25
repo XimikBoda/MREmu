@@ -1,14 +1,14 @@
 #include "Graphic.h"
+#include "../Graphic.h"
 #include "Canvas.h"
 #include "Blt.h"
+#include "../AppContext.h"
 #include <vmgraph.h>
 #include <cstring>
 #include <SFML/System/Clock.hpp>
 #include <SFML/System/Sleep.hpp>
 
 extern sf::Clock global_clock;
-
-extern MREngine::Graphic* graphic;
 
 ColorRGBA read_16_color(const void* buf, int idx, int trans_color) {
 	uint16_t c = ((const uint16_t*)buf)[idx];
@@ -168,10 +168,12 @@ void master_blt(
 }
 
 VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
+	auto graphic = Graphic::getPtr();
+
 	if (layer_handles == 0)
 		return -1;
 
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	for (int i = 0; i < count; ++i)
 		if (layer_handles[i] < 0 || layer_handles[i] >= gr.layers.size())
@@ -209,10 +211,12 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 }
 
 VM_GDI_RESULT vm_graphic_flatten_layer(VMINT* hhandle, VMINT count) {
+	auto graphic = Graphic::getPtr();
+
 	if (hhandle == 0)
 		return -1;
 
-	MREngine::AppGraphic& gr = get_current_app_graphic();
+	MREngine::AppGraphic& gr = AppContext::get_executing_app_graphic();
 
 	for (int i = 0; i < count; ++i)
 		if (hhandle[i] < 0 || hhandle[i] >= gr.layers.size())
@@ -259,6 +263,8 @@ VM_GDI_RESULT vm_graphic_flatten_layer(VMINT* hhandle, VMINT count) {
 
 void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,
 	VMINT x_src, VMINT y_src, VMINT width, VMINT height, VMINT frame_index) {
+	auto& gr = AppContext::get_executing_app_graphic();
+
 	if (dst_disp_buf == 0 || src_disp_buf == 0)
 		return;
 
@@ -277,8 +283,8 @@ void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* sr
 	MREngine::RenderBox b(x_dest, y_dest, x_dest + width, y_dest + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
+	b.clip(gr.clip);
+	b.clip(gr.clip_by_buf(buf_dst));
 
 	int x_offset = x_dest - x_src + cfp_src->left;
 	int y_offset = y_dest - y_src + cfp_src->top;
@@ -298,6 +304,8 @@ void vm_graphic_blt(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* sr
 
 void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE* src_disp_buf,
 	VMINT x_src, VMINT y_src, VMINT width, VMINT height, VMINT frame_index, VMINT alpha) {
+	auto& gr = AppContext::get_executing_app_graphic();
+
 	if (dst_disp_buf == 0 || src_disp_buf == 0)
 		return;
 
@@ -316,8 +324,8 @@ void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE*
 	MREngine::RenderBox b(x_dest, y_dest, x_dest + width, y_dest + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
+	b.clip(gr.clip);
+	b.clip(gr.clip_by_buf(buf_dst));
 
 	int x_offset = x_dest - x_src + cfp_src->left;
 	int y_offset = y_dest - y_src + cfp_src->top;
@@ -337,6 +345,8 @@ void vm_graphic_blt_ex(VMBYTE* dst_disp_buf, VMINT x_dest, VMINT y_dest, VMBYTE*
 
 void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 	VMBYTE* src_buf, VMINT frame_index, VMINT degrees) { //Need more testing
+	auto& gr = AppContext::get_executing_app_graphic();
+
 	if (buf == 0 || src_buf == 0)
 		return;
 
@@ -361,8 +371,8 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 	MREngine::RenderBox b(x_des, y_des, x_des + width, y_des + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
+	b.clip(gr.clip);
+	b.clip(gr.clip_by_buf(buf_dst));
 
 	int src_w = cfp_src->width;
 	int src_h = cfp_src->height;
@@ -420,6 +430,8 @@ void vm_graphic_rotate(VMBYTE* buf, VMINT x_des, VMINT y_des,
 
 
 void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, VMINT frame_index, VMINT direction) {
+	auto& gr = AppContext::get_executing_app_graphic();
+
 	if (buf == 0 || src_buf == 0)
 		return;
 
@@ -441,8 +453,8 @@ void vm_graphic_mirror(VMBYTE* buf, VMINT x_des, VMINT y_des, VMBYTE* src_buf, V
 	MREngine::RenderBox b(x_des, y_des, x_des + width, y_des + height);
 
 	b.clip(*cfp_dst);
-	b.clip(get_current_app_graphic().clip);
-	b.clip(get_current_app_graphic().clip_by_buf(buf_dst));
+	b.clip(gr.clip);
+	b.clip(gr.clip_by_buf(buf_dst));
 
 	int src_w = cfp_src->width;
 	int src_h = cfp_src->height;

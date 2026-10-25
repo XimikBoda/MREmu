@@ -31,6 +31,3 @@ namespace MREngine {
 		int destroy(int id, bool gui);
 	};
 };
-
-
-MREngine::Timer& get_current_app_timer();

@@ -15,46 +15,32 @@
 #include "Bridge.h"
 #include "AppManager.h"
 #include "Log.h"
+#include "Network.h"
+#include "Graphic.h"
+#include "Path.h"
 
 #include "Device/Device.h"
 
-#include "MREngine/Graphic.h"
-#include "MREngine/IO.h"
 #include "MREngine/SIM.h"
 #include "MREngine/CharSet.h"
 #include <cmdparser.hpp>
 
 #include "NativeApps/Menu/AppSelector.h"
 
+#ifdef WIN32
+#include <windows.h>
+#endif // WIN32
+
+#ifdef ANDROID
+#include "Android.h"
+#include <spdlog/sinks/android_sink.h>
+#endif
+
+
 sf::Clock global_clock;
 
 std::string error_message = "";
 bool show_error = false;
-
-AppManager* g_appManager = 0;
-
-#ifdef ANDROID
-#include <spdlog/sinks/android_sink.h>
-
-std::atomic<int> storage_permission_state{0};
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_ximikboda_mremu_MainActivity_notifyPermissionState(JNIEnv *env, jobject thiz, jboolean granted) {
-    storage_permission_state = granted ? 1 : -1;
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thiz, jstring j_path) {
-    const char *path_cstr = env->GetStringUTFChars(j_path, nullptr);
-
-    while(!g_appManager)
-        sf::sleep(sf::seconds(0.2));
-
-    g_appManager->add_app_for_launch(path_cstr, false);
-
-    env->ReleaseStringUTFChars(j_path, path_cstr);
-}
-#endif
 
 int main(int argc, char** argv) {
     std::string app_path = "";
@@ -72,8 +58,10 @@ int main(int argc, char** argv) {
 	{
 		parser.set_optional<std::string>("", "", "", "Path to vxp");
 		parser.set_optional<bool>("l", "path_is_local", false, "Set to run from local filesystem");
+#ifdef BUILTIN_GDB
 		parser.set_optional<bool>("g", "gdb", false, "Set to run gdb server");
 		parser.set_optional<int>("p", "gdb_port", 1234, "Port for gdb server");
+#endif
 	}
 	parser.run_and_exit_if_error();
 	app_path = parser.get<std::string>("");
@@ -81,9 +69,6 @@ int main(int argc, char** argv) {
 
 	if (app_path.size())
 		spdlog::info("Vxp path from args: {} {}", app_path, path_is_local ? "(local path)" : "");
-
-	GDB::gdb_mode = parser.get<bool>("g");
-	GDB::gdb_port = parser.get<int>("p");
 
 	fs::current_path(fs::path(argv[0]).parent_path());
 #else
@@ -93,45 +78,32 @@ int main(int argc, char** argv) {
 #endif
 
     AppManager appManager;
-    g_appManager = &appManager;
+
+#ifdef BUILTIN_GDB
+	GDB::gdb_mode = parser.get<bool>("g");
+	GDB::gdb_port = parser.get<int>("p");
 
 	if(GDB::gdb_mode)
 		GDB::wait();
+#endif
 
 	Memory::init(32 * 1024 * 1024);
 	Cpu::init();
 	Bridge::init();
 
+	Network network;
+	Graphic graphic;
+
 	MREngine::SIM::init();
 	MREngine::System::init();
 	MREngine::CharSet::init();
 	MREngine::AppAudio::init();
-	MREngine::Graphic graphic;
-	MREngine::NetworkManager nm;
 
 #ifdef ANDROID
 	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu");
 	win_device.setFramerateLimit(60);
 
-	while (win_device.isOpen()) {
-		sf::Event event;
-		while (win_device.pollEvent(event)) {
-			if (event.type == sf::Event::Closed) {
-				win_device.close();
-			}
-		}
-
-		int perm_state = storage_permission_state.load();
-
-		if (perm_state == 1)
-			break;
-		else if (perm_state == 0)
-			win_device.clear(sf::Color::Black);
-		else if (perm_state == -1)
-			win_device.clear(sf::Color::Red);
-
-		win_device.display();
-	}
+	Android::wait_storage_permission(win_device);
 #else // Not ANDROID
 
 #ifdef DEBUG_WINDOW
@@ -144,25 +116,27 @@ int main(int argc, char** argv) {
 	win_device.setFramerateLimit(60);
 #endif
 
-	MREngine::IO::init();
+	Path::init();
 
+#ifdef BUILTIN_GDB
 	if (GDB::gdb_mode)
 		GDB::cpu_state = GDB::Stop;
+#endif
 
 	appManager.start();
 
-	Device device(win_device, graphic);
+	Device device(win_device);
 
 	if (app_path.size()) {
 		if (fs::exists(app_path) || path_is_local) {
-			appManager.add_app_for_launch(app_path, path_is_local);
+			appManager.push_event(Event::launch{ Event::path_app{app_path, false} });
 		} else {
 			error_message = "VXP file does not exist:\n" + app_path;
 			show_error = true;
 		}
 	}
 	else
-		appManager.add_app_for_launch("", false, &NativeApps::Menu::AppSelector::Conf);
+		appManager.push_event(Event::launch{ Event::native_app{NativeApps::Menu::AppSelector::Conf.entry, u8"TODO: fix it"}});
 
 	sf::Clock fps;
 
@@ -221,31 +195,32 @@ int main(int argc, char** argv) {
 		device.imgui();
 		graphic.imgui_screen();
 
-		std::lock_guard lock(appManager.active_app_mutex);
-		App* active_app = appManager.get_active_app();
-		if (active_app) {
-			active_app->graphic.imgui_layers();
-			active_app->graphic.imgui_canvases();
+		{
+			auto lock = appManager.get_foreground_app_guard();
+			App* foreground_app = appManager.get_foreground_app();
+			if (foreground_app) {
+				foreground_app->graphic.imgui_layers();
+				foreground_app->graphic.imgui_canvases();
+
+				if (ImGui::Begin("Memory")) { // Todo, move to Memory.h
+					float size = foreground_app->app_memory.get_memory_size();
+					float free_size = foreground_app->app_memory.get_free_memory_size();
+					float used_size = size - free_size;
+					ImGui::Text("All:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
+						size, size / 1024.f, size / 1024.f / 1024.f);
+					ImGui::Text("Free:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
+						free_size, free_size / 1024.f, free_size / 1024.f / 1024.f);
+					ImGui::Text("Used:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n",
+						used_size, used_size / 1024.f, used_size / 1024.f / 1024.f);
+					ImGui::Text("Used: %1.2f%%%", 100.f * used_size / size);
+				}
+				ImGui::End();
+			}
+
+			ImGui::SFML::Render(win_debug);
+			win_debug.display();
+			win_debug.clear();
 		}
-
-		if (ImGui::Begin("Memory") && active_app) {
-			float size = active_app->app_memory.get_memory_size();
-			float free_size = active_app->app_memory.get_free_memory_size();
-			float used_size = size - free_size;
-			ImGui::Text("All:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
-				size, size / 1024.f, size / 1024.f / 1024.f);
-			ImGui::Text("Free:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
-				free_size, free_size / 1024.f, free_size / 1024.f / 1024.f);
-			ImGui::Text("Used:\n%1.0f bytes\n%1.1f kb\n %1.3f mb\n", 
-				used_size, used_size / 1024.f, used_size / 1024.f / 1024.f);
-			ImGui::Text("Used: %1.2f%%%", 100.f*used_size / size);
-		}
-		ImGui::End();
-
-
-		ImGui::SFML::Render(win_debug);
-		win_debug.display();
-		win_debug.clear();
 #endif
 
 		win_device.display();

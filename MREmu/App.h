@@ -1,8 +1,8 @@
 #pragma once
-#include "MreTags.h"
 #include "Memory.h"
 #include "MREngine/System.h"
 #include "MREngine/Resources.h"
+#include "MREngine/Tags.h"
 #include "MREngine/Graphic.h"
 #include "MREngine/Timer.h"
 #include "MREngine/IO.h"
@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 
 class App
 {
-public:
+public: // TODO make private
 	enum State{
 		Runned,
 		SoftClosing,
@@ -37,22 +37,28 @@ public:
 
 	State state = Runned; // todo
 
-	std::u8string app_name;
+	int phandle = -1;
 
-	MreTags tags;
+	std::u8string app_name;
 
 	Memory::MemoryManager app_memory;
 	MREngine::SystemCallbacks system_callbacks;
 	MREngine::Resources resources;
+	MREngine::Tags tags;
 	MREngine::AppGraphic graphic;
 	MREngine::Timer timer;
 	MREngine::AppIO io;
 	MREngine::AppSock sock;
 	MREngine::AppAudio audio;
 
+	bool load(std::ifstream& in);
+	bool load(fs::path path, bool local);
+	bool load(int fd, fs::path path);
+
+	void init_from(App* app);
+
 	virtual bool preparation() { return false; };
 	virtual void start() {};
-	bool load_from_file(fs::path path, bool local);//tmp
 
 	virtual bool is_native() { return true; }
 

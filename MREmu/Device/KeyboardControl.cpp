@@ -1,10 +1,12 @@
-#include "../AppManager.h"
 #include "KeyboardControl.h"
+#include "../MREngine/IO.h"
+#include "../AppContext.h"
 #include <vmio.h>
 #include <vector>
 
-App* get_active_app();
-extern MREngine::Graphic* graphic;
+static void add_keyboard_event(int event, int keycode) {
+	AppContext::push_event(Event::input{ Event::keyboard{ event, keycode } });
+}
 
 KeyboardControl::pkey_t::pkey_t(int key_code, key_source source) {
 	this->key_code = key_code;
@@ -38,13 +40,12 @@ void KeyboardControl::press_key(int key_code, key_source source) {
 			vibration.vibrate(sf::milliseconds(50));
 		}
 #endif
-		if (key_code == MREMU_KEY_PRINTSCREEN){ //TODO
-			auto app = get_active_app();
-			if (app) {
-				graphic->screenshot(app->app_name);
-			}
-
-		}
+		//if (key_code == MREMU_KEY_PRINTSCREEN){ //TODO
+		//	auto app = get_active_app();
+		//	if (app) {
+		//		graphic->screenshot(app->app_name);
+		//	}
+		//}
 
 		pkey.push_back(pkey_t(key_code, source));
 		if(key_code <= VM_KEY_QWERTY_MENU)

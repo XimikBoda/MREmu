@@ -120,6 +120,3 @@ void mremu_media_getreadbuffer(VMUINT16** buffer, VMUINT32* buf_len);
 Media_Status mremu_media_record(Media_Format format, mremu_media_handler handler, void* param);
 void mremu_media_readdatadone(VMUINT32 len);
 void mremu_media_stop();
-
-MREngine::AppAudio& get_current_app_audio();
-bool cur_app_is_native();
