@@ -6,6 +6,9 @@
 #include <fstream>
 #include <sstream>
 #include <vmsys.h>
+#ifdef WIN32
+#include <io.h>
+#endif 
 
 bool App::load(std::ifstream &in) {
 	if (!in.is_open())
@@ -34,16 +37,19 @@ bool App::load(fs::path path, bool local) {
 }
 
 bool App::load(int fd, fs::path path) {
-#ifdef  WIN32
-	std::ifstream in(::_fdopen(fd, "r"));
-#elif
-	__gnu_cxx::stdio_filebuf<char> filebuf(fd, std::ios::in);
-    istream in(&filebuf);
-#endif
+    size_t file_size = lseek(fd, 0, SEEK_END);
+    file_context.resize(file_size);
 
-	real_path = path;
+    lseek(fd, 0, SEEK_SET);
+    int bytes_read = read(fd, (char*)file_context.data(), file_size);
 
-	return load(in);
+    if (bytes_read < 0 || (size_t)bytes_read != file_size) {
+        close(fd);
+        return false;
+    }
+
+    close(fd);
+    return true;
 }
 
 #define APP_TO_THIS(x) this->x = app->x;

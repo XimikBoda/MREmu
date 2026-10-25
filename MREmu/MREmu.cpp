@@ -51,10 +51,10 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_ximikboda_mremu_MainActivity_nativeLoadVxpFile(JNIEnv *env, jobject thiz, jstring j_path) {
     const char *path_cstr = env->GetStringUTFChars(j_path, nullptr);
 
-    while(!g_appManager)
+    while(!AppManager::getPtr())
         sf::sleep(sf::seconds(0.2));
 
-    g_appManager->add_app_for_launch(path_cstr, false);
+    AppManager::getPtr()->push_event(Event::launch{Event::path_app{path_cstr, false}});
 
     env->ReleaseStringUTFChars(j_path, path_cstr);
 }

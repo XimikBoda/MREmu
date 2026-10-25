@@ -100,7 +100,8 @@ namespace Bridge {
 
 	template <typename T>
 	T extract_arg(uc_engine* uc, int index) {
-		static_assert(std::is_pointer_v<T> || sizeof(T) <= 4,
+		static_assert(std::is_pointer_v<T> || sizeof(T) <= 4
+		        || std::is_same_v<T, long> || std::is_same_v<T, unsigned long>,
 			"[BIND_FUNC ERROR]: Argument is > 32 bits (requires read_arg_64). Use a manual lambda!");
 
 		static_assert(!(std::is_pointer_v<T> && std::is_pointer_v<std::remove_pointer_t<T>>),
@@ -119,10 +120,11 @@ namespace Bridge {
 
 	template <typename Ret, typename... Args, Ret(*Func)(Args...)>
 	struct ApiWrapper<Ret(*)(Args...), Func> {
-		template <int... Is>
+		template <std::size_t... Is>
 		static void call_impl(uc_engine* uc, std::index_sequence<Is...>) {
 			if constexpr (!std::is_void_v<Ret>) {
-				static_assert(std::is_pointer_v<Ret> || sizeof(Ret) <= 4,
+                static_assert(std::is_pointer_v<Ret> || sizeof(Ret) <= 4
+                              || std::is_same_v<Ret, long> || std::is_same_v<Ret, unsigned long>,
 					"[BIND_FUNC ERROR]: Return type > 32 bits. Use a manual lambda!");
 
 				static_assert(!(std::is_pointer_v<Ret> && std::is_pointer_v<std::remove_pointer_t<Ret>>),
