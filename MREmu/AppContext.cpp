@@ -67,8 +67,8 @@ namespace AppContext {
 		return get_executing_app()->is_native();
 	}
 
-	void close_executing_app() {
-		get_app_manager()->close_app(get_executing_app()->phandle, false);
+	void close_executing_app(bool soft) {
+		get_app_manager()->close_app(get_executing_app()->phandle, soft);
 	}
 
 	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem) {
@@ -91,6 +91,10 @@ namespace AppContext {
 	}
 
 	void push_event(const Event::system& ev) {
+		get_app_manager()->push_event(ev);
+	}
+
+	void push_event(const Event::file_selector& ev) {
 		get_app_manager()->push_event(ev);
 	}
 }

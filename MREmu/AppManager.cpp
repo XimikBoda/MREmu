@@ -91,14 +91,19 @@ void AppManager::close_app(int phandle, bool soft) {
 void AppManager::close_apps() {
 	for (auto it = apps.begin(); it != apps.end();) {
 		auto& state = it->second->state;
-
-		if (state == App::HardClosing) {
+		
+		switch (state) {
+		case App::SoftClosing:
+			run_sys_event(it->second.get(), VM_MSG_QUIT, 0);
+		case App::HardClosing:
 			pop_foreground_app(it->first);
-			
+
 			it = apps.erase(it);
-		}
-		else
+			break;
+		default:
 			++it;
+			break;
+		}
 	}
 }
 
@@ -127,6 +132,11 @@ void AppManager::push_event(const Event::input& ev) {
 
 void AppManager::push_event(const Event::network& ev) {
 	network_events_queue.push(events_mutex, ev);
+	events_cv.notify_one();
+}
+
+void AppManager::push_event(const Event::file_selector& ev) {
+	file_selector_events_queue.push(events_mutex, ev);
 	events_cv.notify_one();
 }
 
@@ -255,6 +265,21 @@ void AppManager::process_event(const Event::network& ev) {
 			}, ev.data);
 }
 
+void AppManager::process_event(const Event::file_selector& ev) {
+	App* app = set_executing_app_by_phandle(ev.phandle);
+
+	if (app)
+		if (ev.callback) {
+			int wlen = ev.path.length() + 1;
+			VMWCHAR* str = (VMWCHAR*)Memory::shared_malloc(wlen * sizeof(VMWCHAR));
+			memcpy(str, ev.path.data(), wlen * sizeof(VMWCHAR));
+
+			app->run(ev.callback, str, wlen - 1);
+
+			Memory::shared_free(str);
+		}
+}
+
 sf::Time AppManager::get_time_for_nearest_timer()
 {
 	sf::Time nearst = sf::milliseconds(INT32_MAX);
@@ -273,7 +298,8 @@ bool AppManager::is_all_events_empty() {
 	return launch_events_queue.empty()
 		&& input_events_queue.empty()
 		&& system_events_queue.empty()
-		&& network_events_queue.empty();
+		&& network_events_queue.empty()
+		&& file_selector_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -308,7 +334,8 @@ void AppManager::loop() {
 		run_queue(system_events_queue, lock, [this](Event::system data) { process_event(data); });
 		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
 		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
-		
+		run_queue(file_selector_events_queue, lock, [this](Event::file_selector data) { process_event(data); });
+
 		lock.unlock();
 
 		for (const auto& it : apps) {

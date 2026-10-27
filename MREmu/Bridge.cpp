@@ -230,6 +230,7 @@ namespace Bridge {
 		BIND_FUNC(vm_get_disk_info),
 		BIND_FUNC(vm_is_support_keyborad),
 		BIND_FUNC(vm_is_support_pen_touch),
+		BIND_FUNC(vm_selector_run),
 
 		// SIM
 		BIND_FUNC(vm_get_operator),

@@ -4,6 +4,7 @@
 #include "../Log.h"
 #include "../AppContext.h"
 #include "../Path.h"
+#include "../NativeApps/Applet/FileSelector.h"
 #include <vmio.h>
 #include <iostream>
 #include <cstring>
@@ -483,4 +484,10 @@ VMINT vm_is_support_keyborad(void) {
 
 VMINT vm_is_support_pen_touch(void) {
 	return 1;
+}
+
+VMINT vm_selector_run(VMINT type, const VMWCHAR* folder_path, VMINT(*callback)(VMWCHAR* file_path, VMINT wlen)) {
+	std::u16string str = folder_path ? (const char16_t*)folder_path : u"";
+
+	return NativeApps::Applet::FileSelector::start((vm_selector_type_t)type, str, callback);
 }

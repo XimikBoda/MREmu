@@ -21,6 +21,7 @@ namespace Event {
 	struct network;
 	struct input;
 	struct system;
+	struct file_selector;
 }
 
 namespace Memory {
@@ -47,7 +48,7 @@ namespace AppContext {
 	std::filesystem::path		get_executing_app_path();
 	bool						is_executing_app_native();
 
-	void close_executing_app();
+	void close_executing_app(bool soft = false);
 
 	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem);
 
@@ -55,4 +56,5 @@ namespace AppContext {
 	void push_event(const Event::network& ev);
 	void push_event(const Event::input& ev);
 	void push_event(const Event::system& ev);
+	void push_event(const Event::file_selector& ev);
 };
