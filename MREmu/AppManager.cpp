@@ -133,6 +133,7 @@ void AppManager::process_event(const Event::launch& ev) {
 		app = std::make_shared<NativeApp>();
 
 		((NativeApp*)app.get())->conf = *native_app;
+		((NativeApp*)app.get())->app_name = native_app->name;
 
 		app->preparation();
 	}

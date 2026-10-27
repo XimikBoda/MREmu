@@ -184,7 +184,7 @@ VMINT vm_graphic_flush_layer(VMINT* layer_handles, VMINT count) {//TODO
 		const int fps = 30, frame_delay = 1000000 / fps;
 		uint64_t now = millis % frame_delay;
 
-		sf::sleep(sf::microseconds(frame_delay - now));
+		//sf::sleep(sf::microseconds(frame_delay - now)); //TODO
 	}
 
 	for (int sy = 0; sy < graphic->height; ++sy)

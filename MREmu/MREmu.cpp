@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	else
-		appManager.push_event(Event::launch{ Event::native_app{NativeApps::Menu::AppSelector::Conf.entry, u8"TODO: fix it"}});
+		appManager.push_event(Event::launch{ Event::native_app{NativeApps::Menu::AppSelector::Conf.entry, u8"AppSelector"}});
 
 	sf::Clock fps;
 
