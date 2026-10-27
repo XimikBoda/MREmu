@@ -72,7 +72,7 @@ App* AppManager::pop_foreground_app(int phandle) {
 	if (app) {
 		run_sys_event(app, VM_MSG_ACTIVE, 0);
 		app->timer.set_active(true);
-		push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
+		push_event(Event::system{ foreground_app, Event::system_msg{ VM_MSG_PAINT, 0} });
 	}
 	return app;
 }
@@ -99,6 +99,14 @@ void AppManager::close_apps() {
 		}
 		else
 			++it;
+	}
+}
+
+void AppManager::close_all_apps() {
+	for (auto it = apps.begin(); it != apps.end();) {
+		run_sys_event(it->second.get(), VM_MSG_QUIT, 0);
+
+		it = apps.erase(it);
 	}
 }
 
@@ -312,6 +320,8 @@ void AppManager::loop() {
 
 		close_apps();
 	}
+
+	close_all_apps();
 }
 
 void AppManager::start() {

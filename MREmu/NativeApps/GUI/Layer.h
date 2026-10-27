@@ -38,7 +38,7 @@ namespace GUI {
 		}
 
 		~Layer() {
-			//dectroy();
+			dectroy();
 		}
 	};
 }

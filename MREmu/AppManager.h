@@ -60,6 +60,7 @@ public:
 
 	void close_app(int phandle, bool soft);
 	void close_apps();
+	void close_all_apps();
 
 	void push_event(const Event::launch& ev);
 	void push_event(const Event::system& ev);

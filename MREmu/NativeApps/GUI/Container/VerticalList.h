@@ -55,7 +55,7 @@ namespace GUI::Container {
 					rb.x, i_rb.y + i_h,
 					rb.x + rb.w, i_rb.y + i_h, color);
 			}
-		};
+		}
 
 		void key_event(int event, int keycode) override {
 			if (event == VM_KEY_EVENT_UP) {
@@ -63,11 +63,15 @@ namespace GUI::Container {
 					focused_item_id++;
 				else if (keycode == VM_KEY_UP)
 					focused_item_id--;
+				else
+					if (focuse_item_valid())
+						items[focused_item_id].ui->key_event(event, keycode);
 				
 				if (focused_item_id < 0)
 					focused_item_id = items.size() - 1;
 				else if (focused_item_id >= items.size())
 					focused_item_id = 0;
+
 			}
 		}
 
@@ -92,8 +96,12 @@ namespace GUI::Container {
 			items[t_i].ui->pen_event(touch);
 		}
 
+		bool focuse_item_valid() {
+			return focused_item_id >= 0 && focused_item_id < items.size();
+		}
+
 		std::shared_ptr<Base> get_focused() {
-			if (focused_item_id >= 0 && focused_item_id < items.size())
+			if (focuse_item_valid())
 				return items[focused_item_id].ui->get_focused();
 			return nullptr;
 		}

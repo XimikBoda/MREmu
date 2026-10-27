@@ -1,4 +1,6 @@
 #include "AppSelector.h"
+#include "../../AppContext.h"
+#include "../../AppManagerEvents.h"
 #include "../GUI/Engine.h"
 #include "../GUI/View/Text.h"
 #include "../GUI/View/Image.h"
@@ -105,8 +107,12 @@ namespace NativeApps::Menu::AppSelector {
 			list->items.push_back({ std::make_shared<AppItem>(name, path, load_vxp_logo(path, image_size, image_size)) });
 		}
 
-		vm_reg_sysevt_callback([](int m, int p) {engine->sys_event(m, p); });
+		vm_reg_sysevt_callback([](int m, int p) { engine->sys_event(m, p, engine); });
 		vm_reg_keyboard_callback([](int e, int k) {engine->key_event(e, k); });
 		vm_reg_pen_callback([](int e, int x, int y) {engine->pen_event(e, x, y); });
+	}
+
+	void start() {
+		AppContext::push_event(Event::launch{ Event::native_app{entry, u8"AppSelector"} });
 	}
 }

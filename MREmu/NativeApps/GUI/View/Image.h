@@ -22,5 +22,9 @@ namespace GUI::View {
 			if (img)
 				vm_graphic_blt(layer.buf, rb.x, rb.y, (VMBYTE*)img, 0, 0, w, h, 1);
 		};
+
+		~Image() {
+			vm_graphic_release_canvas_FIX(img);
+		}
 	};
 }

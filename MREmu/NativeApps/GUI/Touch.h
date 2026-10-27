@@ -32,7 +32,6 @@ namespace GUI {
 				break;
 			case VM_PEN_EVENT_RELEASE:
 			case VM_PEN_EVENT_ABORT:
-				moved = false;
 				break;
 			}
 
