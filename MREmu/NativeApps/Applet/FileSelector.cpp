@@ -15,7 +15,8 @@
 
 namespace NativeApps::Applet::FileSelector {
 	std::shared_ptr<GUI::Engine> engine;
-	GUI::Container::VertocalList* list;
+	GUI::Container::VerticalList* g_list;
+	GUI::Container::VerticalScroll* g_scroll;
 	std::u16string cur_path;
 	int parent_phandle = -1;
 	VMINT(*ret_callback)(VMWCHAR*, VMINT);
@@ -70,7 +71,7 @@ namespace NativeApps::Applet::FileSelector {
 		}
 	};
 
-	static bool file_sort(GUI::Container::VertocalList::list_item& ai, GUI::Container::VertocalList::list_item& bi) {
+	static bool file_sort(GUI::Container::VerticalList::list_item& ai, GUI::Container::VerticalList::list_item& bi) {
 		FileItem* a = (FileItem*)ai.ui.get(), * b = (FileItem*)bi.ui.get();
 		if (a->is_folder == b->is_folder)
 			return a->name < b->name;
@@ -99,7 +100,7 @@ namespace NativeApps::Applet::FileSelector {
 	void enter_directory(std::u16string path) {
 		cur_path = path;
 
-		list->items.clear();
+		g_list->items.clear();
 
 		if (cur_path.size()) 
 		{
@@ -117,28 +118,31 @@ namespace NativeApps::Applet::FileSelector {
 				if (is_folder)
 					path += u'\\';
 
-				list->items.push_back({ std::make_shared<FileItem>(name, path, is_folder) });
+				g_list->items.push_back({ std::make_shared<FileItem>(name, path, is_folder) });
 			}
 
-			list->items.push_back({ std::make_shared<FileItem>(u"..\\ (previus dir)", prev_dir(cur_path), true)});
-			std::sort(list->items.begin(), list->items.end(), file_sort);
+			g_list->items.push_back({ std::make_shared<FileItem>(u"..\\ (previus dir)", prev_dir(cur_path), true)});
+			std::sort(g_list->items.begin(), g_list->items.end(), file_sort);
 		}
 		else {
-			list->items.push_back({ std::make_shared<FileItem>(u"E:\\ (SD Card)", u"e:\\", true) });
-			list->items.push_back({ std::make_shared<FileItem>(u"C:\\ (Internal memory)", u"c:\\", true) });
-			list->items.push_back({ std::make_shared<FileItem>(u"D:\\ (Hiden internal memory)", u"d:\\", true) });
+			g_list->items.push_back({ std::make_shared<FileItem>(u"E:\\ (SD Card)", u"e:\\", true) });
+			g_list->items.push_back({ std::make_shared<FileItem>(u"C:\\ (Internal memory)", u"c:\\", true) });
+			g_list->items.push_back({ std::make_shared<FileItem>(u"D:\\ (Hiden internal memory)", u"d:\\", true) });
 		}
 
+		g_scroll->scroll_pos = 0;
 		engine->update();
 	}
 
 	void entry() {
 		engine = std::make_shared<GUI::Engine>();
-		auto list_local = std::make_shared<GUI::Container::VertocalList>();
+		auto local = std::make_shared<GUI::Container::VerticalList>();
 		auto scroll = std::make_shared<GUI::Container::VerticalScroll>();
-		scroll->ui = list_local;
+		scroll->ui = local;
 		engine->ui = scroll;
-		list = list_local.get();
+
+		g_list = local.get();
+		g_scroll = scroll.get();
 
 		enter_directory(cur_path);
 

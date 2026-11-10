@@ -89,7 +89,7 @@ namespace NativeApps::Menu::AppSelector {
 
 	void entry() {
 		engine = std::make_shared<GUI::Engine>();
-		auto list = std::make_shared<GUI::Container::VertocalList>();
+		auto list = std::make_shared<GUI::Container::VerticalList>();
 		auto scroll = std::make_shared<GUI::Container::VerticalScroll>();
 		scroll->ui = list;
 		engine->ui = scroll;

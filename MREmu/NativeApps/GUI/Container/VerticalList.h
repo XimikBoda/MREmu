@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace GUI::Container {
-	class VertocalList : public Container {
+	class VerticalList : public Container {
 	public:
 		struct list_item{
 			std::shared_ptr<Base> ui;
