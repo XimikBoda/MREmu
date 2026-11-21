@@ -28,7 +28,7 @@ VMINT vm_get_time(vm_time_t* time) {
 	std::time_t t = std::time(nullptr);
 	std::tm* const pTInfo = std::localtime(&t);
 	time->year = 1900 + pTInfo->tm_year;
-	time->mon = pTInfo->tm_mon;
+	time->mon = pTInfo->tm_mon + 1;
 	time->day = pTInfo->tm_mday;
 	time->hour = pTInfo->tm_hour;
 	time->min = pTInfo->tm_min;
