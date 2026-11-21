@@ -197,6 +197,8 @@ namespace NativeApps::Applet::FileSelector {
 	}
 
 	void enter_directory(std::u16string path) {
+		std::u16string prew_path = cur_path;
+
 		cur_path = path;
 
 		g_list->items.clear();
@@ -230,6 +232,15 @@ namespace NativeApps::Applet::FileSelector {
 		}
 
 		g_scroll->scroll_pos = 0;
+		g_list->focused_item_id = 0;
+
+		for (int i = 0; i < g_list->items.size(); ++i)
+			if (auto fi = dynamic_cast<FileItem*>(g_list->items[i].ui.get()))
+				if (fi->path == prew_path)
+					g_list->focused_item_id = i;
+
+		g_scroll->check_focused_pos();
+
 		engine->update();
 	}
 
