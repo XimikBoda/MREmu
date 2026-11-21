@@ -1,14 +1,18 @@
 #pragma once
 #include "Layer.h"
 #include "Touch.h"
+#include "SoftKeySet.h"
 #include <cinttypes>
 #include <memory>
 
 namespace GUI {
+	typedef std::shared_ptr<class Base> BaseSh;
+
 	class Base : public std::enable_shared_from_this<Base> {
 	public:
 		int w = 0, h = 0;
 		uint16_t focused_color = VM_COLOR_888_TO_565(50, 50, 50);
+		uint16_t back_color = 0;
 		
 		RenderBox rb;
 
@@ -35,9 +39,16 @@ namespace GUI {
 			return shared_from_this();
 		};
 
+		virtual SoftKeySet get_soft_keys() {
+			return {};
+		};
+
 		virtual void draw_focused(const Layer& layer) {
 			vm_graphic_fill_rect(layer.buf, rb.x, rb.y, rb.w, rb.h, focused_color, focused_color);
 		};
 
+		virtual void draw_back(const Layer& layer) {
+			vm_graphic_fill_rect(layer.buf, rb.x, rb.y, rb.w, rb.h, back_color, back_color);
+		};
 	};
 }

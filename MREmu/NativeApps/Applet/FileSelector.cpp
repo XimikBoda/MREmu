@@ -4,6 +4,8 @@
 #include "../GUI/Engine.h"
 #include "../GUI/View/Text.h"
 #include "../GUI/View/Image.h"
+#include "../GUI/Container/AlignContainer.h"
+#include "../GUI/Container/MainContainer.h"
 #include "../GUI/Container/VerticalList.h"
 #include "../GUI/Container/VerticalScroll.h"
 #include "../GUI/Base.h"
@@ -11,6 +13,7 @@
 #include <vmmissing.h>
 #include <vmio.h>
 #include <vmpromng.h>
+#include <functional>
 #include <memory>
 
 namespace NativeApps::Applet::FileSelector {
@@ -22,25 +25,18 @@ namespace NativeApps::Applet::FileSelector {
 	VMINT(*ret_callback)(VMWCHAR*, VMINT);
 
 	void enter_directory(std::u16string path);
+	std::u16string prev_dir(std::u16string path);
 
-	class FileItem : public GUI::Base {
+	class MenuItem : public GUI::Base {
 	public:
-		std::u16string name;
-		std::u16string path;
-
+		const int text_x = 2, text_y = 2;
 		GUI::View::Text text;
 
-		bool is_folder = false;
+		GUI::SoftKeySet soft_key_set;
 
-		const int text_x = 2, text_y = 2;
-		const uint16_t folder_text_color = VM_COLOR_888_TO_565(255, 165, 0);
-
-		FileItem(std::u16string name, std::u16string path, bool is_folder) 
-			: text(name, is_folder ? folder_text_color : 0xFFFF) 
+		MenuItem(std::u16string name, GUI::SoftKeySet soft_key_set) : text(name)
 		{
-			this->name = name;
-			this->path = path;
-			this->is_folder = is_folder;
+			this->soft_key_set = soft_key_set;
 			h = 20;
 		}
 
@@ -55,19 +51,114 @@ namespace NativeApps::Applet::FileSelector {
 		}
 
 		void draw(const GUI::Layer& layer, bool focused) override {
+			draw_back(layer);
+
+			if (focused)
+				draw_focused(layer);
+
+			text.draw(layer, focused);
+		}
+
+		GUI::SoftKeySet get_soft_keys() {
+			return soft_key_set;
+		}
+	};
+
+	class FileItem : public GUI::Base {
+	public:
+		const int text_x = 2, text_y = 2;
+		const uint16_t folder_text_color = VM_COLOR_888_TO_565(255, 165, 0);
+
+		std::u16string name;
+		std::u16string path;
+
+		GUI::View::Text text;
+
+		bool is_folder = false;
+		bool is_root = false;
+
+		FileItem(std::u16string name, std::u16string path, bool is_folder, bool is_root = false)
+			: text(name, is_folder ? folder_text_color : 0xFFFF) 
+		{
+			this->name = name;
+			this->path = path;
+			this->is_folder = is_folder;
+			this->is_root = is_root;
+			h = 20;
+		}
+
+		void update_size() override {
+			text.update_size();
+			w = text_x * 2 + text.w;
+		}
+
+		void update_rb(GUI::RenderBox rb) override {
+			this->rb = rb;
+			text.update_rb({ rb.x + text_x, rb.y + text_y, rb.w - text_x, rb.h - text_y });
+		}
+
+		void draw(const GUI::Layer& layer, bool focused) override {
 			if (focused)
 				draw_focused(layer);
 
 			text.draw(layer, focused);
 		};
 
+		void left(GUI::BaseSh& ui_menu) {
+			auto list = std::make_shared<GUI::Container::VerticalList>();
+
+			GUI::SoftKeySet sks = {
+				std::nullopt,
+				GUI::SoftKey{u"Ok", [this](GUI::BaseSh& ui_menu) { ok(); }},
+				GUI::SoftKey{u"Back", [this](GUI::BaseSh& ui_menu) { ui_menu.reset(); }},
+			};
+
+			if (is_folder)
+				list->items.push_back({ std::make_shared<MenuItem>(u"Open", sks) });
+
+			sks.keys[GUI::SoftKeySet::Ok]->func = [this](GUI::BaseSh& ui_menu) { select(); };
+			list->items.push_back({ std::make_shared<MenuItem>(u"Select", sks) });
+
+			sks.keys[GUI::SoftKeySet::Ok]->func = [this](GUI::BaseSh& ui_menu) { cancel(); };
+			list->items.push_back({ std::make_shared<MenuItem>(u"Cancel", sks) });
+
+			auto aling = std::make_shared<GUI::Container::AlignContainer>(list, 
+				GUI::Container::AlignContainer::Horisontal::Left, GUI::Container::AlignContainer::Vertical::Bottom);
+
+			ui_menu = aling;
+			engine->update();
+		}
+
 		void ok() override {
 			if (is_folder)
 				enter_directory(path);
-			else {
-				AppContext::push_event(Event::file_selector{ path, ret_callback, parent_phandle });
-				AppContext::close_executing_app(true);
-			}
+			else
+				select();
+		}
+
+		void right() {
+			if (is_root)
+				cancel();
+			else
+				enter_directory(prev_dir(cur_path));
+		}
+
+		void select() {
+			AppContext::push_event(Event::file_selector{ path, ret_callback, parent_phandle });
+			AppContext::close_executing_app(true);
+		}
+
+		void cancel() {
+			AppContext::push_event(Event::file_selector{ u"", ret_callback, parent_phandle });
+			AppContext::close_executing_app(true);
+		}
+
+		GUI::SoftKeySet get_soft_keys() {
+			return {
+				GUI::SoftKey{u"Options", [this](GUI::BaseSh& ui_menu) { left(ui_menu); }},
+				GUI::SoftKey{is_folder ? u"Open" : u"Select", [this](GUI::BaseSh& ui_menu) { ok(); }},
+				GUI::SoftKey{is_root ? u"Cancel" : u"Back", [this](GUI::BaseSh& ui_menu) { right(); }},
+			};
 		}
 	};
 
@@ -125,9 +216,9 @@ namespace NativeApps::Applet::FileSelector {
 			std::sort(g_list->items.begin(), g_list->items.end(), file_sort);
 		}
 		else {
-			g_list->items.push_back({ std::make_shared<FileItem>(u"E:\\ (SD Card)", u"e:\\", true) });
-			g_list->items.push_back({ std::make_shared<FileItem>(u"C:\\ (Internal memory)", u"c:\\", true) });
-			g_list->items.push_back({ std::make_shared<FileItem>(u"D:\\ (Hiden internal memory)", u"d:\\", true) });
+			g_list->items.push_back({ std::make_shared<FileItem>(u"E:\\ (SD Card)", u"e:\\", true, true) });
+			g_list->items.push_back({ std::make_shared<FileItem>(u"C:\\ (Internal memory)", u"c:\\", true, true) });
+			g_list->items.push_back({ std::make_shared<FileItem>(u"D:\\ (Hiden internal memory)", u"d:\\", true, true) });
 		}
 
 		g_scroll->scroll_pos = 0;
@@ -138,8 +229,10 @@ namespace NativeApps::Applet::FileSelector {
 		engine = std::make_shared<GUI::Engine>();
 		auto local = std::make_shared<GUI::Container::VerticalList>();
 		auto scroll = std::make_shared<GUI::Container::VerticalScroll>();
+		auto main = std::make_shared<GUI::Container::MainContainer>();
 		scroll->ui = local;
-		engine->ui = scroll;
+		main->ui = scroll;
+		engine->ui = main;
 
 		g_list = local.get();
 		g_scroll = scroll.get();

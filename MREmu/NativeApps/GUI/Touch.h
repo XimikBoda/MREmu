@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <vmio.h>
+#include "RenderBox.h"
 
 namespace GUI {
 	class Touch {
@@ -36,6 +37,11 @@ namespace GUI {
 			}
 
 			return *this;
+		}
+
+		bool in_renderbox(const RenderBox& rb) const {
+			return x >= rb.x && x < rb.x + rb.w 
+				&& y >= rb.y && y < rb.y + rb.h;
 		}
 	};
 }
