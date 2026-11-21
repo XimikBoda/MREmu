@@ -59,7 +59,15 @@ namespace NativeApps::Applet::FileSelector {
 			text.draw(layer, focused);
 		}
 
-		GUI::SoftKeySet get_soft_keys() {
+		void ok() override {
+			if (soft_key_set.keys[GUI::SoftKeySet::Ok].has_value())
+				if (auto func = soft_key_set.keys[GUI::SoftKeySet::Ok]->func) {
+					engine->key_event(VM_KEY_EVENT_DOWN, VM_KEY_OK); // TODO
+					engine->key_event(VM_KEY_EVENT_UP, VM_KEY_OK);
+				}
+		}
+
+		GUI::SoftKeySet get_soft_keys() override {
 			return soft_key_set;
 		}
 	};
@@ -109,14 +117,14 @@ namespace NativeApps::Applet::FileSelector {
 
 			GUI::SoftKeySet sks = {
 				std::nullopt,
-				GUI::SoftKey{u"Ok", [this](GUI::BaseSh& ui_menu) { ok(); }},
+				GUI::SoftKey{u"Ok", [this](GUI::BaseSh& ui_menu) { ok(); ui_menu.reset();; }},
 				GUI::SoftKey{u"Back", [this](GUI::BaseSh& ui_menu) { ui_menu.reset(); }},
 			};
 
 			if (is_folder)
 				list->items.push_back({ std::make_shared<MenuItem>(u"Open", sks) });
 
-			sks.keys[GUI::SoftKeySet::Ok]->func = [this](GUI::BaseSh& ui_menu) { select(); };
+			sks.keys[GUI::SoftKeySet::Ok]->func = [this](GUI::BaseSh& ui_menu) { select(); ui_menu.reset(); };
 			list->items.push_back({ std::make_shared<MenuItem>(u"Select", sks) });
 
 			sks.keys[GUI::SoftKeySet::Ok]->func = [this](GUI::BaseSh& ui_menu) { cancel(); };
@@ -153,7 +161,7 @@ namespace NativeApps::Applet::FileSelector {
 			AppContext::close_executing_app(true);
 		}
 
-		GUI::SoftKeySet get_soft_keys() {
+		GUI::SoftKeySet get_soft_keys() override {
 			return {
 				GUI::SoftKey{u"Options", [this](GUI::BaseSh& ui_menu) { left(ui_menu); }},
 				GUI::SoftKey{is_folder ? u"Open" : u"Select", [this](GUI::BaseSh& ui_menu) { ok(); }},
