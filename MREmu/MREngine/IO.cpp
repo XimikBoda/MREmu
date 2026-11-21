@@ -5,6 +5,7 @@
 #include "../AppContext.h"
 #include "../Path.h"
 #include "../NativeApps/Applet/FileSelector.h"
+#include "../NativeApps/Applet/TextInput.h"
 #include <vmio.h>
 #include <iostream>
 #include <cstring>
@@ -476,6 +477,35 @@ VMUINT vm_get_disk_free_space(VMWSTR drv_name) {
 
 VMINT vm_get_disk_info(const VMCHAR* drv_name, vm_fs_disk_info* fs_disk, vm_fs_di_enum e_di) {
 	return -1;
+}
+
+VMINT vm_input_text(void (*f)(VMINT state, VMWSTR text)) {
+	return vm_input_text2((VMWSTR)u"", VM_INPUT_METHOD_TEXT, f);
+}
+
+VMINT vm_input_text2(VMWSTR def_str, VMINT def_input_method, void (*f) (VMINT state, VMWSTR text)) {
+	return vm_input_text3(def_str, 250, def_input_method, f);
+}
+
+VMINT vm_input_text3(VMWSTR default_string, VMINT input_max_size,
+	VMINT default_input_method, void (*input_text_cb)(VMINT state, VMWSTR text)) 
+{
+	std::u16string def_str;
+	if (default_string) 
+		def_str = (char16_t*)default_string;
+
+	return NativeApps::Applet::TextInput::start(def_str, input_max_size,
+		default_input_method, input_text_cb);
+}
+
+void vm_input_close_screen(void) {
+}
+
+void vm_input_move_cursor_to_start(void) {
+}
+
+VMINT vm_input_set_editor_title(VMWSTR title) {
+	return 0;
 }
 
 VMINT vm_is_support_keyborad(void) {
