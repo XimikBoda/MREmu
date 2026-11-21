@@ -253,6 +253,9 @@ namespace NativeApps::Applet::FileSelector {
 		main->ui = scroll;
 		engine->ui = main;
 
+		scroll->show_scroll_bar = true;
+		scroll->scroll_bar_color = VM_COLOR_GREEN;
+
 		g_list = local.get();
 		g_scroll = scroll.get();
 

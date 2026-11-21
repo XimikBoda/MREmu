@@ -9,6 +9,9 @@ namespace GUI::Container {
 		std::shared_ptr<Base> ui;
 		int scroll_pos = 0;
 
+		bool show_scroll_bar = false;
+		uint16_t scroll_bar_color = 0xFFFF;
+
 		void update_size() override {
 			ui->update_size();
 			w = ui->w, h = ui->h;
@@ -22,6 +25,15 @@ namespace GUI::Container {
 
 		void draw(const Layer& layer, bool focused) override {
 			ui->draw(layer, focused);
+
+			if (show_scroll_bar && h && rb.h < h) {
+				int scroll_bar_h = rb.h * rb.h / h;
+				if (scroll_bar_h > rb.h) scroll_bar_h = rb.h;
+				int scroll_bar_y = (rb.h - scroll_bar_h) * scroll_pos / (h - rb.h);
+
+				vm_graphic_fill_rect(layer.buf, rb.x + rb.w - 1, rb.y + scroll_bar_y,
+					1, scroll_bar_h, scroll_bar_color, scroll_bar_color);
+			}
 		};
 
 		void check_focused_pos() {
