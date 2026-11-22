@@ -39,6 +39,8 @@ namespace MREngine {
 
 		std::function<void(char32_t)> unicode_event;
 		std::function<void(std::u16string, int, int, int, int)> ime_event;
+
+		~AppIO();
 	};
 };
 

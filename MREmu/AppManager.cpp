@@ -39,8 +39,11 @@ void AppManager::fix_mtone_wireless(App* app) {
 }
 
 void AppManager::run_sys_event(App* app, int event, int param) { // TODO
-	if (auto handler = app->system_callbacks.sysevt)
-		app->run(handler, event, param);
+	int last_executing_app = executing_app;
+
+	process_event(Event::system{ app->phandle, Event::system_msg{event, param} });
+
+	executing_app = last_executing_app;
 }
 
 App* AppManager::push_foreground_app(int phandle, bool fist_time) {
@@ -361,11 +364,13 @@ void AppManager::loop() {
 
 		run_queue(launch_events_queue, lock, [this](Event::launch data) { process_event(data); });
 		run_queue(system_events_queue, lock, [this](Event::system data) { process_event(data); });
-		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
 		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
-		run_queue(file_selector_events_queue, lock, [this](Event::file_selector data) { process_event(data); });
+
+		run_queue(file_selector_events_queue, lock, [this](Event::file_selector data) { process_event(data); }); // must be before input
 		run_queue(text_input_events_queue, lock, [this](Event::text_input data) { process_event(data); });
 
+		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
+		
 		lock.unlock();
 
 		for (const auto& it : apps) {

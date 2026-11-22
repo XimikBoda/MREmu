@@ -73,6 +73,12 @@ fs::path MREngine::find_el::next() {
 	return lfolder / di->path().filename();
 }
 
+MREngine::AppIO::~AppIO() {
+	for (int i = 0; i < files.size(); ++i)
+		if (files.is_active(i))
+			fclose(files[i]);
+}
+
 void vm_reg_keyboard_callback(vm_key_handler_t handler) {
 	MREngine::AppIO& io = AppContext::get_executing_app_io();
 
