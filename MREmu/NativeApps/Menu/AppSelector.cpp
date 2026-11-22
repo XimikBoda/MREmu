@@ -110,8 +110,6 @@ namespace NativeApps::Menu::AppSelector {
 		vm_reg_sysevt_callback([](int m, int p) { engine->sys_event(m, p, engine); });
 		vm_reg_keyboard_callback([](int e, int k) {engine->key_event(e, k); });
 		vm_reg_pen_callback([](int e, int x, int y) {engine->pen_event(e, x, y); });
-
-		vm_input_text2((VMWSTR)u"Hel\nlo     this is just simpe example text for testing text input vm_reg_sysevt_callback_reg_sysevt_callback_reg_sysevt_callback and okay end) new line", 1, [](VMINT state, VMWSTR text) {});
 	}
 
 	void start() {

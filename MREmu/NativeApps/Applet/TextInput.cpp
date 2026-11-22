@@ -18,13 +18,8 @@
 #include <functional>
 #include <memory>
 
-
-#include "../../Log.h"
-#include "../../MREngine/CharSet.h"
-
 namespace NativeApps::Applet::TextInput {
 	std::shared_ptr<GUI::Engine> engine;
-	//std::shared_ptr<AndroidIme> ime;
 
 	std::u16string def_text;
 	int max_size = 0;
@@ -42,13 +37,16 @@ namespace NativeApps::Applet::TextInput {
 		const int text_x = 2, text_y = 2;
 		const uint16_t folder_text_color = VM_COLOR_888_TO_565(255, 165, 0);
 		const int space_width = vm_graphic_get_character_width(u' ');
+		const int star_width = vm_graphic_get_character_width(u'*');
 		const int char_heigth = vm_graphic_get_character_height();
+		std::u16string password_text;
 
 		AndroidIme ime;
 
 		std::u16string text;
 		int max_size = 0;
 		int cursor_pos = 0;
+		int input_method = 0;
 
 		struct char_info {
 			int line = 0;
@@ -64,13 +62,14 @@ namespace NativeApps::Applet::TextInput {
 
 		std::vector<text_line> lines;
 
-		TextInput(std::u16string text, int max_size) {
+		TextInput(std::u16string text, int max_size, int input_method) {
 			this->text = text;
 			this->max_size = max_size;
+			this->input_method = input_method;
 
 			cursor_pos = text.size();
 
-			ime.open(text, max_size);
+			ime.open(text, max_size, input_method);
 		}
 
 		void update_text() {
@@ -79,6 +78,29 @@ namespace NativeApps::Applet::TextInput {
 
 			text_line line;
 			text_line world;
+
+			if (input_method & VM_INPUT_METHOD_PASSWORD) {
+				for (int i = 0; i < text.size(); ++i) {
+					text_info[i] = { (int)lines.size(),  star_width, line.width };
+
+					if (line.width + text_info[i].width < rb.w) {
+						line.size += 1;
+						line.width += text_info[i].width;
+					}
+					else {
+						lines.push_back(line);
+						line = { i };
+						world = { i };
+						--i;
+					}
+				}
+
+				if (line.size)
+					lines.push_back(line);
+
+				return;
+			}
+
 
 			for (int i = 0; i < text.size(); ++i) {
 				text_info[i] = { (int)lines.size(),  vm_graphic_get_character_width(text[i]), line.width };
@@ -132,6 +154,9 @@ namespace NativeApps::Applet::TextInput {
 		void update_rb(GUI::RenderBox rb) override {
 			this->rb = rb;
 
+			if (input_method & VM_INPUT_METHOD_PASSWORD)
+				password_text.resize(rb.w / star_width + 1, u'*');
+
 			update_text();
 		}
 
@@ -151,8 +176,12 @@ namespace NativeApps::Applet::TextInput {
 			vm_graphic_fill_rect(layer.buf, rb.x, rb.y, rb.w, rb.h, 0xFFFF, 0xFFFF);
 
 			for (int i = 0; i < lines.size(); ++i)
-				vm_graphic_textout(layer.buf, rb.x, rb.y + i * char_heigth, 
-					(VMWSTR)text.c_str() + lines[i].pos, lines[i].size, 0);
+				if (input_method & VM_INPUT_METHOD_PASSWORD)
+					vm_graphic_textout(layer.buf, rb.x, rb.y + i * char_heigth, 
+						(VMWSTR)password_text.c_str(), lines[i].size, 0);
+				else
+					vm_graphic_textout(layer.buf, rb.x, rb.y + i * char_heigth,
+						(VMWSTR)text.c_str() + lines[i].pos, lines[i].size, 0);
 
 			vm_graphic_fill_rect(layer.buf, rb.x + get_chapter_x(cursor_pos), rb.y + char_heigth * get_chapter_line(cursor_pos),
 				2, char_heigth, VM_COLOR_RED, VM_COLOR_RED);
@@ -220,8 +249,13 @@ namespace NativeApps::Applet::TextInput {
 		}
 
 		void unicode_event(char16_t code) {
-			if (code == u'\b')
+			if (code == u'\b' || text.size() + 1 >= max_size)
 				return;
+
+			if (input_method & VM_INPUT_METHOD_NUMERIC)
+				if ((code < u'0' || code > u'9')
+					&& code != u'*' && code != '#')
+					return;
 
 			text.insert(text.begin() + cursor_pos, code);
 			cursor_pos++;
@@ -265,16 +299,13 @@ namespace NativeApps::Applet::TextInput {
 	void entry() {
 		engine = std::make_shared<GUI::Engine>();
 		auto main = std::make_shared<GUI::Container::MainContainer>();
-		auto input = std::make_shared<TextInput>(def_text, max_size);
+		auto input = std::make_shared<TextInput>(def_text, max_size, input_method);
 		main->ui = input;
 		engine->ui = main;
 
 		vm_reg_sysevt_callback([](int m, int p) { engine->sys_event(m, p, engine); });
 		vm_reg_keyboard_callback([](int e, int k) {engine->key_event(e, k); });
 		vm_reg_pen_callback([](int e, int x, int y) {engine->pen_event(e, x, y); });
-
-		//ime = std::make_shared<AndroidIme>();
-		//ime->open(def_text, max_size);
 
 		AppContext::get_executing_app_io().ime_event = 
 			[input](std::u16string text, int sBeg, int sEnd, int cBeg, int cEnd) {

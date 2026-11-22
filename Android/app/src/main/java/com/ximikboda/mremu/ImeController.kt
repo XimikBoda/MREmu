@@ -76,7 +76,7 @@ class ImeController(
             }
 
             hiddenEditText.inputType = if (inputTypeFlags != 0) {
-                inputTypeFlags
+                mapMreInputMethod(inputTypeFlags)
             } else {
                 InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             }
@@ -116,6 +116,26 @@ class ImeController(
             val clamped = cursorPos.coerceIn(0, newText.length)
             hiddenEditText.setSelection(clamped)
             isSyncingFromNative = false
+        }
+    }
+
+    private fun mapMreInputMethod(mreFlags: Int): Int {
+        val isPassword = (mreFlags and 2) != 0
+        val isNumeric  = (mreFlags and 4) != 0
+        val isUrl      = (mreFlags and 16) != 0
+        val isText     = (mreFlags and (1 or 8 or 32)) != 0
+
+        return when {
+            isPassword && isNumeric && !isText ->
+                InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            isPassword ->
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            isUrl ->
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            isNumeric && !isText ->
+                InputType.TYPE_CLASS_PHONE
+            else ->
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         }
     }
 }
