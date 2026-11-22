@@ -97,4 +97,8 @@ namespace AppContext {
 	void push_event(const Event::file_selector& ev) {
 		get_app_manager()->push_event(ev);
 	}
+
+	void push_event(const Event::text_input& ev) {
+		get_app_manager()->push_event(ev);
+	}
 }

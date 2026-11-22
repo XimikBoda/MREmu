@@ -3,11 +3,12 @@
 #include <vmio.h>
 
 namespace Event {
-	/*struct file_selector {
-		std::u16string path;
-		VMINT(*callback)(VMWCHAR*, VMINT);
+	struct text_input {
+		int state;
+		std::u16string text;
+		void(*callback)(VMINT, VMWSTR);
 		int phandle = -1;
-	};*/
+	};
 }
 
 namespace NativeApps::Applet::TextInput {

@@ -269,12 +269,17 @@ namespace NativeApps::Applet::TextInput {
 		}
 
 		void ok() override {
+			AppContext::push_event(Event::text_input{ VM_INPUT_OK, text, ret_callback, parent_phandle });
+			AppContext::close_executing_app(true);
 		}
 
 		void right() {
 			if (text.size())
 				clear();
-				
+			else {
+				AppContext::push_event(Event::text_input{ VM_INPUT_CANCEL, u"", ret_callback, parent_phandle});
+				AppContext::close_executing_app(true);
+			}
 		}
 
 		void clear() {
@@ -291,7 +296,7 @@ namespace NativeApps::Applet::TextInput {
 			return {
 				GUI::SoftKey{u"", [this](GUI::BaseSh& ui_menu) { left(ui_menu); }},
 				GUI::SoftKey{u"Ok", [this](GUI::BaseSh& ui_menu) { ok(); }},
-				GUI::SoftKey{u"Clear", [this](GUI::BaseSh& ui_menu) { right(); }},
+				GUI::SoftKey{text.size() ? u"Clear" : u"Close", [this](GUI::BaseSh& ui_menu) { right(); }},
 			};
 		}
 	};
@@ -333,6 +338,6 @@ namespace NativeApps::Applet::TextInput {
 		ret_callback = callback;
 		parent_phandle = vm_pmng_get_current_handle();
 		AppContext::push_event(Event::launch{ Event::native_app{entry, u8"Text input"} });
-		return VM_SELECTOR_ERR_NO_RES;
+		return 0;
 	}
 }

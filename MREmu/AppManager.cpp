@@ -140,6 +140,11 @@ void AppManager::push_event(const Event::file_selector& ev) {
 	events_cv.notify_one();
 }
 
+void AppManager::push_event(const Event::text_input& ev) {
+	text_input_events_queue.push(events_mutex, ev);
+	events_cv.notify_one();
+}
+
 std::unique_lock<std::mutex> AppManager::get_foreground_app_guard() {
 	return std::unique_lock<std::mutex>(foreground_app_mutex);
 }
@@ -288,6 +293,21 @@ void AppManager::process_event(const Event::file_selector& ev) {
 		}
 }
 
+void AppManager::process_event(const Event::text_input& ev) {
+	App* app = set_executing_app_by_phandle(ev.phandle);
+
+	if (app)
+		if (ev.callback) {
+			int wlen = ev.text.length() + 1;
+			VMWCHAR* str = (VMWCHAR*)Memory::shared_malloc(wlen * sizeof(VMWCHAR));
+			memcpy(str, ev.text.data(), wlen * sizeof(VMWCHAR));
+
+			app->run(ev.callback, ev.state, str);
+
+			Memory::shared_free(str);
+		}
+}
+
 sf::Time AppManager::get_time_for_nearest_timer()
 {
 	sf::Time nearst = sf::milliseconds(INT32_MAX);
@@ -307,7 +327,8 @@ bool AppManager::is_all_events_empty() {
 		&& input_events_queue.empty()
 		&& system_events_queue.empty()
 		&& network_events_queue.empty()
-		&& file_selector_events_queue.empty();
+		&& file_selector_events_queue.empty()
+		&& text_input_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -343,6 +364,7 @@ void AppManager::loop() {
 		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
 		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
 		run_queue(file_selector_events_queue, lock, [this](Event::file_selector data) { process_event(data); });
+		run_queue(text_input_events_queue, lock, [this](Event::text_input data) { process_event(data); });
 
 		lock.unlock();
 

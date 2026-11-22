@@ -7,6 +7,7 @@
 #include "History.h"
 #include "AppManagerEvents.h"
 #include "NativeApps/Applet/FileSelector.h"
+#include "NativeApps/Applet/TextInput.h"
 
 namespace fs = std::filesystem;
 
@@ -18,7 +19,8 @@ class AppManager {
 	Queue<Event::input> input_events_queue;
 	Queue<Event::system> system_events_queue;
 	Queue<Event::network> network_events_queue;
-	Queue<Event::file_selector> file_selector_events_queue;
+	Queue<Event::file_selector> file_selector_events_queue; //TODO: do I need this
+	Queue<Event::text_input> text_input_events_queue;
 
 	std::mutex events_mutex;
 	std::condition_variable events_cv;
@@ -28,6 +30,7 @@ class AppManager {
 	void process_event(const Event::input& ev);
 	void process_event(const Event::network& ev);
 	void process_event(const Event::file_selector& ev);
+	void process_event(const Event::text_input& ev);
 
 	void run_sys_event(App* app, int event, int param);
 
@@ -70,6 +73,7 @@ public:
 	void push_event(const Event::input& ev);
 	void push_event(const Event::network& ev);
 	void push_event(const Event::file_selector& ev);
+	void push_event(const Event::text_input& ev);
 
 	std::unique_lock<std::mutex> get_foreground_app_guard();
 

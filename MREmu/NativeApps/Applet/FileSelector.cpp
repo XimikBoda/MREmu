@@ -271,6 +271,6 @@ namespace NativeApps::Applet::FileSelector {
 		ret_callback = callback;
 		parent_phandle = vm_pmng_get_current_handle();
 		AppContext::push_event(Event::launch{ Event::native_app{entry, u8"File Selector"} });
-		return VM_SELECTOR_ERR_NO_RES;
+		return VM_SELECTOR_ERR_SUCCESS;
 	}
 }

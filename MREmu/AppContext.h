@@ -22,6 +22,7 @@ namespace Event {
 	struct input;
 	struct system;
 	struct file_selector;
+	struct text_input;
 }
 
 namespace Memory {
@@ -57,4 +58,5 @@ namespace AppContext {
 	void push_event(const Event::input& ev);
 	void push_event(const Event::system& ev);
 	void push_event(const Event::file_selector& ev);
+	void push_event(const Event::text_input& ev);
 };
