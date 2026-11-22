@@ -1,4 +1,6 @@
 #include "../AppManager.h"
+#include "../AppContext.h"
+#include "../MREngine/IO.h"
 #include "Keyboard.h"
 #include <vmio.h>
 #include <vector>
@@ -73,6 +75,9 @@ bool Keyboard::event(sf::Event& event) {
 	switch (event.type) {
 	case sf::Event::KeyPressed:
 	case sf::Event::KeyReleased: {
+		if (event.key.code == sf::Keyboard::Enter && event.key.control)
+			return true;
+
 		const auto& el = key_to_key.find(event.key.code);
 
 		if (el != key_to_key.end()) {

@@ -241,6 +241,14 @@ void AppManager::process_event(const Event::input& ev) {
 			if (auto handler = app->io.pen_handler)
 				app->run(handler, arg.event, arg.x, arg.y);
 		}
+		else if constexpr (std::is_same_v<T, Event::unicode>) {
+			if (auto handler = app->io.unicode_event)
+				handler(arg.code);
+		}
+		else if constexpr (std::is_same_v<T, Event::andoid_ime>) {
+			if (auto handler = app->io.ime_event)
+				handler(arg.text, arg.selStart, arg.selEnd, arg.compStart, arg.compEnd);
+		}
 			}, ev.data);
 }
 

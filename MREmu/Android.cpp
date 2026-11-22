@@ -4,6 +4,7 @@
 #include <jni.h>
 #include "AppContext.h"
 #include "AppManagerEvents.h"
+#include "MREngine/IO.h"
 #include <atomic>
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
@@ -47,6 +48,21 @@ void Android::wait_storage_permission(sf::RenderWindow &win) {
 
         win.display();
 	}
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ximikboda_mremu_ImeController_nativeOnImeTextChanged(
+    JNIEnv* env, jobject thiz, jstring jText,
+    jint selStart, jint selEnd, jint compStart, jint compEnd)
+{
+    const jchar* chars = env->GetStringChars(jText, nullptr);
+    jsize len = env->GetStringLength(jText);
+
+    std::u16string text(reinterpret_cast<const char16_t*>(chars), len);
+    env->ReleaseStringChars(jText, chars);
+
+    AppContext::push_event(Event::input{ 
+        Event::andoid_ime{ text, selStart, selEnd, compStart, compEnd } });
 }
 
 #endif

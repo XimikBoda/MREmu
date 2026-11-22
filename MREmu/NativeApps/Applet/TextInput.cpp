@@ -1,6 +1,8 @@
 #include "TextInput.h"
 #include "../../AppContext.h"
 #include "../../AppManagerEvents.h"
+#include "../../MREngine/IO.h"
+#include "../../jni/AndroidIme.h"
 #include "../GUI/Engine.h"
 #include "../GUI/View/Text.h"
 #include "../GUI/View/Image.h"
@@ -16,8 +18,13 @@
 #include <functional>
 #include <memory>
 
+
+#include "../../Log.h"
+#include "../../MREngine/CharSet.h"
+
 namespace NativeApps::Applet::TextInput {
 	std::shared_ptr<GUI::Engine> engine;
+	//std::shared_ptr<AndroidIme> ime;
 
 	std::u16string def_text;
 	int max_size = 0;
@@ -36,6 +43,8 @@ namespace NativeApps::Applet::TextInput {
 		const uint16_t folder_text_color = VM_COLOR_888_TO_565(255, 165, 0);
 		const int space_width = vm_graphic_get_character_width(u' ');
 		const int char_heigth = vm_graphic_get_character_height();
+
+		AndroidIme ime;
 
 		std::u16string text;
 		int max_size = 0;
@@ -58,9 +67,14 @@ namespace NativeApps::Applet::TextInput {
 		TextInput(std::u16string text, int max_size) {
 			this->text = text;
 			this->max_size = max_size;
+
+			cursor_pos = text.size();
+
+			ime.open(text, max_size);
 		}
 
 		void update_text() {
+			lines.clear();
 			text_info.resize(text.size());
 
 			text_line line;
@@ -69,7 +83,14 @@ namespace NativeApps::Applet::TextInput {
 			for (int i = 0; i < text.size(); ++i) {
 				text_info[i] = { (int)lines.size(),  vm_graphic_get_character_width(text[i]), line.width };
 
-				if (text[i] == u' ') {
+                bool new_line = false;
+
+				if (text[i] == u'\n') {
+					new_line = true;
+					text_info[i] = { (int)lines.size() + 1 };
+					++i;
+				}
+				else if (text[i] == u' ') {
 					world = { i + 1 };
 					line.size += 1;
 					line.width += text_info[i].width;
@@ -80,22 +101,23 @@ namespace NativeApps::Applet::TextInput {
 					world.size += 1;
 					world.width += text_info[i].width;
 				}
-				else {
-					if (line.pos != world.pos) {
-						line.size -= world.size;
-						line.width -= world.width;
-						lines.push_back(line);
-						line = { world.pos };
-						world = { world.pos };
-						i = world.pos - 1;
-					}
-					else {
-						lines.push_back(line);
-						line = { i };
-						world = { i };
-						--i;
-					}
+				else if (line.pos != world.pos) {
+					line.size -= world.size;
+					line.width -= world.width;
+					lines.push_back(line);
+					line = { world.pos };
+					world = { world.pos };
+					i = world.pos - 1;
 				}
+				else
+                    new_line = true;
+
+                if (new_line){
+                    lines.push_back(line);
+                    line = { i };
+                    world = { i };
+					--i;
+                }
 			}
 
 			if (line.size)
@@ -103,8 +125,9 @@ namespace NativeApps::Applet::TextInput {
 
 		}
 
-		//void update_size() override {
-		//}
+		void update_size() override {
+			h = char_heigth * lines.size();
+		}
 
 		void update_rb(GUI::RenderBox rb) override {
 			this->rb = rb;
@@ -113,14 +136,14 @@ namespace NativeApps::Applet::TextInput {
 		}
 
 		int get_chapter_x(int pos) {
-			if (cursor_pos > 0 && cursor_pos <= text.size() && text.size())
+			if (pos > 0 && pos <= text.size() && text.size())
 				return text_info[pos - 1].x + text_info[pos - 1].width;
 			return 0;
 		}
 
 		int get_chapter_line(int pos) {
-			if (cursor_pos > 0 && cursor_pos <= text.size() && text.size())
-				return text_info[cursor_pos - 1].line;
+			if (pos > 0 && pos <= text.size() && text.size())
+				return text_info[pos - 1].line;
 			return 0;
 		}
 
@@ -165,13 +188,47 @@ namespace NativeApps::Applet::TextInput {
 					cursor_pos = find_pos_by_x(mod(line - 1, lines.size()), x);
 				else if (keycode == VM_KEY_DOWN)
 					cursor_pos = find_pos_by_x(mod(line + 1, lines.size()), x);
+				else if (keycode == VM_KEY_CLEAR)
+					clear();
 
 				if (cursor_pos < 0)
 					cursor_pos = text.size();
 				else if (cursor_pos > text.size())
 					cursor_pos = 0;
 
+				ime.setSelection(cursor_pos);
 			}
+		}
+
+		void pen_event(const GUI::Touch& touch) override {
+			if (!lines.size()) return;
+
+			int line = (touch.y - rb.y) / char_heigth;
+
+			if (line < 0) line = 0;
+			if (line >= lines.size()) line = lines.size() - 1;
+
+			cursor_pos = find_pos_by_x(mod(line, lines.size()), touch.x - rb.x);
+
+			ime.setSelection(cursor_pos);
+		}
+
+		void ime_event(std::u16string text, int sBeg, int sEnd, int cBeg, int cEnd) {
+			this->text = text;
+			this->cursor_pos = sEnd;
+			this->update_text();
+		}
+
+		void unicode_event(char16_t code) {
+			if (code == u'\b')
+				return;
+
+			text.insert(text.begin() + cursor_pos, code);
+			cursor_pos++;
+
+			update_text();
+
+			ime.setText(text, cursor_pos);
 		}
 
 		void left(GUI::BaseSh& ui_menu) {
@@ -181,13 +238,26 @@ namespace NativeApps::Applet::TextInput {
 		}
 
 		void right() {
+			if (text.size())
+				clear();
+				
+		}
+
+		void clear() {
+			if (text.size() && cursor_pos) {
+				text.erase(text.begin() + --cursor_pos);
+
+				update_text();
+
+				ime.setText(text, cursor_pos);
+			}
 		}
 
 		GUI::SoftKeySet get_soft_keys() override {
 			return {
 				GUI::SoftKey{u"", [this](GUI::BaseSh& ui_menu) { left(ui_menu); }},
 				GUI::SoftKey{u"Ok", [this](GUI::BaseSh& ui_menu) { ok(); }},
-				GUI::SoftKey{u"Clean", [this](GUI::BaseSh& ui_menu) { right(); }},
+				GUI::SoftKey{u"Clear", [this](GUI::BaseSh& ui_menu) { right(); }},
 			};
 		}
 	};
@@ -202,6 +272,27 @@ namespace NativeApps::Applet::TextInput {
 		vm_reg_sysevt_callback([](int m, int p) { engine->sys_event(m, p, engine); });
 		vm_reg_keyboard_callback([](int e, int k) {engine->key_event(e, k); });
 		vm_reg_pen_callback([](int e, int x, int y) {engine->pen_event(e, x, y); });
+
+		//ime = std::make_shared<AndroidIme>();
+		//ime->open(def_text, max_size);
+
+		AppContext::get_executing_app_io().ime_event = 
+			[input](std::u16string text, int sBeg, int sEnd, int cBeg, int cEnd) {
+				input->ime_event(text, sBeg, sEnd, cBeg, cEnd);
+				engine->draw();
+			};
+
+		AppContext::get_executing_app_io().unicode_event =
+			[input](char32_t code) {
+				if (code <= 0xFFFF) {
+					if (code >= 0xD800 && code <= 0xDFFF)
+						return; 
+					
+					input->unicode_event(code);
+					engine->draw();
+				}
+				
+			};
 	}
 
 	int start(std::u16string def_str, int max_size_, int input_method_, void (*callback)(VMINT state, VMWSTR text)) {

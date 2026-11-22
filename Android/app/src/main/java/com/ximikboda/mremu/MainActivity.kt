@@ -31,16 +31,17 @@ class MainActivity : NativeActivity() {
         }
     }
 
+    private lateinit var imeController: ImeController
     private external fun notifyPermissionState(granted: Boolean)
     private external fun nativeLoadVxpFile(fd: Int, path: String)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        imeController = ImeController(this) { hideSystemUI() }
+
         checkAndRequestStoragePermission()
-
         hideSystemUI()
-
         handleIntent(intent)
     }
 
@@ -201,4 +202,13 @@ class MainActivity : NativeActivity() {
         }
         return 0
     }
+
+    fun openIme(initialText: String, maxSize: Int, inputTypeFlags: Int) =
+        imeController.open(initialText, maxSize, inputTypeFlags)
+
+    fun closeIme() = imeController.close()
+
+    fun setImeSelection(pos: Int) = imeController.setSelection(pos)
+
+    fun setImeText(newText: String, cursorPos: Int) = imeController.setText(newText, cursorPos)
 }

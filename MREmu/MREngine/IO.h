@@ -5,6 +5,7 @@
 #include <regex>
 #include <filesystem>
 #include <variant>
+#include <functional>
 
 #include <vmio.h>
 
@@ -35,6 +36,9 @@ namespace MREngine {
 
 		vm_key_handler_t key_handler = 0;
 		vm_pen_handler_t pen_handler = 0;
+
+		std::function<void(char32_t)> unicode_event;
+		std::function<void(std::u16string, int, int, int, int)> ime_event;
 	};
 };
 
@@ -49,7 +53,17 @@ namespace Event {
 		int x, y;
 	};
 
+	struct unicode {
+		char32_t code;
+	};
+
+	struct andoid_ime {
+		std::u16string text;
+		int selStart, selEnd;
+		int compStart, compEnd;
+	};
+
 	struct input {
-		std::variant<keyboard, pen> data;
+		std::variant<keyboard, pen, unicode, andoid_ime> data;
 	};
 }

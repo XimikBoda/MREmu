@@ -22,6 +22,7 @@ set(SOURCES
 						"mutex_wrapper.h" "Queue.h" "History.h"
 						"jni/Vibration.cpp" "jni/Vibration.h"
 						"jni/ScreenCorner.cpp" "jni/ScreenCorner.h"
+						"jni/AndroidIme.cpp" "jni/AndroidIme.h"
 )
 
 if (ANDROID)

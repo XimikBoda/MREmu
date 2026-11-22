@@ -1,5 +1,7 @@
 #include "Device.h"
 #include "../Graphic.h"
+#include "../AppContext.h"
+#include "../MREngine/IO.h"
 
 Device::Device(sf::RenderWindow& win_device) 
 	: win(win_device), keyboard(keyboardControl), menubar(keyboardControl)
@@ -20,6 +22,9 @@ void Device::process_events() {
 		case sf::Event::Resized:
 			win.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
 			update_size();
+			break;
+		case sf::Event::TextEntered:
+			AppContext::push_event(Event::input{ Event::unicode{ event.text.unicode } });
 			break;
 		}
 	}
