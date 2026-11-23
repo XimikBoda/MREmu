@@ -40,7 +40,8 @@ namespace NativeApps::Applet::TextInput {
 
 	static void run_callback(int status, const std::u16string &text) {
 		AppContext::push_event(Event::text_input{ status, text, ret_callback, parent_phandle });
-		AppContext::close_app_by_phandle(phandle, true);
+		AppContext::close_app_by_phandle(phandle, false, true); // todo
+		engine->sys_event(VM_MSG_QUIT, 0, engine);
 	}
 
 	class TextInput : public GUI::Base {

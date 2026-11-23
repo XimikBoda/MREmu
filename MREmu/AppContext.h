@@ -50,7 +50,7 @@ namespace AppContext {
 	bool						is_executing_app_native();
 
 	void close_executing_app(bool soft = false);
-	void close_app_by_phandle(int phandle, bool soft = false);
+	void close_app_by_phandle(int phandle, bool soft = false, bool pop = false);
 
 	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem);
 

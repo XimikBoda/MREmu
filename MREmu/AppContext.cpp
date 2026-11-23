@@ -15,6 +15,7 @@ namespace AppContext {
 		return get_app_manager()->get_executing_app();
 	}
 
+
 	std::u8string_view get_foreground_app_name() {
 		App* app = get_foreground_app();
 		if (app)
@@ -71,8 +72,8 @@ namespace AppContext {
 		get_app_manager()->close_app(get_executing_app()->phandle, soft);
 	}
 
-	void close_app_by_phandle(int phandle, bool soft) {
-		get_app_manager()->close_app(phandle, soft);
+	void close_app_by_phandle(int phandle, bool soft, bool pop) {
+		get_app_manager()->close_app(phandle, soft, pop);
 	}
 
 	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem) {

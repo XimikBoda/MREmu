@@ -20,7 +20,6 @@ class AppManager {
 	Queue<Event::system> system_events_queue;
 	Queue<Event::network> network_events_queue;
 	Queue<Event::file_selector> file_selector_events_queue; //TODO: do I need this
-	Queue<Event::text_input> text_input_events_queue;
 
 	std::mutex events_mutex;
 	std::condition_variable events_cv;
@@ -64,7 +63,7 @@ public:
 	void start();
 	void stop();
 
-	void close_app(int phandle, bool soft);
+	void close_app(int phandle, bool soft, bool pop = false);
 	void close_apps();
 	void close_all_apps();
 

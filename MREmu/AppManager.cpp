@@ -51,6 +51,9 @@ void AppManager::run_sys_event(App* app, int event, int param) { // TODO
 App* AppManager::push_foreground_app(int phandle, bool fist_time) {
 	auto lock = get_foreground_app_guard();
 
+	if (foreground_app == phandle)
+		return get_foreground_app();
+
 	if (foreground_app != -1) {
 		App* app = get_foreground_app();
 		run_sys_event(app, VM_MSG_INACTIVE, 0); // TODO baground apps
@@ -62,8 +65,9 @@ App* AppManager::push_foreground_app(int phandle, bool fist_time) {
 		foreground_app = foreground_app_history.push(phandle);
 		if (!fist_time) {
 			run_sys_event(app, VM_MSG_ACTIVE, 0);
+			run_sys_event(app, VM_MSG_PAINT, 0);
 			app->timer.set_active(true);
-			push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
+			//push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
 		}
 	}
 	return app;
@@ -72,17 +76,22 @@ App* AppManager::push_foreground_app(int phandle, bool fist_time) {
 App* AppManager::pop_foreground_app(int phandle) {
 	auto lock = get_foreground_app_guard();
 
-	foreground_app = foreground_app_history.pop(phandle);
+	int next_foreground_app = foreground_app_history.pop(phandle);
+	if(next_foreground_app == foreground_app)
+		return get_foreground_app();
+
+	foreground_app = next_foreground_app;
 	App* app = get_foreground_app();
 	if (app) {
 		run_sys_event(app, VM_MSG_ACTIVE, 0);
+		run_sys_event(app, VM_MSG_PAINT, 0);
 		app->timer.set_active(true);
-		push_event(Event::system{ foreground_app, Event::system_msg{ VM_MSG_PAINT, 0} });
+		//push_event(Event::system{ foreground_app, Event::system_msg{ VM_MSG_PAINT, 0} });
 	}
 	return app;
 }
 
-void AppManager::close_app(int phandle, bool soft) {
+void AppManager::close_app(int phandle, bool soft, bool pop) {
 	App* app = get_app_by_phandle(phandle);
 	if (app) {
 		auto& state = app->state;
@@ -90,6 +99,9 @@ void AppManager::close_app(int phandle, bool soft) {
 		App::State close_state = soft ? App::SoftClosing : App::HardClosing;
 		if (state < close_state)
 			state = close_state;
+
+		if(pop)
+			pop_foreground_app(phandle);
 	}
 }
 
@@ -154,8 +166,11 @@ void AppManager::push_event(const Event::file_selector& ev) {
 }
 
 void AppManager::push_event(const Event::text_input& ev) {
-	text_input_events_queue.push(events_mutex, ev);
-	events_cv.notify_one();
+	int last_executing_app = executing_app;
+
+	process_event(ev);
+
+	executing_app = last_executing_app;
 }
 
 std::unique_lock<std::mutex> AppManager::get_foreground_app_guard() {
@@ -315,7 +330,7 @@ void AppManager::process_event(const Event::text_input& ev) {
 			VMWCHAR* str = (VMWCHAR*)Memory::shared_malloc(wlen * sizeof(VMWCHAR));
 			memcpy(str, ev.text.data(), wlen * sizeof(VMWCHAR));
 
-			app->run(ev.callback, ev.state, str);
+			app->run<true>(ev.callback, ev.state, str);
 
 			Memory::shared_free(str);
 		}
@@ -340,8 +355,7 @@ bool AppManager::is_all_events_empty() {
 		&& input_events_queue.empty()
 		&& system_events_queue.empty()
 		&& network_events_queue.empty()
-		&& file_selector_events_queue.empty()
-		&& text_input_events_queue.empty();
+		&& file_selector_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -377,8 +391,7 @@ void AppManager::loop() {
 		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
 
 		run_queue(file_selector_events_queue, lock, [this](Event::file_selector data) { process_event(data); }); // must be before input
-		run_queue(text_input_events_queue, lock, [this](Event::text_input data) { process_event(data); });
-
+		
 		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
 		
 		lock.unlock();
