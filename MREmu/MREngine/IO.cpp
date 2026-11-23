@@ -505,13 +505,18 @@ VMINT vm_input_text3(VMWSTR default_string, VMINT input_max_size,
 }
 
 void vm_input_close_screen(void) {
+	NativeApps::Applet::TextInput::close();
 }
 
 void vm_input_move_cursor_to_start(void) {
+	NativeApps::Applet::TextInput::move_cursor_to_start();
 }
 
 VMINT vm_input_set_editor_title(VMWSTR title) {
-	return 0;
+	if (!title)
+		return 0;
+
+	return NativeApps::Applet::TextInput::set_title((char16_t*)title);
 }
 
 VMINT vm_is_support_keyborad(void) {

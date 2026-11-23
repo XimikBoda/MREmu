@@ -71,6 +71,10 @@ namespace AppContext {
 		get_app_manager()->close_app(get_executing_app()->phandle, soft);
 	}
 
+	void close_app_by_phandle(int phandle, bool soft) {
+		get_app_manager()->close_app(phandle, soft);
+	}
+
 	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem) {
 		App* app = get_app_manager()->get_app_by_mem_adr(offset_mem);
 		if (app)
@@ -78,8 +82,8 @@ namespace AppContext {
 		return 0;
 	}
 
-	void push_event(const Event::launch& ev) {
-		get_app_manager()->push_event(ev);
+	void push_event(const Event::launch& ev, bool immediately) {
+		get_app_manager()->push_event(ev, immediately);
 	}
 
 	void push_event(const Event::network& ev) {

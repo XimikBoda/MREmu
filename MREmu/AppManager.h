@@ -68,7 +68,7 @@ public:
 	void close_apps();
 	void close_all_apps();
 
-	void push_event(const Event::launch& ev);
+	void push_event(const Event::launch& ev, bool immediately = false);
 	void push_event(const Event::system& ev);
 	void push_event(const Event::input& ev);
 	void push_event(const Event::network& ev);

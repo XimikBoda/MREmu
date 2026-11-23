@@ -2,6 +2,7 @@
 #include "../../AppContext.h"
 #include "../../AppManagerEvents.h"
 #include "../../MREngine/IO.h"
+#include "../../MREngine/CharSet.h"
 #include "../../jni/AndroidIme.h"
 #include "../GUI/Engine.h"
 #include "../GUI/View/Text.h"
@@ -20,6 +21,9 @@
 
 namespace NativeApps::Applet::TextInput {
 	std::shared_ptr<GUI::Engine> engine;
+	class TextInput* input_p = 0;
+
+	std::u8string title = u8"Text input";
 
 	std::u16string def_text;
 	int max_size = 0;
@@ -27,9 +31,16 @@ namespace NativeApps::Applet::TextInput {
 	int parent_phandle = -1;
 	void(*ret_callback)(VMINT, VMWSTR);
 
-	int mod(int val, int lim) {
+	int phandle = -1;
+
+	static int mod(int val, int lim) {
 		int r = val % lim;
 		return r < 0 ? r + lim : r;
+	}
+
+	static void run_callback(int status, const std::u16string &text) {
+		AppContext::push_event(Event::text_input{ status, text, ret_callback, parent_phandle });
+		AppContext::close_app_by_phandle(phandle, true);
 	}
 
 	class TextInput : public GUI::Base {
@@ -172,6 +183,17 @@ namespace NativeApps::Applet::TextInput {
 			return 0;
 		}
 
+		void set_cursor_pos(int pos) {
+			cursor_pos = pos;
+
+			if (cursor_pos < 0)
+				cursor_pos = text.size();
+			else if (cursor_pos > text.size())
+				cursor_pos = 0;
+
+			ime.setSelection(cursor_pos);
+		}
+
 		void draw(const GUI::Layer& layer, bool focused) override {
 			vm_graphic_fill_rect(layer.buf, rb.x, rb.y, rb.w, rb.h, 0xFFFF, 0xFFFF);
 
@@ -220,12 +242,7 @@ namespace NativeApps::Applet::TextInput {
 				else if (keycode == VM_KEY_CLEAR)
 					clear();
 
-				if (cursor_pos < 0)
-					cursor_pos = text.size();
-				else if (cursor_pos > text.size())
-					cursor_pos = 0;
-
-				ime.setSelection(cursor_pos);
+				set_cursor_pos(cursor_pos);
 			}
 		}
 
@@ -239,7 +256,7 @@ namespace NativeApps::Applet::TextInput {
 
 			cursor_pos = find_pos_by_x(mod(line, lines.size()), touch.x - rb.x);
 
-			ime.setSelection(cursor_pos);
+			set_cursor_pos(cursor_pos);
 		}
 
 		void ime_event(std::u16string text, int sBeg, int sEnd, int cBeg, int cEnd) {
@@ -269,17 +286,22 @@ namespace NativeApps::Applet::TextInput {
 		}
 
 		void ok() override {
-			AppContext::push_event(Event::text_input{ VM_INPUT_OK, text, ret_callback, parent_phandle });
-			AppContext::close_executing_app(true);
+			run_callback(VM_INPUT_OK, text);
 		}
 
 		void right() {
 			if (text.size())
 				clear();
-			else {
-				AppContext::push_event(Event::text_input{ VM_INPUT_CANCEL, u"", ret_callback, parent_phandle});
-				AppContext::close_executing_app(true);
-			}
+			else 
+				cancel();
+		}
+
+		void cancel() {
+			run_callback(VM_INPUT_CANCEL, u"");
+		}
+
+		void close(bool by_parent) {
+			run_callback(by_parent ? VM_INPUT_CLOSE : VM_INPUT_NOTIFY, u"");
 		}
 
 		void clear() {
@@ -308,36 +330,60 @@ namespace NativeApps::Applet::TextInput {
 		main->ui = input;
 		engine->ui = main;
 
+		input_p = input.get();
+
+		phandle = vm_pmng_get_current_handle();
+
 		vm_reg_sysevt_callback([](int m, int p) { engine->sys_event(m, p, engine); });
 		vm_reg_keyboard_callback([](int e, int k) {engine->key_event(e, k); });
 		vm_reg_pen_callback([](int e, int x, int y) {engine->pen_event(e, x, y); });
 
 		AppContext::get_executing_app_io().ime_event = 
-			[input](std::u16string text, int sBeg, int sEnd, int cBeg, int cEnd) {
-				input->ime_event(text, sBeg, sEnd, cBeg, cEnd);
-				engine->draw();
+			[](std::u16string text, int sBeg, int sEnd, int cBeg, int cEnd) {
+				if (engine) {
+					input_p->ime_event(text, sBeg, sEnd, cBeg, cEnd);
+					engine->draw();
+				}
 			};
 
 		AppContext::get_executing_app_io().unicode_event =
-			[input](char32_t code) {
-				if (code <= 0xFFFF) {
-					if (code >= 0xD800 && code <= 0xDFFF)
-						return; 
+			[](char32_t code) {
+				if (engine)
+					if (code <= 0xFFFF) {
+						if (code >= 0xD800 && code <= 0xDFFF)
+							return; 
 					
-					input->unicode_event(code);
-					engine->draw();
-				}
-				
+						input_p->unicode_event(code);
+						engine->draw();
+					}
 			};
 	}
 
 	int start(std::u16string def_str, int max_size_, int input_method_, void (*callback)(VMINT state, VMWSTR text)) {
+		if (engine)
+			return -1;
+		
 		def_text = def_str;
 		max_size = max_size_;
 		input_method = input_method_;
 		ret_callback = callback;
 		parent_phandle = vm_pmng_get_current_handle();
-		AppContext::push_event(Event::launch{ Event::native_app{entry, u8"Text input"} });
+		AppContext::push_event(Event::launch{ Event::native_app{entry, title} }, true);
 		return 0;
+	}
+
+	void close() {
+		if (engine)
+			input_p->close(vm_pmng_get_current_handle() == parent_phandle);
+	}
+
+	void move_cursor_to_start() {
+		if (engine)
+			input_p->set_cursor_pos(0);
+	}
+
+	int set_title(std::u16string title_) {
+		title = ucs2_to_utf8(title_);
+		return 1;
 	}
 }

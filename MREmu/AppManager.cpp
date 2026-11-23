@@ -41,8 +41,10 @@ void AppManager::fix_mtone_wireless(App* app) {
 void AppManager::run_sys_event(App* app, int event, int param) { // TODO
 	int last_executing_app = executing_app;
 
-	process_event(Event::system{ app->phandle, Event::system_msg{event, param} });
-
+	executing_app = app->phandle;
+	if (auto handler = app->system_callbacks.sysevt)
+		app->run<true>(handler, event, param);
+	
 	executing_app = last_executing_app;
 }
 
@@ -118,9 +120,17 @@ void AppManager::close_all_apps() {
 	}
 }
 
-void AppManager::push_event(const Event::launch& ev) {
-	launch_events_queue.push(events_mutex, ev);
-	events_cv.notify_one();
+void AppManager::push_event(const Event::launch& ev, bool immediately) {
+	if (immediately) {
+		int last_executing_app = executing_app;
+
+		process_event(ev);
+
+		executing_app = last_executing_app;
+	} else {
+		launch_events_queue.push(events_mutex, ev);
+		events_cv.notify_one();
+	}
 }
 
 void AppManager::push_event(const Event::system& ev) {

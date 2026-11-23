@@ -50,10 +50,11 @@ namespace AppContext {
 	bool						is_executing_app_native();
 
 	void close_executing_app(bool soft = false);
+	void close_app_by_phandle(int phandle, bool soft = false);
 
 	MREngine::Tags* get_tags_by_mem_adr(size_t offset_mem);
 
-	void push_event(const Event::launch& ev);
+	void push_event(const Event::launch& ev, bool immediately = false);
 	void push_event(const Event::network& ev);
 	void push_event(const Event::input& ev);
 	void push_event(const Event::system& ev);
