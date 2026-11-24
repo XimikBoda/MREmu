@@ -307,7 +307,7 @@ void Keyboard::update_resize(int win_w, int win_h, int menu_h) {
 
 	sf::IntRect left, right;
 	if (win_h - screen_h > win_w - screen_w) { //bottom
-		auto size = size_by_aspect_ratio(win_w, win_h - screen_h, 6.f / 4.f);
+		auto size = size_by_aspect_ratio(win_w, win_h - screen_h - menu_h, 6.f / 4.f);
 		int x = (win_w - size.x) / 2, y = screen_y + screen_h;
 		left = { x, y, size.x / 2 + 1, size.y };
 		right = { x + size.x / 2, y, size.x / 2, size.y };
