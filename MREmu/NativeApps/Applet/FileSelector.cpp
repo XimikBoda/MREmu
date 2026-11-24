@@ -24,8 +24,16 @@ namespace NativeApps::Applet::FileSelector {
 	int parent_phandle = -1;
 	VMINT(*ret_callback)(VMWCHAR*, VMINT);
 
+	int phandle = -1;
+
 	void enter_directory(std::u16string path);
 	std::u16string prev_dir(std::u16string path);
+
+	static void run_callback(const std::u16string& path) {
+		AppContext::push_event(Event::file_selector{ path, ret_callback, parent_phandle });
+		AppContext::close_app_by_phandle(phandle, false, true); // todo
+		engine->sys_event(VM_MSG_QUIT, 0, engine);
+	}
 
 	class MenuItem : public GUI::Base {
 	public:
@@ -152,13 +160,11 @@ namespace NativeApps::Applet::FileSelector {
 		}
 
 		void select() {
-			AppContext::push_event(Event::file_selector{ path, ret_callback, parent_phandle });
-			AppContext::close_executing_app(true);
+			run_callback(path);
 		}
 
 		void cancel() {
-			AppContext::push_event(Event::file_selector{ u"", ret_callback, parent_phandle });
-			AppContext::close_executing_app(true);
+			run_callback(u"");
 		}
 
 		GUI::SoftKeySet get_soft_keys() override {
@@ -259,6 +265,8 @@ namespace NativeApps::Applet::FileSelector {
 		g_list = local.get();
 		g_scroll = scroll.get();
 
+		phandle = vm_pmng_get_current_handle();
+
 		enter_directory(cur_path);
 
 		vm_reg_sysevt_callback([](int m, int p) { engine->sys_event(m, p, engine); });
@@ -267,6 +275,9 @@ namespace NativeApps::Applet::FileSelector {
 	}
 
 	vm_selector_error_t start(vm_selector_type_t type, std::u16string path, VMINT(*callback)(VMWCHAR*, VMINT)) {
+		if(engine)
+			return VM_SELECTOR_ERR_NO_RES;
+		
 		cur_path = path;
 		ret_callback = callback;
 		parent_phandle = vm_pmng_get_current_handle();

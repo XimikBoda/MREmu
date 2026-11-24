@@ -880,7 +880,7 @@ void vm_graphic_reset_clip(void) {
 }
 
 void vm_graphic_flush_screen(void) {
-	AppContext::push_event(Event::system{ vm_pmng_get_current_handle(), Event::system_msg{ VM_MSG_PAINT, 0} });
+	AppContext::flush_screen();
 }
 
 VMINT vm_graphic_get_blt_layer_count(void) {

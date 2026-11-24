@@ -39,6 +39,9 @@ void AppManager::fix_mtone_wireless(App* app) {
 }
 
 void AppManager::run_sys_event(App* app, int event, int param) { // TODO
+	if (!app)
+		return;
+
 	int last_executing_app = executing_app;
 
 	executing_app = app->phandle;
@@ -67,7 +70,6 @@ App* AppManager::push_foreground_app(int phandle, bool fist_time) {
 			run_sys_event(app, VM_MSG_ACTIVE, 0);
 			run_sys_event(app, VM_MSG_PAINT, 0);
 			app->timer.set_active(true);
-			//push_event(Event::system{ phandle, Event::system_msg{ VM_MSG_PAINT, 0} });
 		}
 	}
 	return app;
@@ -86,7 +88,6 @@ App* AppManager::pop_foreground_app(int phandle) {
 		run_sys_event(app, VM_MSG_ACTIVE, 0);
 		run_sys_event(app, VM_MSG_PAINT, 0);
 		app->timer.set_active(true);
-		//push_event(Event::system{ foreground_app, Event::system_msg{ VM_MSG_PAINT, 0} });
 	}
 	return app;
 }
@@ -161,15 +162,14 @@ void AppManager::push_event(const Event::network& ev) {
 }
 
 void AppManager::push_event(const Event::file_selector& ev) {
-	file_selector_events_queue.push(events_mutex, ev);
-	events_cv.notify_one();
+	int last_executing_app = executing_app;
+	process_event(ev);
+	executing_app = last_executing_app;
 }
 
 void AppManager::push_event(const Event::text_input& ev) {
 	int last_executing_app = executing_app;
-
 	process_event(ev);
-
 	executing_app = last_executing_app;
 }
 
@@ -336,6 +336,10 @@ void AppManager::process_event(const Event::text_input& ev) {
 		}
 }
 
+void AppManager::flush_screen() {
+	run_sys_event(get_foreground_app(), VM_MSG_PAINT, 0);
+}
+
 sf::Time AppManager::get_time_for_nearest_timer()
 {
 	sf::Time nearst = sf::milliseconds(INT32_MAX);
@@ -354,8 +358,7 @@ bool AppManager::is_all_events_empty() {
 	return launch_events_queue.empty()
 		&& input_events_queue.empty()
 		&& system_events_queue.empty()
-		&& network_events_queue.empty()
-		&& file_selector_events_queue.empty();
+		&& network_events_queue.empty();
 }
 
 template<typename T, typename F>
@@ -389,9 +392,6 @@ void AppManager::loop() {
 		run_queue(launch_events_queue, lock, [this](Event::launch data) { process_event(data); });
 		run_queue(system_events_queue, lock, [this](Event::system data) { process_event(data); });
 		run_queue(network_events_queue, lock, [this](Event::network data) { process_event(data); });
-
-		run_queue(file_selector_events_queue, lock, [this](Event::file_selector data) { process_event(data); }); // must be before input
-		
 		run_queue(input_events_queue, lock, [this](Event::input data) { process_event(data); });
 		
 		lock.unlock();

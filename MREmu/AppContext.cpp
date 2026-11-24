@@ -106,4 +106,8 @@ namespace AppContext {
 	void push_event(const Event::text_input& ev) {
 		get_app_manager()->push_event(ev);
 	}
+
+	void flush_screen() {
+		get_app_manager()->flush_screen();
+	}
 }
