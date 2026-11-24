@@ -236,8 +236,8 @@ void AppManager::process_event(const Event::launch& ev) {
 	push_foreground_app(app_phandle, true);
 	app->start();
 
-	run_sys_event(app.get(), VM_MSG_CREATE, 0); // now
-	push_event(Event::system{ app_phandle, Event::system_msg{ VM_MSG_PAINT, 0} }); // later
+	run_sys_event(app.get(), VM_MSG_CREATE, 0);
+	run_sys_event(app.get(), VM_MSG_PAINT, 0);
 
 }
 

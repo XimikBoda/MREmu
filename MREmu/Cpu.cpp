@@ -17,10 +17,11 @@ Disassembler dism; //TODO
 
 uc_engine* uc = 0;
 
-
 namespace Cpu {
 	void* stack_p = 0;
 	size_t stack_size = 128 * 1024;
+
+	constexpr int PREALLOC_CPUS = 4;
 
 	std::vector<uc_engine*> ucs;
 	int cur_cpu_id = -1;
@@ -245,12 +246,19 @@ namespace Cpu {
 		//add_hook(UC_HOOK_MEM_WRITE | UC_HOOK_MEM_READ, (void*)hook_unaligned_access, 0, 1, 0);
 
 		push_cpu();
+
+		for (int i = 0; i < PREALLOC_CPUS; ++i) // Warm CPUs, without this it will crash on Android
+			push_cpu();
+		for (int i = 1; i < PREALLOC_CPUS; ++i)
+			pop_cpu();
 	}
 
 	void push_cpu() {
 		cur_cpu_id++;
 
 		if (cur_cpu_id >= ucs.size()) {
+			spdlog::warn("Creating uc_engine from hook at depth {}", cur_cpu_id);
+
 			uc_engine* uc_l = 0;
 
 			uc_err uc_er = uc_open(UC_ARCH_ARM, UC_MODE_THUMB, &uc_l);
@@ -282,12 +290,14 @@ namespace Cpu {
 		else {
 			uc_engine* uc_prew = ucs[cur_cpu_id - 1];
 
-			uc_context* context;
-			uc_context_alloc(uc_prew, &context);
-			uc_context_save(uc_prew, context);
+			uc_err uc_er;
 
-			uc_context_restore(uc, context);
-			uc_context_free(context);
+			uc_context* context;
+			uc_er = uc_context_alloc(uc_prew, &context);
+			uc_er = uc_context_save(uc_prew, context);
+
+			uc_er = uc_context_restore(uc, context);
+			uc_er = uc_context_free(context);
 		}
 	}
 
