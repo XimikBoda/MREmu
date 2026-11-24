@@ -12,6 +12,7 @@ public:
     void close() {}
     void setSelection(int) {}
     void setText(const std::u16string&, int) {}
+    void setVisible(bool) {}
 };
 #else
 #include <android/native_activity.h>
@@ -27,6 +28,7 @@ public:
     void close();
     void setSelection(int pos);
     void setText(const std::u16string& newText, int cursorPos);
+    void setVisible(bool visible);
 
 private:
     JavaVM* vm_;
@@ -35,5 +37,6 @@ private:
     jmethodID closeMethod_;
     jmethodID setSelectionMethod_;
     jmethodID setTextMethod_;
+    jmethodID setVisibleMethod_;
 };
 #endif

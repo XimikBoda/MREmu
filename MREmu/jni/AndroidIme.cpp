@@ -47,6 +47,7 @@ AndroidIme::AndroidIme()
     closeMethod_ = jni.env->GetMethodID(activityClass_, "closeIme", "()V");
     setSelectionMethod_ = jni.env->GetMethodID(activityClass_, "setImeSelection", "(I)V");
     setTextMethod_ = jni.env->GetMethodID(activityClass_, "setImeText", "(Ljava/lang/String;I)V");
+    setVisibleMethod_ = jni.env->GetMethodID(activityClass_, "setImeVisible", "(Z)V");
 }
 
 AndroidIme::~AndroidIme() {
@@ -94,5 +95,13 @@ void AndroidIme::setText(const std::u16string& newText, int cursorPos) {
         static_cast<jsize>(newText.size()));
     jni.env->CallVoidMethod(sf::getNativeActivity()->clazz, setTextMethod_, jStr, (jint)cursorPos);
     jni.env->DeleteLocalRef(jStr);
+}
+
+void AndroidIme::setVisible(bool visible) {
+    if (!vm_ || !setVisibleMethod_) return;
+    JniScope jni(vm_);
+    if (!jni.env) return;
+
+    jni.env->CallVoidMethod(sf::getNativeActivity()->clazz, setVisibleMethod_, static_cast<jboolean>(visible));
 }
 #endif

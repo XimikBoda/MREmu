@@ -211,4 +211,6 @@ class MainActivity : NativeActivity() {
     fun setImeSelection(pos: Int) = imeController.setSelection(pos)
 
     fun setImeText(newText: String, cursorPos: Int) = imeController.setText(newText, cursorPos)
+
+    fun setImeVisible(visible: Boolean) = imeController.setVisible(visible)
 }

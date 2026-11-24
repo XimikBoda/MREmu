@@ -119,6 +119,21 @@ class ImeController(
         }
     }
 
+    fun setVisible(visible: Boolean) {
+        activity.runOnUiThread {
+            val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            if (visible) {
+                if (!hiddenEditText.hasFocus()) {
+                    hiddenEditText.requestFocus()
+                }
+                imm.showSoftInput(hiddenEditText, InputMethodManager.SHOW_IMPLICIT)
+            } else {
+                imm.hideSoftInputFromWindow(hiddenEditText.windowToken, 0)
+                onImeClosed()
+            }
+        }
+    }
+
     private fun mapMreInputMethod(mreFlags: Int): Int {
         val isPassword = (mreFlags and 2) != 0
         val isNumeric  = (mreFlags and 4) != 0

@@ -258,6 +258,8 @@ namespace NativeApps::Applet::TextInput {
 			cursor_pos = find_pos_by_x(mod(line, lines.size()), touch.x - rb.x);
 
 			set_cursor_pos(cursor_pos);
+
+			ime.setVisible(true);
 		}
 
 		void ime_event(std::u16string text, int sBeg, int sEnd, int cBeg, int cEnd) {
