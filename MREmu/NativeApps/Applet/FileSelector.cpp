@@ -30,9 +30,10 @@ namespace NativeApps::Applet::FileSelector {
 	std::u16string prev_dir(std::u16string path);
 
 	static void run_callback(const std::u16string& path) {
+		AppContext::close_app_by_phandle(phandle, true, true); // todo
 		AppContext::push_event(Event::file_selector{ path, ret_callback, parent_phandle });
-		AppContext::close_app_by_phandle(phandle, false, true); // todo
-		engine->sys_event(VM_MSG_QUIT, 0, engine);
+		engine->redraw = false;
+		//engine->sys_event(VM_MSG_QUIT, 0, engine);
 	}
 
 	class MenuItem : public GUI::Base {

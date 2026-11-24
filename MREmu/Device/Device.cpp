@@ -23,9 +23,11 @@ void Device::process_events() {
 			win.setView(sf::View(sf::FloatRect(0.f, 0.f, (float)event.size.width, (float)event.size.height)));
 			update_size();
 			break;
+#ifndef ANDROID
 		case sf::Event::TextEntered:
 			AppContext::push_event(Event::input{ Event::unicode{ event.text.unicode } });
 			break;
+#endif
 		}
 	}
 }

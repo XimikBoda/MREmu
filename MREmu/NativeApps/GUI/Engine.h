@@ -13,6 +13,7 @@ namespace GUI {
 		Touch touch;
 		int key_press_count = 0;
 		bool pen_pressed = false;
+		bool redraw = true;
 
 		void update() {
 			if (ui) {
@@ -54,7 +55,8 @@ namespace GUI {
 
 			if (ui && key_press_count) {
 				ui->key_event(event, keycode);
-				draw();
+				if (redraw)
+					draw();
 			}
 
 			if (event == VM_KEY_EVENT_UP)
@@ -68,7 +70,8 @@ namespace GUI {
 
 			if (ui && pen_pressed) {
 				ui->pen_event(touch.pen_event(event, x, y));
-				draw();
+				if (redraw)
+					draw();
 			}
 
 			if (event == VM_PEN_EVENT_RELEASE || event == VM_PEN_EVENT_ABORT)
