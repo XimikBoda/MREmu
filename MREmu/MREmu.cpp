@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
 	MREngine::AppAudio::init();
 
 #ifdef ANDROID
-	sf::RenderWindow win_device(sf::VideoMode(graphic.width, graphic.height + 208), "MREmu");
+	sf::RenderWindow win_device(sf::VideoMode::getDesktopMode(), "MREmu");
 	win_device.setFramerateLimit(60);
 
 	Android::wait_storage_permission(win_device);

@@ -100,7 +100,7 @@ void Graphic::screenshot() {
 	vm_time_t time;
 	vm_get_time(&time);
 
-	auto name = AppContext::get_executing_app_path();
+	std::u8string name(AppContext::get_foreground_app_name());
 
 	int ms = vm_get_tick_count();
 
